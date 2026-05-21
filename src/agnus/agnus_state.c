@@ -14,7 +14,7 @@ static void riegel_agnus_raise_blitter_irq(void *opaque, uint16_t mask)
         return;
     }
 
-    riegel_chipset_raise_intreq(&ctx->chipset, mask);
+    riegel_chipset_raise_irq_source(&ctx->chipset, mask);
 }
 
 void riegel_agnus_reset(RiegelAgnus *agnus)

@@ -2,6 +2,7 @@
 #define RIEGEL_CHIPSET_H
 
 #include "agnus/agnus_state.h"
+#include "paula/paula_state.h"
 #include "riegel/riegel_snapshot.h"
 #include "riegel/riegel_types.h"
 
@@ -13,8 +14,7 @@ enum {
 struct RiegelChipset {
     riegel_u64 cycles;
     RiegelAgnus agnus;
-    riegel_u16 intreq;
-    riegel_u16 intena;
+    RiegelPaula paula;
     riegel_u16 custom_regs[RIEGEL_CUSTOM_REG_COUNT];
 };
 
@@ -24,6 +24,7 @@ void riegel_chipset_take_snapshot(const RiegelChipset *chipset, riegel_snapshot_
 
 riegel_u16 riegel_chipset_read_reg(const RiegelChipset *chipset, riegel_u32 addr);
 void riegel_chipset_write_reg(RiegelChipset *chipset, riegel_u32 addr, riegel_u16 value);
-void riegel_chipset_raise_intreq(RiegelChipset *chipset, riegel_u16 value);
+void riegel_chipset_raise_irq_source(RiegelChipset *chipset, riegel_u16 mask);
+void riegel_chipset_clear_irq_source(RiegelChipset *chipset, riegel_u16 mask);
 
 #endif

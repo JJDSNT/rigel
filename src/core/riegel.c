@@ -5,6 +5,7 @@
 
 #include "chipset/chipset.h"
 #include "core/riegel_context.h"
+#include "paula/paula_interrupts.h"
 
 RiegelContext *riegel_create(const riegel_config_t *config)
 {
@@ -97,9 +98,9 @@ bool riegel_load_state(RiegelContext *ctx, const void *buffer, size_t buffer_siz
 
     (void)memcpy(&snapshot, buffer, sizeof(snapshot));
     ctx->chipset.cycles = snapshot.cycles;
-    ctx->chipset.intreq = snapshot.intreq;
-    ctx->chipset.intena = snapshot.intena;
-    riegel_context_write_reg(ctx, 0x009a, ctx->chipset.intena);
-    riegel_context_write_reg(ctx, 0x009c, ctx->chipset.intreq);
+    riegel_paula_interrupts_write_intena(&ctx->chipset.paula.interrupts, RIEGEL_PAULA_INT_SETCLR | snapshot.intena);
+    riegel_paula_interrupts_write_intreq(&ctx->chipset.paula.interrupts, RIEGEL_PAULA_INT_SETCLR | snapshot.intreq);
+    riegel_context_write_reg(ctx, 0x009a, riegel_paula_interrupts_read_intena(&ctx->chipset.paula.interrupts));
+    riegel_context_write_reg(ctx, 0x009c, riegel_paula_interrupts_read_intreq(&ctx->chipset.paula.interrupts));
     return true;
 }

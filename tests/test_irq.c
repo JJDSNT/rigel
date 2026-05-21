@@ -14,10 +14,10 @@ int main(void)
         return 1;
     }
 
-    riegel_custom_write16(ctx, RIEGEL_REG_INTENA, 0x8001);
+    riegel_custom_write16(ctx, RIEGEL_REG_INTENA, 0xc001);
     riegel_custom_write16(ctx, RIEGEL_REG_INTREQ, 0x8001);
 
-    if (riegel_get_intena(ctx) != 0x0001 || riegel_get_intreq(ctx) != 0x0001) {
+    if (riegel_get_intena(ctx) != 0x4001 || riegel_get_intreq(ctx) != 0x0001) {
         riegel_destroy(ctx);
         return 1;
     }

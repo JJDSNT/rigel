@@ -41,6 +41,8 @@ add_library(riegel
     src/denise/sprites.c
     src/denise/color.c
     src/paula/paula.c
+    src/paula/paula_state.c
+    src/paula/paula_interrupts.c
     src/paula/paula_regs.c
     src/paula/audio.c
     src/paula/disk.c
