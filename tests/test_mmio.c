@@ -16,6 +16,18 @@ int main(void)
         return 1;
     }
 
+    riegel_custom_write16(ctx, RIEGEL_REG_DMACON, 0x8200);
+    if (riegel_custom_read16(ctx, RIEGEL_REG_DMACON) != 0x0200) {
+        riegel_destroy(ctx);
+        return 1;
+    }
+
+    riegel_custom_write16(ctx, RIEGEL_REG_DMACON, 0x0200);
+    if (riegel_custom_read16(ctx, RIEGEL_REG_DMACON) != 0x0000) {
+        riegel_destroy(ctx);
+        return 1;
+    }
+
     riegel_destroy(ctx);
     return 0;
 }

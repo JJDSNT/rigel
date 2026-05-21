@@ -12,6 +12,7 @@ enum {
 struct RiegelContext {
     riegel_config_t config;
     riegel_u64 cycles;
+    riegel_u16 dmacon;
     riegel_u16 intreq;
     riegel_u16 intena;
     riegel_u16 custom_regs[RIEGEL_CUSTOM_REG_COUNT];

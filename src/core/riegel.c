@@ -36,6 +36,7 @@ void riegel_reset(RiegelContext *ctx)
     }
 
     ctx->cycles = 0;
+    ctx->dmacon = 0;
     ctx->intreq = 0;
     ctx->intena = 0;
     (void)memset(ctx->custom_regs, 0, sizeof(ctx->custom_regs));
