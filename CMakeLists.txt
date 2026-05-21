@@ -64,6 +64,7 @@ if(RIEGEL_BUILD_TESTS)
     set(RIEGEL_TESTS
         test_mmio
         test_irq
+        test_custom_map
         test_beam
         test_cia
         test_blitter

@@ -1,1 +1,19 @@
 build/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+Testing/
+compile_commands.json
+
+# Build outputs
+*.a
+*.o
+*.so
+*.so.*
+*.dll
+*.dylib
+*.exe
