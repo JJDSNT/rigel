@@ -2,6 +2,18 @@
 
 int main(void)
 {
+    if (!riegel_custom_is_valid_reg(RIEGEL_REG_DMACON)) {
+        return 1;
+    }
+
+    if (riegel_custom_is_valid_reg(0x001)) {
+        return 1;
+    }
+
+    if (riegel_custom_is_valid_reg(0x200)) {
+        return 1;
+    }
+
     if (riegel_custom_domain_for_reg(RIEGEL_REG_DMACON) != RIEGEL_DOMAIN_AGNUS) {
         return 1;
     }

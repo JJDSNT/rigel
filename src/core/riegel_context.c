@@ -1,10 +1,12 @@
 #include "core/riegel_context.h"
 
+#include "riegel/riegel_custom.h"
+
 riegel_u16 riegel_context_read_reg(const RiegelContext *ctx, riegel_u32 addr)
 {
     riegel_u32 index;
 
-    if (ctx == NULL || (addr & 1u) != 0 || addr >= RIEGEL_CUSTOM_SPACE_SIZE) {
+    if (ctx == NULL || !riegel_custom_is_valid_reg(addr)) {
         return 0;
     }
 
@@ -16,7 +18,7 @@ void riegel_context_write_reg(RiegelContext *ctx, riegel_u32 addr, riegel_u16 va
 {
     riegel_u32 index;
 
-    if (ctx == NULL || (addr & 1u) != 0 || addr >= RIEGEL_CUSTOM_SPACE_SIZE) {
+    if (ctx == NULL || !riegel_custom_is_valid_reg(addr)) {
         return;
     }
 

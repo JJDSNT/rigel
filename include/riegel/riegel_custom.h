@@ -22,6 +22,7 @@ typedef enum riegel_custom_domain {
     RIEGEL_DOMAIN_PAULA
 } riegel_custom_domain_t;
 
+bool riegel_custom_is_valid_reg(riegel_u32 addr);
 riegel_custom_domain_t riegel_custom_domain_for_reg(riegel_u32 addr);
 
 #endif

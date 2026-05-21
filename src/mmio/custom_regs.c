@@ -4,8 +4,17 @@
 #include "irq/intena.h"
 #include "irq/intreq.h"
 
+bool riegel_custom_is_valid_reg(riegel_u32 addr)
+{
+    return (addr & 1u) == 0 && addr <= RIEGEL_CUSTOM_END;
+}
+
 riegel_custom_domain_t riegel_custom_domain_for_reg(riegel_u32 addr)
 {
+    if (!riegel_custom_is_valid_reg(addr)) {
+        return RIEGEL_DOMAIN_UNKNOWN;
+    }
+
     switch (addr) {
     case RIEGEL_REG_DMACON:
         return RIEGEL_DOMAIN_AGNUS;
@@ -21,7 +30,7 @@ riegel_custom_domain_t riegel_custom_domain_for_reg(riegel_u32 addr)
 
 riegel_u16 custom_regs_read16(RiegelContext *ctx, riegel_u32 addr)
 {
-    if (ctx == NULL) {
+    if (ctx == NULL || !riegel_custom_is_valid_reg(addr)) {
         return 0;
     }
 
@@ -37,7 +46,7 @@ riegel_u16 custom_regs_read16(RiegelContext *ctx, riegel_u32 addr)
 
 void custom_regs_write16(RiegelContext *ctx, riegel_u32 addr, riegel_u16 value)
 {
-    if (ctx == NULL) {
+    if (ctx == NULL || !riegel_custom_is_valid_reg(addr)) {
         return;
     }
 
