@@ -63,6 +63,7 @@ int main(void)
     chip_ram.opaque = &ram;
     chip_ram.write16 = test_chip_ram_write16;
     riegel_paula_set_disk_memory_if(&paula, chip_ram);
+    riegel_paula_set_disk_inserted(&paula, 1);
 
     disk_write_dsklen(&paula.disk, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
     disk_write_dsklen(&paula.disk, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
@@ -83,6 +84,21 @@ int main(void)
         return 1;
     }
 
+    riegel_paula_reset(&paula);
+    riegel_paula_set_disk_irq_sink(&paula, sink);
+    disk_write_dsklen(&paula.disk, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
+    disk_write_dsklen(&paula.disk, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
+
+    if (disk_dma_wants_service(&paula.disk)) {
+        return 1;
+    }
+
+    irq_mask = 0;
+    disk_step(&paula.disk, RIEGEL_PAULA_DISK_FAKE_DMA_CYCLES);
+    if ((irq_mask & 0x0002u) == 0) {
+        return 1;
+    }
+
     cfg.chip_ram = chip_ram;
     ctx = riegel_create(&cfg);
     if (ctx == NULL) {
@@ -91,8 +107,14 @@ int main(void)
 
     riegel_custom_write16(ctx, RIEGEL_REG_DSKPTH, 0x0000);
     riegel_custom_write16(ctx, RIEGEL_REG_DSKPTL, 0x0000);
+    riegel_custom_write16(ctx, RIEGEL_REG_ADKCON, RIEGEL_PAULA_ADKCON_SETCLR | RIEGEL_PAULA_ADKCON_WORDSYNC);
     riegel_custom_write16(ctx, RIEGEL_REG_DSKLEN, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
     riegel_custom_write16(ctx, RIEGEL_REG_DSKLEN, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
+
+    if ((riegel_custom_read16(ctx, RIEGEL_REG_ADKCONR) & RIEGEL_PAULA_ADKCON_WORDSYNC) == 0) {
+        riegel_destroy(ctx);
+        return 1;
+    }
 
     if ((riegel_custom_read16(ctx, RIEGEL_REG_DSKBYTR) & RIEGEL_PAULA_DSKBYTR_DMAON) == 0) {
         riegel_destroy(ctx);
@@ -100,6 +122,11 @@ int main(void)
     }
 
     riegel_step(ctx, 1);
+
+    if (riegel_custom_read16(ctx, RIEGEL_REG_DSKDATR) != 0) {
+        riegel_destroy(ctx);
+        return 1;
+    }
 
     if ((riegel_get_intreq(ctx) & 0x0002u) == 0) {
         riegel_destroy(ctx);

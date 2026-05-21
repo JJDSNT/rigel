@@ -33,11 +33,19 @@ static void disk_maybe_emit_sync(disk_state_t *disk)
 
 void disk_reset(disk_state_t *disk)
 {
+    unsigned inserted;
+    riegel_chip_ram_if_t chip_ram;
+    paula_disk_irq_sink_t irq;
+
     if (disk == NULL) {
         return;
     }
 
-    disk->inserted = 0;
+    inserted = disk->inserted;
+    chip_ram = disk->chip_ram;
+    irq = disk->irq;
+
+    disk->inserted = inserted;
     disk->dskptr = 0;
     disk->dsklen = 0;
     disk->dskbytr = 0;
@@ -56,6 +64,8 @@ void disk_reset(disk_state_t *disk)
     disk->dma_bytes_total = 0;
     disk->dma_bytes_done = 0;
     disk->dma_fill_word = 0;
+    disk->chip_ram = chip_ram;
+    disk->irq = irq;
 }
 
 void disk_set_irq_sink(disk_state_t *disk, paula_disk_irq_sink_t sink)
@@ -74,6 +84,15 @@ void disk_set_memory_if(disk_state_t *disk, riegel_chip_ram_if_t chip_ram)
     }
 
     disk->chip_ram = chip_ram;
+}
+
+void disk_set_inserted(disk_state_t *disk, int inserted)
+{
+    if (disk == NULL) {
+        return;
+    }
+
+    disk->inserted = inserted != 0;
 }
 
 void disk_write_dskpth(disk_state_t *disk, riegel_u16 value)
@@ -124,7 +143,7 @@ void disk_write_adkcon(disk_state_t *disk, riegel_u16 value)
     disk_maybe_emit_sync(disk);
 }
 
-static void disk_start_dma_no_media(disk_state_t *disk, riegel_u16 value)
+static void disk_start_dma(disk_state_t *disk, riegel_u16 value)
 {
     riegel_u32 len_words;
 
@@ -137,14 +156,25 @@ static void disk_start_dma_no_media(disk_state_t *disk, riegel_u16 value)
     disk->sync_seen = 0;
     disk->sync_irq_fired = 0;
     disk->dskbytr_data = 0;
-    disk->countdown = RIEGEL_PAULA_DISK_FAKE_DMA_CYCLES;
+    disk->countdown = 0;
     disk->dskbytr = (riegel_u16)(disk->dskbytr | RIEGEL_PAULA_DSKBYTR_DMAON);
     disk->dskbytr = (riegel_u16)(disk->dskbytr & (riegel_u16)(~RIEGEL_PAULA_DSKBYTR_WORDSYNC));
     disk->dskdatr = 0;
     disk->dma_ptr_base = disk->dskptr;
-    disk->dma_bytes_total = len_words << 1;
+    disk->dma_bytes_total = 0;
     disk->dma_bytes_done = 0;
     disk->dma_fill_word = 0;
+
+    if (disk->write_mode || len_words == 0) {
+        return;
+    }
+
+    if (!disk->inserted) {
+        disk->countdown = RIEGEL_PAULA_DISK_FAKE_DMA_CYCLES;
+        return;
+    }
+
+    disk->dma_bytes_total = len_words << 1;
 }
 
 void disk_write_dsklen(disk_state_t *disk, riegel_u16 value)
@@ -173,7 +203,7 @@ void disk_write_dsklen(disk_state_t *disk, riegel_u16 value)
         return;
     }
 
-    disk_start_dma_no_media(disk, value);
+    disk_start_dma(disk, value);
 }
 
 riegel_u16 disk_read_dskbytr(disk_state_t *disk)
@@ -213,7 +243,7 @@ void disk_step(disk_state_t *disk, riegel_u32 cycles)
         return;
     }
 
-    if (!disk->dma_active || disk->countdown == 0) {
+    if (!disk->dma_active || disk->dma_bytes_total > 0 || disk->countdown == 0) {
         return;
     }
 
@@ -230,7 +260,6 @@ void disk_step(disk_state_t *disk, riegel_u32 cycles)
     disk->sync_irq_fired = 0;
     disk->dskbytr = (riegel_u16)(disk->dskbytr & (riegel_u16)(~RIEGEL_PAULA_DSKBYTR_DMAON));
     disk->dsklen = (riegel_u16)(disk->dsklen & (riegel_u16)(~RIEGEL_PAULA_DSKLEN_DMAEN));
-    disk_load_dskbytr(disk, 0);
     disk_emit_irq(disk, 0x0002u);
 }
 

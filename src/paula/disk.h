@@ -49,6 +49,7 @@ typedef struct disk_state {
 void disk_reset(disk_state_t *disk);
 void disk_set_irq_sink(disk_state_t *disk, paula_disk_irq_sink_t sink);
 void disk_set_memory_if(disk_state_t *disk, riegel_chip_ram_if_t chip_ram);
+void disk_set_inserted(disk_state_t *disk, int inserted);
 void disk_write_dskpth(disk_state_t *disk, riegel_u16 value);
 void disk_write_dskptl(disk_state_t *disk, riegel_u16 value);
 void disk_write_dsklen(disk_state_t *disk, riegel_u16 value);

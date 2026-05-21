@@ -19,6 +19,7 @@ void riegel_paula_raise_irq(RiegelPaula *paula, riegel_u16 mask);
 void riegel_paula_clear_irq(RiegelPaula *paula, riegel_u16 mask);
 void riegel_paula_set_disk_irq_sink(RiegelPaula *paula, paula_disk_irq_sink_t sink);
 void riegel_paula_set_disk_memory_if(RiegelPaula *paula, riegel_chip_ram_if_t chip_ram);
+void riegel_paula_set_disk_inserted(RiegelPaula *paula, int inserted);
 paula_disk_irq_sink_t riegel_paula_disk_irq_sink(RiegelContext *ctx);
 
 #endif

@@ -2,6 +2,7 @@
 
 1. Continue `paula_disk` migration
 - improve `DSKBYTR` / `DSKDATR` / `DSKSYNC` / `ADKCON` fidelity
+- replace the temporary `inserted` flag with a clearer media/data-source abstraction
 - decide when to introduce real media/drive abstraction
 
 2. Expand `RiegelPaula`

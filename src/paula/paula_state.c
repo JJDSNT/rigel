@@ -76,6 +76,15 @@ void riegel_paula_set_disk_memory_if(RiegelPaula *paula, riegel_chip_ram_if_t ch
     disk_set_memory_if(&paula->disk, chip_ram);
 }
 
+void riegel_paula_set_disk_inserted(RiegelPaula *paula, int inserted)
+{
+    if (paula == NULL) {
+        return;
+    }
+
+    disk_set_inserted(&paula->disk, inserted);
+}
+
 paula_disk_irq_sink_t riegel_paula_disk_irq_sink(RiegelContext *ctx)
 {
     paula_disk_irq_sink_t sink;

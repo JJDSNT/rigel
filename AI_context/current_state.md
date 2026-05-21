@@ -23,6 +23,18 @@
 - Paula disk path:
   - MMIO -> Paula -> disk registers
   - disk DMA service -> chip RAM interface write -> IRQ publish
+  - no-media fallback -> countdown -> fake `DSKBLK` IRQ
+
+# Disk Notes
+
+- `disk_reset()` preserves external attachments/configuration:
+  - chip RAM interface
+  - IRQ sink
+  - synthetic media-present flag
+- `disk.inserted` currently acts as a minimal "data source present" flag:
+  - `inserted = 1` enables DMA service grants
+  - `inserted = 0` falls back to no-media countdown behavior
+- `riegel_create()` currently enables synthetic disk presence when a chip RAM write callback exists.
 
 # Notes
 

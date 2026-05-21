@@ -22,9 +22,10 @@ RiegelContext *riegel_create(const riegel_config_t *config)
     }
 
     ctx->config = *config;
+    riegel_reset(ctx);
     riegel_paula_set_disk_memory_if(&ctx->chipset.paula, ctx->config.chip_ram);
     riegel_paula_set_disk_irq_sink(&ctx->chipset.paula, riegel_paula_disk_irq_sink(ctx));
-    riegel_reset(ctx);
+    riegel_paula_set_disk_inserted(&ctx->chipset.paula, ctx->config.chip_ram.write16 != NULL);
     return ctx;
 }
 
