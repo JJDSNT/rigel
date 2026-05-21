@@ -19,7 +19,7 @@ struct RiegelChipset {
 };
 
 void riegel_chipset_reset(RiegelChipset *chipset);
-void riegel_chipset_step(RiegelChipset *chipset, riegel_u32 cycles);
+void riegel_chipset_step(RiegelContext *ctx, riegel_u32 cycles);
 void riegel_chipset_take_snapshot(const RiegelChipset *chipset, riegel_snapshot_t *snapshot);
 
 riegel_u16 riegel_chipset_read_reg(const RiegelChipset *chipset, riegel_u32 addr);

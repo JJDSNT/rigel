@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "agnus/agnus_state.h"
+#include "core/riegel_context.h"
 #include "core/riegel_timing.h"
 #include "paula/paula_interrupts.h"
 #include "paula/paula_state.h"
@@ -21,13 +22,17 @@ void riegel_chipset_reset(RiegelChipset *chipset)
     (void)memset(chipset->custom_regs, 0, sizeof(chipset->custom_regs));
 }
 
-void riegel_chipset_step(RiegelChipset *chipset, riegel_u32 cycles)
+void riegel_chipset_step(RiegelContext *ctx, riegel_u32 cycles)
 {
-    if (chipset == NULL) {
+    RiegelChipset *chipset;
+
+    if (ctx == NULL) {
         return;
     }
 
+    chipset = &ctx->chipset;
     chipset->cycles = riegel_timing_advance(chipset->cycles, cycles);
+    riegel_agnus_step(ctx, cycles);
     riegel_paula_step(&chipset->paula, cycles);
 
     if (disk_dma_wants_service(&chipset->paula.disk)) {

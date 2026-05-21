@@ -66,7 +66,7 @@ void riegel_step(RiegelContext *ctx, riegel_u32 cycles)
         return;
     }
 
-    riegel_chipset_step(&ctx->chipset, cycles);
+    riegel_chipset_step(ctx, cycles);
 }
 
 void riegel_take_snapshot(const RiegelContext *ctx, riegel_snapshot_t *snapshot)
