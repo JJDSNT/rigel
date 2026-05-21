@@ -8,7 +8,7 @@ riegel_u16 riegel_get_intreq(const RiegelContext *ctx)
         return 0;
     }
 
-    return ctx->intreq;
+    return ctx->chipset.intreq;
 }
 
 riegel_u16 riegel_get_intena(const RiegelContext *ctx)
@@ -17,7 +17,7 @@ riegel_u16 riegel_get_intena(const RiegelContext *ctx)
         return 0;
     }
 
-    return ctx->intena;
+    return ctx->chipset.intena;
 }
 
 riegel_u8 riegel_get_ipl(const RiegelContext *ctx)
@@ -28,6 +28,6 @@ riegel_u8 riegel_get_ipl(const RiegelContext *ctx)
         return 0;
     }
 
-    pending = (riegel_u16)(ctx->intreq & ctx->intena);
+    pending = (riegel_u16)(ctx->chipset.intreq & ctx->chipset.intena);
     return pending != 0 ? 1u : 0u;
 }

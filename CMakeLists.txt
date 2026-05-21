@@ -13,6 +13,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 option(RIEGEL_BUILD_TESTS "Build Riegel unit tests" ON)
 
 add_library(riegel
+    src/chipset/chipset.c
     src/core/riegel.c
     src/core/riegel_context.c
     src/core/riegel_timing.c
@@ -22,16 +23,19 @@ add_library(riegel
     src/irq/intreq.c
     src/irq/intena.c
     src/agnus/agnus.c
+    src/agnus/agnus_regs.c
     src/agnus/beam.c
     src/agnus/dma.c
     src/agnus/copper.c
     src/agnus/blitter.c
     src/agnus/bitplanes.c
     src/denise/denise.c
+    src/denise/denise_regs.c
     src/denise/video.c
     src/denise/sprites.c
     src/denise/color.c
     src/paula/paula.c
+    src/paula/paula_regs.c
     src/paula/audio.c
     src/paula/disk.c
     src/paula/serial.c
@@ -62,6 +66,7 @@ if(RIEGEL_BUILD_TESTS)
     enable_testing()
 
     set(RIEGEL_TESTS
+        test_chipset
         test_mmio
         test_irq
         test_custom_map

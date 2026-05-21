@@ -16,5 +16,6 @@ typedef enum riegel_status {
 } riegel_status_t;
 
 typedef struct RiegelContext RiegelContext;
+typedef struct RiegelChipset RiegelChipset;
 
 #endif

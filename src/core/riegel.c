@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "chipset/chipset.h"
 #include "core/riegel_context.h"
-#include "core/riegel_timing.h"
 
 RiegelContext *riegel_create(const riegel_config_t *config)
 {
@@ -24,6 +24,24 @@ RiegelContext *riegel_create(const riegel_config_t *config)
     return ctx;
 }
 
+RiegelChipset *riegel_get_chipset(RiegelContext *ctx)
+{
+    if (ctx == NULL) {
+        return NULL;
+    }
+
+    return &ctx->chipset;
+}
+
+const RiegelChipset *riegel_get_chipset_const(const RiegelContext *ctx)
+{
+    if (ctx == NULL) {
+        return NULL;
+    }
+
+    return &ctx->chipset;
+}
+
 void riegel_destroy(RiegelContext *ctx)
 {
     free(ctx);
@@ -35,11 +53,7 @@ void riegel_reset(RiegelContext *ctx)
         return;
     }
 
-    ctx->cycles = 0;
-    ctx->dmacon = 0;
-    ctx->intreq = 0;
-    ctx->intena = 0;
-    (void)memset(ctx->custom_regs, 0, sizeof(ctx->custom_regs));
+    riegel_chipset_reset(&ctx->chipset);
 }
 
 void riegel_step(RiegelContext *ctx, riegel_u32 cycles)
@@ -48,18 +62,16 @@ void riegel_step(RiegelContext *ctx, riegel_u32 cycles)
         return;
     }
 
-    ctx->cycles = riegel_timing_advance(ctx->cycles, cycles);
+    riegel_chipset_step(&ctx->chipset, cycles);
 }
 
 void riegel_take_snapshot(const RiegelContext *ctx, riegel_snapshot_t *snapshot)
 {
-    if (ctx == NULL || snapshot == NULL) {
+    if (ctx == NULL) {
         return;
     }
 
-    snapshot->cycles = ctx->cycles;
-    snapshot->intreq = ctx->intreq;
-    snapshot->intena = ctx->intena;
+    riegel_chipset_take_snapshot(&ctx->chipset, snapshot);
 }
 
 bool riegel_save_state(const RiegelContext *ctx, void *buffer, size_t buffer_size)
@@ -84,10 +96,10 @@ bool riegel_load_state(RiegelContext *ctx, const void *buffer, size_t buffer_siz
     }
 
     (void)memcpy(&snapshot, buffer, sizeof(snapshot));
-    ctx->cycles = snapshot.cycles;
-    ctx->intreq = snapshot.intreq;
-    ctx->intena = snapshot.intena;
-    riegel_context_write_reg(ctx, 0x009a, ctx->intena);
-    riegel_context_write_reg(ctx, 0x009c, ctx->intreq);
+    ctx->chipset.cycles = snapshot.cycles;
+    ctx->chipset.intreq = snapshot.intreq;
+    ctx->chipset.intena = snapshot.intena;
+    riegel_context_write_reg(ctx, 0x009a, ctx->chipset.intena);
+    riegel_context_write_reg(ctx, 0x009c, ctx->chipset.intreq);
     return true;
 }

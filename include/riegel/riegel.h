@@ -12,6 +12,9 @@
 RiegelContext *riegel_create(const riegel_config_t *config);
 void riegel_destroy(RiegelContext *ctx);
 
+RiegelChipset *riegel_get_chipset(RiegelContext *ctx);
+const RiegelChipset *riegel_get_chipset_const(const RiegelContext *ctx);
+
 void riegel_reset(RiegelContext *ctx);
 void riegel_step(RiegelContext *ctx, riegel_u32 cycles);
 

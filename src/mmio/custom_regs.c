@@ -1,19 +1,9 @@
 #include "mmio/custom_regs.h"
 
+#include "agnus/agnus_regs.h"
 #include "core/riegel_context.h"
-#include "irq/intena.h"
-#include "irq/intreq.h"
-
-static riegel_u16 riegel_apply_setclr(riegel_u16 current, riegel_u16 value)
-{
-    riegel_u16 mask = (riegel_u16)(value & 0x7fffU);
-
-    if ((value & 0x8000U) != 0) {
-        return (riegel_u16)(current | mask);
-    }
-
-    return (riegel_u16)(current & (riegel_u16)(~mask));
-}
+#include "denise/denise_regs.h"
+#include "paula/paula_regs.h"
 
 bool riegel_custom_is_valid_reg(riegel_u32 addr)
 {
@@ -45,13 +35,13 @@ riegel_u16 custom_regs_read16(RiegelContext *ctx, riegel_u32 addr)
         return 0;
     }
 
-    switch (addr) {
-    case RIEGEL_REG_DMACON:
-        return ctx->dmacon;
-    case RIEGEL_REG_INTENA:
-        return ctx->intena;
-    case RIEGEL_REG_INTREQ:
-        return ctx->intreq;
+    switch (riegel_custom_domain_for_reg(addr)) {
+    case RIEGEL_DOMAIN_AGNUS:
+        return agnus_read_reg(ctx, addr);
+    case RIEGEL_DOMAIN_PAULA:
+        return paula_read_reg(ctx, addr);
+    case RIEGEL_DOMAIN_DENISE:
+        return denise_read_reg(ctx, addr);
     default:
         return riegel_context_read_reg(ctx, addr);
     }
@@ -65,30 +55,14 @@ void custom_regs_write16(RiegelContext *ctx, riegel_u32 addr, riegel_u16 value)
 
     switch (riegel_custom_domain_for_reg(addr)) {
     case RIEGEL_DOMAIN_AGNUS:
-        if (addr == RIEGEL_REG_DMACON) {
-            ctx->dmacon = riegel_apply_setclr(ctx->dmacon, value);
-            riegel_context_write_reg(ctx, addr, ctx->dmacon);
-            break;
-        }
-
-        riegel_context_write_reg(ctx, addr, value);
+        agnus_write_reg(ctx, addr, value);
         break;
     case RIEGEL_DOMAIN_PAULA:
-        if (addr == RIEGEL_REG_INTENA) {
-            ctx->intena = intena_apply_write(ctx->intena, value);
-            riegel_context_write_reg(ctx, addr, ctx->intena);
-            break;
-        }
-
-        if (addr == RIEGEL_REG_INTREQ) {
-            ctx->intreq = intreq_apply_write(ctx->intreq, value);
-            riegel_context_write_reg(ctx, addr, ctx->intreq);
-            break;
-        }
-
-        riegel_context_write_reg(ctx, addr, value);
+        paula_write_reg(ctx, addr, value);
         break;
     case RIEGEL_DOMAIN_DENISE:
+        denise_write_reg(ctx, addr, value);
+        break;
     case RIEGEL_DOMAIN_UNKNOWN:
     default:
         riegel_context_write_reg(ctx, addr, value);
