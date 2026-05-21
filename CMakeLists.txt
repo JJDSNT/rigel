@@ -14,6 +14,7 @@ option(RIEGEL_BUILD_TESTS "Build Riegel unit tests" ON)
 
 add_library(riegel
     src/chipset/chipset.c
+    src/agnus/agnus_state.c
     src/core/riegel.c
     src/core/riegel_context.c
     src/core/riegel_timing.c
@@ -28,6 +29,9 @@ add_library(riegel
     src/agnus/dma.c
     src/agnus/copper.c
     src/agnus/blitter.c
+    src/agnus/blitter/blitter_command.c
+    src/agnus/blitter/blitter_regs.c
+    src/agnus/blitter/blitter_timing.c
     src/agnus/bitplanes.c
     src/denise/denise.c
     src/denise/denise_regs.c

@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "agnus/agnus_state.h"
 #include "core/riegel_timing.h"
 #include "riegel/riegel_custom.h"
 
@@ -13,7 +14,7 @@ void riegel_chipset_reset(RiegelChipset *chipset)
     }
 
     chipset->cycles = 0;
-    chipset->dmacon = 0;
+    riegel_agnus_reset(&chipset->agnus);
     chipset->intreq = 0;
     chipset->intena = 0;
     (void)memset(chipset->custom_regs, 0, sizeof(chipset->custom_regs));

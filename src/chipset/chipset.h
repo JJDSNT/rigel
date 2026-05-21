@@ -1,6 +1,7 @@
 #ifndef RIEGEL_CHIPSET_H
 #define RIEGEL_CHIPSET_H
 
+#include "agnus/agnus_state.h"
 #include "riegel/riegel_snapshot.h"
 #include "riegel/riegel_types.h"
 
@@ -11,7 +12,7 @@ enum {
 
 struct RiegelChipset {
     riegel_u64 cycles;
-    riegel_u16 dmacon;
+    RiegelAgnus agnus;
     riegel_u16 intreq;
     riegel_u16 intena;
     riegel_u16 custom_regs[RIEGEL_CUSTOM_REG_COUNT];

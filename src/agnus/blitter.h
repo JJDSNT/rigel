@@ -1,10 +1,6 @@
-#ifndef BLITTER_H
-#define BLITTER_H
+#ifndef RIEGEL_AGNUS_BLITTER_COMPAT_H
+#define RIEGEL_AGNUS_BLITTER_COMPAT_H
 
-typedef struct blitter_state {
-    unsigned busy;
-} blitter_state_t;
-
-void blitter_start(blitter_state_t *blitter);
+#include "agnus/blitter/blitter.h"
 
 #endif

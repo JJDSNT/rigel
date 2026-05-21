@@ -25,7 +25,7 @@ riegel_custom_domain_t riegel_custom_domain_for_reg(riegel_u32 addr)
     case RIEGEL_REG_COLOR00:
         return RIEGEL_DOMAIN_DENISE;
     default:
-        return RIEGEL_DOMAIN_UNKNOWN;
+        return agnus_owns_reg(addr) ? RIEGEL_DOMAIN_AGNUS : RIEGEL_DOMAIN_UNKNOWN;
     }
 }
 
