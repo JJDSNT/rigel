@@ -2,9 +2,9 @@
 
 1. Continue `paula_disk` migration
 - improve `DSKBYTR` / `DSKDATR` / `DSKSYNC` / `ADKCON` fidelity
-- decide when to introduce real media/drive abstraction
-- add a stable attach/eject surface between host and internal `FloppyDrive`
 - start reusing more of the old track/sync path now that `FloppyDrive` is wired in
+- decide how drive selection should flow from Paula/CIA into `DF0..DF3`
+- keep the public floppy API stable while internals move from fixed `DF0` wiring to real selection
 
 2. Expand `RigelPaula`
 - choose next subdomain:

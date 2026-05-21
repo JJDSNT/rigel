@@ -1,4 +1,3 @@
-#include "core/rigel_context.h"
 #include "paula/paula_state.h"
 #include "rigel/rigel.h"
 
@@ -64,12 +63,11 @@ int main(void)
     sink.raise = test_disk_irq_raise;
     rigel_paula_set_disk_irq_sink(&paula, sink);
 
-    floppy_init(&drive);
-    floppy_insert(&drive, g_test_adf, sizeof(g_test_adf));
-
     chip_ram.opaque = &ram;
     chip_ram.write16 = test_chip_ram_write16;
     rigel_paula_set_disk_memory_if(&paula, chip_ram);
+    floppy_init(&drive);
+    floppy_insert(&drive, g_test_adf, sizeof(g_test_adf));
     rigel_paula_set_disk_drive(&paula, &drive);
 
     disk_write_dsklen(&paula.disk, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
@@ -117,9 +115,10 @@ int main(void)
         return 1;
     }
 
-    floppy_init(&drive);
-    floppy_insert(&drive, g_test_adf, sizeof(g_test_adf));
-    rigel_paula_set_disk_drive(&ctx->chipset.paula, &drive);
+    if (rigel_floppy_insert(ctx, RIGEL_FLOPPY_DRIVE_DF0, g_test_adf, sizeof(g_test_adf)) != RIGEL_STATUS_OK) {
+        rigel_destroy(ctx);
+        return 1;
+    }
 
     rigel_custom_write16(ctx, RIGEL_REG_DSKPTH, 0x0000);
     rigel_custom_write16(ctx, RIGEL_REG_DSKPTL, 0x0000);

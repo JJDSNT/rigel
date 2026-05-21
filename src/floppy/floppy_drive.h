@@ -92,6 +92,7 @@ typedef struct
 /* ------------------------------------------------------------------------- */
 
 void floppy_init(FloppyDrive *d);
+void floppy_reset(FloppyDrive *d);
 
 void floppy_insert(FloppyDrive *d, const uint8_t *adf, uint32_t adf_size);
 void floppy_eject(FloppyDrive *d);

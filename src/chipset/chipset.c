@@ -12,13 +12,19 @@
 
 void rigel_chipset_reset(RigelChipset *chipset)
 {
+    rigel_u32 i;
+
     if (chipset == NULL) {
         return;
     }
 
     chipset->cycles = 0;
+    for (i = 0; i < RIGEL_FLOPPY_DRIVE_COUNT; ++i) {
+        floppy_reset(&chipset->floppy[i]);
+    }
     rigel_agnus_reset(&chipset->agnus);
     rigel_paula_reset(&chipset->paula);
+    rigel_paula_set_disk_drive(&chipset->paula, &chipset->floppy[RIGEL_FLOPPY_DRIVE_DF0]);
     (void)memset(chipset->custom_regs, 0, sizeof(chipset->custom_regs));
 }
 
@@ -101,4 +107,38 @@ void rigel_chipset_clear_irq_source(RigelChipset *chipset, rigel_u16 mask)
         RIGEL_REG_INTREQ,
         rigel_paula_interrupts_read_intreq(&chipset->paula.interrupts)
     );
+}
+
+FloppyDrive *rigel_chipset_floppy_drive(RigelChipset *chipset, rigel_floppy_drive_id_t drive)
+{
+    if (chipset == NULL) {
+        return NULL;
+    }
+
+    switch (drive) {
+    case RIGEL_FLOPPY_DRIVE_DF0:
+    case RIGEL_FLOPPY_DRIVE_DF1:
+    case RIGEL_FLOPPY_DRIVE_DF2:
+    case RIGEL_FLOPPY_DRIVE_DF3:
+        return &chipset->floppy[drive];
+    default:
+        return NULL;
+    }
+}
+
+const FloppyDrive *rigel_chipset_floppy_drive_const(const RigelChipset *chipset, rigel_floppy_drive_id_t drive)
+{
+    if (chipset == NULL) {
+        return NULL;
+    }
+
+    switch (drive) {
+    case RIGEL_FLOPPY_DRIVE_DF0:
+    case RIGEL_FLOPPY_DRIVE_DF1:
+    case RIGEL_FLOPPY_DRIVE_DF2:
+    case RIGEL_FLOPPY_DRIVE_DF3:
+        return &chipset->floppy[drive];
+    default:
+        return NULL;
+    }
 }

@@ -1,5 +1,7 @@
 #include "floppy/floppy_drive.h"
 
+#include <stddef.h>
+
 /* ------------------------------------------------------------------------- */
 /* Init                                                                      */
 /* ------------------------------------------------------------------------- */
@@ -34,6 +36,24 @@ void floppy_init(FloppyDrive *d)
     d->adf = 0;
     d->adf_size = 0;
     d->read_offset = 0;
+}
+
+void floppy_reset(FloppyDrive *d)
+{
+    const uint8_t *adf;
+    uint32_t adf_size;
+
+    if (d == NULL) {
+        return;
+    }
+
+    adf = d->adf;
+    adf_size = d->adf_size;
+    floppy_init(d);
+
+    if (adf != NULL && adf_size != 0) {
+        floppy_insert(d, adf, adf_size);
+    }
 }
 
 /* ------------------------------------------------------------------------- */

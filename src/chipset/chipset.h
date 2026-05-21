@@ -2,19 +2,23 @@
 #define RIGEL_CHIPSET_H
 
 #include "agnus/agnus_state.h"
+#include "floppy/floppy_drive.h"
 #include "paula/paula_state.h"
+#include "rigel/rigel_floppy.h"
 #include "rigel/rigel_snapshot.h"
 #include "rigel/rigel_types.h"
 
 enum {
     RIGEL_CUSTOM_SPACE_SIZE = 0x200,
-    RIGEL_CUSTOM_REG_COUNT = RIGEL_CUSTOM_SPACE_SIZE / 2
+    RIGEL_CUSTOM_REG_COUNT = RIGEL_CUSTOM_SPACE_SIZE / 2,
+    RIGEL_FLOPPY_DRIVE_COUNT = 4
 };
 
 struct RigelChipset {
     rigel_u64 cycles;
     RigelAgnus agnus;
     RigelPaula paula;
+    FloppyDrive floppy[RIGEL_FLOPPY_DRIVE_COUNT];
     rigel_u16 custom_regs[RIGEL_CUSTOM_REG_COUNT];
 };
 
@@ -26,5 +30,7 @@ rigel_u16 rigel_chipset_read_reg(const RigelChipset *chipset, rigel_u32 addr);
 void rigel_chipset_write_reg(RigelChipset *chipset, rigel_u32 addr, rigel_u16 value);
 void rigel_chipset_raise_irq_source(RigelChipset *chipset, rigel_u16 mask);
 void rigel_chipset_clear_irq_source(RigelChipset *chipset, rigel_u16 mask);
+FloppyDrive *rigel_chipset_floppy_drive(RigelChipset *chipset, rigel_floppy_drive_id_t drive);
+const FloppyDrive *rigel_chipset_floppy_drive_const(const RigelChipset *chipset, rigel_floppy_drive_id_t drive);
 
 #endif
