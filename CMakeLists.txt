@@ -30,6 +30,8 @@ add_library(riegel
     src/agnus/copper.c
     src/agnus/blitter.c
     src/agnus/blitter/blitter_command.c
+    src/agnus/blitter/blitter_dma.c
+    src/agnus/blitter/blitter_ref.c
     src/agnus/blitter/blitter_regs.c
     src/agnus/blitter/blitter_timing.c
     src/agnus/bitplanes.c
@@ -77,6 +79,7 @@ if(RIEGEL_BUILD_TESTS)
         test_beam
         test_cia
         test_blitter
+        test_blitter_dma
         test_copper
     )
 

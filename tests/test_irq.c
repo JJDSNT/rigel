@@ -8,6 +8,7 @@ int main(void)
     riegel_config_t cfg = { 0 };
     RiegelContext *ctx = riegel_create(&cfg);
     BlitterIrqSink sink;
+    BlitterState blitter;
 
     if (ctx == NULL) {
         return 1;
@@ -28,8 +29,8 @@ int main(void)
 
     riegel_reset(ctx);
     sink = riegel_agnus_blitter_irq_sink(ctx);
-    blitter_init(&riegel_get_chipset(ctx)->agnus.blitter);
-    blitter_force_finish(&riegel_get_chipset(ctx)->agnus.blitter, sink);
+    blitter_init(&blitter);
+    blitter_force_finish(&blitter, sink);
 
     if ((riegel_get_intreq(ctx) & 0x0040u) == 0) {
         riegel_destroy(ctx);
