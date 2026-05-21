@@ -89,13 +89,13 @@ void blitter_start_timing(BlitterState *b);
 void blitter_step_dma(
     BlitterState *b,
     BlitterMemory mem,
-    BlitterHost host,
+    BlitterIrqSink irq,
     uint32_t dma_slots
 );
 
 void blitter_force_finish(
     BlitterState *b,
-    BlitterHost host
+    BlitterIrqSink irq
 );
 
 void blitter_debug_dump_regs(const BlitterState *b);

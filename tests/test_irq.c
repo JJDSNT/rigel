@@ -1,9 +1,13 @@
 #include "riegel/riegel.h"
 
+#include "agnus/agnus_state.h"
+#include "agnus/blitter.h"
+
 int main(void)
 {
     riegel_config_t cfg = { 0 };
     RiegelContext *ctx = riegel_create(&cfg);
+    BlitterIrqSink sink;
 
     if (ctx == NULL) {
         return 1;
@@ -18,6 +22,16 @@ int main(void)
     }
 
     if (riegel_get_ipl(ctx) == 0) {
+        riegel_destroy(ctx);
+        return 1;
+    }
+
+    riegel_reset(ctx);
+    sink = riegel_agnus_blitter_irq_sink(ctx);
+    blitter_init(&riegel_get_chipset(ctx)->agnus.blitter);
+    blitter_force_finish(&riegel_get_chipset(ctx)->agnus.blitter, sink);
+
+    if ((riegel_get_intreq(ctx) & 0x0040u) == 0) {
         riegel_destroy(ctx);
         return 1;
     }

@@ -10,5 +10,6 @@ typedef struct RiegelAgnus {
 } RiegelAgnus;
 
 void riegel_agnus_reset(RiegelAgnus *agnus);
+BlitterIrqSink riegel_agnus_blitter_irq_sink(RiegelContext *ctx);
 
 #endif

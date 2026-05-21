@@ -8,15 +8,11 @@ static inline uint16_t chip_read16(
 ) {
     addr &= BLITTER_CHIP_ADDR_MASK;
 
-    if ((addr + 1) >= mem->chipram_size) {
+    if (mem->read16 == NULL) {
         return 0;
     }
 
-    uint16_t value =
-        ((uint16_t)mem->chipram[addr] << 8) |
-        ((uint16_t)mem->chipram[addr + 1]);
-
-    return value;
+    return mem->read16(mem->opaque, addr);
 }
 
 static inline void chip_write16(
@@ -26,12 +22,11 @@ static inline void chip_write16(
 ) {
     addr &= BLITTER_CHIP_ADDR_MASK;
 
-    if ((addr + 1) >= mem->chipram_size) {
+    if (mem->write16 == NULL) {
         return;
     }
 
-    mem->chipram[addr]     = (uint8_t)(value >> 8);
-    mem->chipram[addr + 1] = (uint8_t)(value & 0xFFu);
+    mem->write16(mem->opaque, addr, value);
 }
 
 static uint16_t blitter_logic(

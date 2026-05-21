@@ -3,7 +3,7 @@
 void blitter_step_dma(
     BlitterState *b,
     BlitterMemory mem,
-    BlitterHost host,
+    BlitterIrqSink irq,
     uint32_t dma_slots
 ) {
     /*
@@ -85,6 +85,6 @@ void blitter_step_dma(
 
     blitter_force_finish(
         b,
-        host
+        irq
     );
 }

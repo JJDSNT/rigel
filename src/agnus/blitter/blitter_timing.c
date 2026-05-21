@@ -79,7 +79,7 @@ void blitter_start_timing(BlitterState *b)
 
 void blitter_force_finish(
     BlitterState *b,
-    BlitterHost host
+    BlitterIrqSink irq
 ) {
     b->busy = false;
 
@@ -91,9 +91,9 @@ void blitter_force_finish(
      * Publish BLIT interrupt through Paula.
      */
 
-    if (host.intreq) {
-        host.intreq(
-            host.opaque,
+    if (irq.raise) {
+        irq.raise(
+            irq.opaque,
             BLITTER_INTREQ_BLIT
         );
     }

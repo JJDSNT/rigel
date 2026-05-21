@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "riegel/riegel_config.h"
+
 /*
  * Riegel Agnus Blitter
  *
@@ -138,16 +140,13 @@ typedef struct BlitterResult {
     bool zero;
 } BlitterResult;
 
-typedef struct BlitterMemory {
-    uint8_t *chipram;
-    size_t chipram_size;
-} BlitterMemory;
+typedef riegel_chip_ram_if_t BlitterMemory;
 
-typedef void (*BlitterIntreqFn)(void *opaque, uint16_t value);
+typedef void (*BlitterIrqRaiseFn)(void *opaque, uint16_t mask);
 
-typedef struct BlitterHost {
+typedef struct BlitterIrqSink {
     void *opaque;
-    BlitterIntreqFn intreq;
-} BlitterHost;
+    BlitterIrqRaiseFn raise;
+} BlitterIrqSink;
 
 #endif

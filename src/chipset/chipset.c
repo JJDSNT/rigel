@@ -5,6 +5,7 @@
 
 #include "agnus/agnus_state.h"
 #include "core/riegel_timing.h"
+#include "irq/intreq.h"
 #include "riegel/riegel_custom.h"
 
 void riegel_chipset_reset(RiegelChipset *chipset)
@@ -62,4 +63,14 @@ void riegel_chipset_write_reg(RiegelChipset *chipset, riegel_u32 addr, riegel_u1
 
     index = addr >> 1;
     chipset->custom_regs[index] = value;
+}
+
+void riegel_chipset_raise_intreq(RiegelChipset *chipset, riegel_u16 value)
+{
+    if (chipset == NULL) {
+        return;
+    }
+
+    chipset->intreq = intreq_apply_write(chipset->intreq, value);
+    riegel_chipset_write_reg(chipset, RIEGEL_REG_INTREQ, chipset->intreq);
 }

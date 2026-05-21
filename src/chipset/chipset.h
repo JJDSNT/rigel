@@ -24,5 +24,6 @@ void riegel_chipset_take_snapshot(const RiegelChipset *chipset, riegel_snapshot_
 
 riegel_u16 riegel_chipset_read_reg(const RiegelChipset *chipset, riegel_u32 addr);
 void riegel_chipset_write_reg(RiegelChipset *chipset, riegel_u32 addr, riegel_u16 value);
+void riegel_chipset_raise_intreq(RiegelChipset *chipset, riegel_u16 value);
 
 #endif

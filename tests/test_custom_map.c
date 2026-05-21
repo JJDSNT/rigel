@@ -30,7 +30,11 @@ int main(void)
         return 1;
     }
 
-    if (riegel_custom_domain_for_reg(0x002) != RIEGEL_DOMAIN_UNKNOWN) {
+    if (riegel_custom_domain_for_reg(0x002) != RIEGEL_DOMAIN_AGNUS) {
+        return 1;
+    }
+
+    if (riegel_custom_domain_for_reg(0x004) != RIEGEL_DOMAIN_UNKNOWN) {
         return 1;
     }
 
