@@ -2,22 +2,22 @@
 
 #include <stddef.h>
 
-#include "core/riegel_context.h"
+#include "core/rigel_context.h"
 #include "chipset/chipset.h"
-#include "riegel/riegel_custom.h"
+#include "rigel/rigel_custom.h"
 
-static void riegel_agnus_raise_blitter_irq(void *opaque, uint16_t mask)
+static void rigel_agnus_raise_blitter_irq(void *opaque, uint16_t mask)
 {
-    RiegelContext *ctx = (RiegelContext *)opaque;
+    RigelContext *ctx = (RigelContext *)opaque;
 
     if (ctx == NULL) {
         return;
     }
 
-    riegel_chipset_raise_irq_source(&ctx->chipset, mask);
+    rigel_chipset_raise_irq_source(&ctx->chipset, mask);
 }
 
-void riegel_agnus_reset(RiegelAgnus *agnus)
+void rigel_agnus_reset(RigelAgnus *agnus)
 {
     if (agnus == NULL) {
         return;
@@ -27,7 +27,7 @@ void riegel_agnus_reset(RiegelAgnus *agnus)
     blitter_reset(&agnus->blitter);
 }
 
-BlitterMemory riegel_agnus_blitter_memory(RiegelContext *ctx)
+BlitterMemory rigel_agnus_blitter_memory(RigelContext *ctx)
 {
     BlitterMemory mem;
 
@@ -35,16 +35,16 @@ BlitterMemory riegel_agnus_blitter_memory(RiegelContext *ctx)
     return mem;
 }
 
-BlitterIrqSink riegel_agnus_blitter_irq_sink(RiegelContext *ctx)
+BlitterIrqSink rigel_agnus_blitter_irq_sink(RigelContext *ctx)
 {
     BlitterIrqSink sink;
 
     sink.opaque = ctx;
-    sink.raise = riegel_agnus_raise_blitter_irq;
+    sink.raise = rigel_agnus_raise_blitter_irq;
     return sink;
 }
 
-void riegel_agnus_blitter_step_dma(RiegelContext *ctx, riegel_u32 dma_slots)
+void rigel_agnus_blitter_step_dma(RigelContext *ctx, rigel_u32 dma_slots)
 {
     if (ctx == NULL || dma_slots == 0) {
         return;
@@ -52,15 +52,15 @@ void riegel_agnus_blitter_step_dma(RiegelContext *ctx, riegel_u32 dma_slots)
 
     blitter_step_dma(
         &ctx->chipset.agnus.blitter,
-        riegel_agnus_blitter_memory(ctx),
-        riegel_agnus_blitter_irq_sink(ctx),
+        rigel_agnus_blitter_memory(ctx),
+        rigel_agnus_blitter_irq_sink(ctx),
         dma_slots
     );
 }
 
-void riegel_agnus_step(RiegelContext *ctx, riegel_u32 cycles)
+void rigel_agnus_step(RigelContext *ctx, rigel_u32 cycles)
 {
-    riegel_u16 dmacon;
+    rigel_u16 dmacon;
 
     if (ctx == NULL || cycles == 0) {
         return;
@@ -68,13 +68,13 @@ void riegel_agnus_step(RiegelContext *ctx, riegel_u32 cycles)
 
     dmacon = ctx->chipset.agnus.dmacon;
 
-    if ((dmacon & RIEGEL_DMACON_DMAEN) == 0) {
+    if ((dmacon & RIGEL_DMACON_DMAEN) == 0) {
         return;
     }
 
-    if ((dmacon & RIEGEL_DMACON_BLTEN) == 0) {
+    if ((dmacon & RIGEL_DMACON_BLTEN) == 0) {
         return;
     }
 
-    riegel_agnus_blitter_step_dma(ctx, cycles);
+    rigel_agnus_blitter_step_dma(ctx, cycles);
 }

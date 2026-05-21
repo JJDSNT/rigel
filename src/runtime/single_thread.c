@@ -2,9 +2,9 @@
 
 #include <stddef.h>
 
-#include "runtime/riegel_runtime.h"
+#include "runtime/rigel_runtime.h"
 
-void single_thread_pump(RiegelContext *ctx, unsigned frames)
+void single_thread_pump(RigelContext *ctx, unsigned frames)
 {
     unsigned i;
 
@@ -13,6 +13,6 @@ void single_thread_pump(RiegelContext *ctx, unsigned frames)
     }
 
     for (i = 0; i < frames; ++i) {
-        riegel_runtime_run_frame(ctx);
+        rigel_runtime_run_frame(ctx);
     }
 }

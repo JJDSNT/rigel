@@ -1,10 +1,10 @@
-# riegel
+# rigel
 
 Scaffold inicial para um projeto C modular voltado a MMIO, IRQ, timing e subsistemas inspirados em chipset.
 
 ## Estrutura
 
-- `include/riegel/`: API publica.
+- `include/rigel/`: API publica.
 - `src/`: implementacao por dominio.
 - `tests/`: executaveis de teste simples.
 - `docs/`: notas de arquitetura e integracao.

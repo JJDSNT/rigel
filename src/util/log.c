@@ -3,11 +3,11 @@
 #include <stddef.h>
 #include <stdio.h>
 
-void riegel_log_info(const char *message)
+void rigel_log_info(const char *message)
 {
     if (message == NULL) {
         return;
     }
 
-    (void)fprintf(stderr, "[riegel] %s\n", message);
+    (void)fprintf(stderr, "[rigel] %s\n", message);
 }

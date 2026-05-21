@@ -1,21 +1,21 @@
 #include "agnus/agnus_regs.h"
 
 #include "agnus/blitter/blitter.h"
-#include "core/riegel_context.h"
-#include "riegel/riegel_custom.h"
+#include "core/rigel_context.h"
+#include "rigel/rigel_custom.h"
 
-static riegel_u16 riegel_apply_setclr(riegel_u16 current, riegel_u16 value)
+static rigel_u16 rigel_apply_setclr(rigel_u16 current, rigel_u16 value)
 {
-    riegel_u16 mask = (riegel_u16)(value & 0x7fffU);
+    rigel_u16 mask = (rigel_u16)(value & 0x7fffU);
 
-    if ((value & RIEGEL_SETCLR) != 0) {
-        return (riegel_u16)(current | mask);
+    if ((value & RIGEL_SETCLR) != 0) {
+        return (rigel_u16)(current | mask);
     }
 
-    return (riegel_u16)(current & (riegel_u16)(~mask));
+    return (rigel_u16)(current & (rigel_u16)(~mask));
 }
 
-static bool agnus_blitter_owns_reg(riegel_u32 addr)
+static bool agnus_blitter_owns_reg(rigel_u32 addr)
 {
     switch (addr) {
     case 0x000:
@@ -46,16 +46,16 @@ static bool agnus_blitter_owns_reg(riegel_u32 addr)
     }
 }
 
-bool agnus_owns_reg(riegel_u32 addr)
+bool agnus_owns_reg(rigel_u32 addr)
 {
-    if (addr == RIEGEL_REG_DMACON) {
+    if (addr == RIGEL_REG_DMACON) {
         return true;
     }
 
     return agnus_blitter_owns_reg(addr);
 }
 
-riegel_u16 agnus_read_reg(RiegelContext *ctx, riegel_u32 addr)
+rigel_u16 agnus_read_reg(RigelContext *ctx, rigel_u32 addr)
 {
     if (ctx == NULL) {
         return 0;
@@ -66,14 +66,14 @@ riegel_u16 agnus_read_reg(RiegelContext *ctx, riegel_u32 addr)
     }
 
     switch (addr) {
-    case RIEGEL_REG_DMACON:
+    case RIGEL_REG_DMACON:
         return ctx->chipset.agnus.dmacon;
     default:
-        return riegel_context_read_reg(ctx, addr);
+        return rigel_context_read_reg(ctx, addr);
     }
 }
 
-void agnus_write_reg(RiegelContext *ctx, riegel_u32 addr, riegel_u16 value)
+void agnus_write_reg(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
 {
     if (ctx == NULL) {
         return;
@@ -81,17 +81,17 @@ void agnus_write_reg(RiegelContext *ctx, riegel_u32 addr, riegel_u16 value)
 
     if (agnus_blitter_owns_reg(addr)) {
         blitter_write_reg16(&ctx->chipset.agnus.blitter, addr, value);
-        riegel_context_write_reg(ctx, addr, value);
+        rigel_context_write_reg(ctx, addr, value);
         return;
     }
 
     switch (addr) {
-    case RIEGEL_REG_DMACON:
-        ctx->chipset.agnus.dmacon = riegel_apply_setclr(ctx->chipset.agnus.dmacon, value);
-        riegel_context_write_reg(ctx, addr, ctx->chipset.agnus.dmacon);
+    case RIGEL_REG_DMACON:
+        ctx->chipset.agnus.dmacon = rigel_apply_setclr(ctx->chipset.agnus.dmacon, value);
+        rigel_context_write_reg(ctx, addr, ctx->chipset.agnus.dmacon);
         break;
     default:
-        riegel_context_write_reg(ctx, addr, value);
+        rigel_context_write_reg(ctx, addr, value);
         break;
     }
 }

@@ -1,13 +1,13 @@
 #ifndef BEAM_H
 #define BEAM_H
 
-#include "riegel/riegel_types.h"
+#include "rigel/rigel_types.h"
 
 typedef struct beam_state {
-    riegel_u16 hpos;
-    riegel_u16 vpos;
+    rigel_u16 hpos;
+    rigel_u16 vpos;
 } beam_state_t;
 
-void beam_step(beam_state_t *beam, riegel_u16 clocks);
+void beam_step(beam_state_t *beam, rigel_u16 clocks);
 
 #endif

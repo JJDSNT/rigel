@@ -2,7 +2,7 @@
 
 ## Overview
 
-`riegel` e uma biblioteca C organizada por modulos para MMIO, IRQ, timing e subsistemas internos.
+`rigel` e uma biblioteca C organizada por modulos para MMIO, IRQ, timing e subsistemas internos.
 
 ## Modules
 

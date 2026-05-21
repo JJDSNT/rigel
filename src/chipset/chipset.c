@@ -4,43 +4,43 @@
 #include <string.h>
 
 #include "agnus/agnus_state.h"
-#include "core/riegel_context.h"
-#include "core/riegel_timing.h"
+#include "core/rigel_context.h"
+#include "core/rigel_timing.h"
 #include "paula/paula_interrupts.h"
 #include "paula/paula_state.h"
-#include "riegel/riegel_custom.h"
+#include "rigel/rigel_custom.h"
 
-void riegel_chipset_reset(RiegelChipset *chipset)
+void rigel_chipset_reset(RigelChipset *chipset)
 {
     if (chipset == NULL) {
         return;
     }
 
     chipset->cycles = 0;
-    riegel_agnus_reset(&chipset->agnus);
-    riegel_paula_reset(&chipset->paula);
+    rigel_agnus_reset(&chipset->agnus);
+    rigel_paula_reset(&chipset->paula);
     (void)memset(chipset->custom_regs, 0, sizeof(chipset->custom_regs));
 }
 
-void riegel_chipset_step(RiegelContext *ctx, riegel_u32 cycles)
+void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles)
 {
-    RiegelChipset *chipset;
+    RigelChipset *chipset;
 
     if (ctx == NULL) {
         return;
     }
 
     chipset = &ctx->chipset;
-    chipset->cycles = riegel_timing_advance(chipset->cycles, cycles);
-    riegel_agnus_step(ctx, cycles);
-    riegel_paula_step(&chipset->paula, cycles);
+    chipset->cycles = rigel_timing_advance(chipset->cycles, cycles);
+    rigel_agnus_step(ctx, cycles);
+    rigel_paula_step(&chipset->paula, cycles);
 
     if (disk_dma_wants_service(&chipset->paula.disk)) {
         disk_dma_service_grant(&chipset->paula.disk);
     }
 }
 
-void riegel_chipset_take_snapshot(const RiegelChipset *chipset, riegel_snapshot_t *snapshot)
+void rigel_chipset_take_snapshot(const RigelChipset *chipset, rigel_snapshot_t *snapshot)
 {
     if (chipset == NULL || snapshot == NULL) {
         return;
@@ -51,11 +51,11 @@ void riegel_chipset_take_snapshot(const RiegelChipset *chipset, riegel_snapshot_
     snapshot->intena = chipset->paula.interrupts.intena;
 }
 
-riegel_u16 riegel_chipset_read_reg(const RiegelChipset *chipset, riegel_u32 addr)
+rigel_u16 rigel_chipset_read_reg(const RigelChipset *chipset, rigel_u32 addr)
 {
-    riegel_u32 index;
+    rigel_u32 index;
 
-    if (chipset == NULL || !riegel_custom_is_valid_reg(addr)) {
+    if (chipset == NULL || !rigel_custom_is_valid_reg(addr)) {
         return 0;
     }
 
@@ -63,11 +63,11 @@ riegel_u16 riegel_chipset_read_reg(const RiegelChipset *chipset, riegel_u32 addr
     return chipset->custom_regs[index];
 }
 
-void riegel_chipset_write_reg(RiegelChipset *chipset, riegel_u32 addr, riegel_u16 value)
+void rigel_chipset_write_reg(RigelChipset *chipset, rigel_u32 addr, rigel_u16 value)
 {
-    riegel_u32 index;
+    rigel_u32 index;
 
-    if (chipset == NULL || !riegel_custom_is_valid_reg(addr)) {
+    if (chipset == NULL || !rigel_custom_is_valid_reg(addr)) {
         return;
     }
 
@@ -75,30 +75,30 @@ void riegel_chipset_write_reg(RiegelChipset *chipset, riegel_u32 addr, riegel_u1
     chipset->custom_regs[index] = value;
 }
 
-void riegel_chipset_raise_irq_source(RiegelChipset *chipset, riegel_u16 mask)
+void rigel_chipset_raise_irq_source(RigelChipset *chipset, rigel_u16 mask)
 {
     if (chipset == NULL) {
         return;
     }
 
-    riegel_paula_raise_irq(&chipset->paula, mask);
-    riegel_chipset_write_reg(
+    rigel_paula_raise_irq(&chipset->paula, mask);
+    rigel_chipset_write_reg(
         chipset,
-        RIEGEL_REG_INTREQ,
-        riegel_paula_interrupts_read_intreq(&chipset->paula.interrupts)
+        RIGEL_REG_INTREQ,
+        rigel_paula_interrupts_read_intreq(&chipset->paula.interrupts)
     );
 }
 
-void riegel_chipset_clear_irq_source(RiegelChipset *chipset, riegel_u16 mask)
+void rigel_chipset_clear_irq_source(RigelChipset *chipset, rigel_u16 mask)
 {
     if (chipset == NULL) {
         return;
     }
 
-    riegel_paula_clear_irq(&chipset->paula, mask);
-    riegel_chipset_write_reg(
+    rigel_paula_clear_irq(&chipset->paula, mask);
+    rigel_chipset_write_reg(
         chipset,
-        RIEGEL_REG_INTREQ,
-        riegel_paula_interrupts_read_intreq(&chipset->paula.interrupts)
+        RIGEL_REG_INTREQ,
+        rigel_paula_interrupts_read_intreq(&chipset->paula.interrupts)
     );
 }

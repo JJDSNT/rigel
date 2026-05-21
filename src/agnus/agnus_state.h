@@ -1,18 +1,18 @@
-#ifndef RIEGEL_AGNUS_STATE_H
-#define RIEGEL_AGNUS_STATE_H
+#ifndef RIGEL_AGNUS_STATE_H
+#define RIGEL_AGNUS_STATE_H
 
 #include "agnus/blitter/blitter.h"
-#include "riegel/riegel_types.h"
+#include "rigel/rigel_types.h"
 
-typedef struct RiegelAgnus {
-    riegel_u16 dmacon;
+typedef struct RigelAgnus {
+    rigel_u16 dmacon;
     BlitterState blitter;
-} RiegelAgnus;
+} RigelAgnus;
 
-void riegel_agnus_reset(RiegelAgnus *agnus);
-BlitterMemory riegel_agnus_blitter_memory(RiegelContext *ctx);
-BlitterIrqSink riegel_agnus_blitter_irq_sink(RiegelContext *ctx);
-void riegel_agnus_blitter_step_dma(RiegelContext *ctx, riegel_u32 dma_slots);
-void riegel_agnus_step(RiegelContext *ctx, riegel_u32 cycles);
+void rigel_agnus_reset(RigelAgnus *agnus);
+BlitterMemory rigel_agnus_blitter_memory(RigelContext *ctx);
+BlitterIrqSink rigel_agnus_blitter_irq_sink(RigelContext *ctx);
+void rigel_agnus_blitter_step_dma(RigelContext *ctx, rigel_u32 dma_slots);
+void rigel_agnus_step(RigelContext *ctx, rigel_u32 cycles);
 
 #endif

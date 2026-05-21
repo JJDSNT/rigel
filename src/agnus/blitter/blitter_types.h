@@ -1,14 +1,14 @@
-#ifndef RIEGEL_AGNUS_BLITTER_TYPES_H
-#define RIEGEL_AGNUS_BLITTER_TYPES_H
+#ifndef RIGEL_AGNUS_BLITTER_TYPES_H
+#define RIGEL_AGNUS_BLITTER_TYPES_H
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "riegel/riegel_config.h"
+#include "rigel/rigel_config.h"
 
 /*
- * Riegel Agnus Blitter
+ * Rigel Agnus Blitter
  *
  * This module separates:
  *
@@ -140,7 +140,7 @@ typedef struct BlitterResult {
     bool zero;
 } BlitterResult;
 
-typedef riegel_chip_ram_if_t BlitterMemory;
+typedef rigel_chip_ram_if_t BlitterMemory;
 
 typedef void (*BlitterIrqRaiseFn)(void *opaque, uint16_t mask);
 

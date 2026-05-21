@@ -1,8 +1,8 @@
-#include "bus/riegel_bus.h"
+#include "bus/rigel_bus.h"
 
 #include <stddef.h>
 
-void riegel_bus_touch(riegel_bus_t *bus, riegel_u32 addr)
+void rigel_bus_touch(rigel_bus_t *bus, rigel_u32 addr)
 {
     if (bus == NULL) {
         return;

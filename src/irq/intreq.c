@@ -1,12 +1,12 @@
 #include "irq/intreq.h"
 
-riegel_u16 intreq_apply_write(riegel_u16 current, riegel_u16 value)
+rigel_u16 intreq_apply_write(rigel_u16 current, rigel_u16 value)
 {
-    riegel_u16 mask = (riegel_u16)(value & 0x7fffU);
+    rigel_u16 mask = (rigel_u16)(value & 0x7fffU);
 
     if ((value & 0x8000U) != 0) {
-        return (riegel_u16)(current | mask);
+        return (rigel_u16)(current | mask);
     }
 
-    return (riegel_u16)(current & (riegel_u16)(~mask));
+    return (rigel_u16)(current & (rigel_u16)(~mask));
 }

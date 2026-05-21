@@ -1,8 +1,8 @@
 #ifndef INTENA_H
 #define INTENA_H
 
-#include "riegel/riegel_types.h"
+#include "rigel/rigel_types.h"
 
-riegel_u16 intena_apply_write(riegel_u16 current, riegel_u16 value);
+rigel_u16 intena_apply_write(rigel_u16 current, rigel_u16 value);
 
 #endif

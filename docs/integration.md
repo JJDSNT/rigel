@@ -2,7 +2,7 @@
 
 ## Scope
 
-`riegel` deve poder ser integrado a um host externo sem depender de CPU, frontend ou plataforma especifica.
+`rigel` deve poder ser integrado a um host externo sem depender de CPU, frontend ou plataforma especifica.
 
 ## Initial Notes
 

@@ -1,5 +1,5 @@
-#ifndef RIEGEL_AGNUS_BLITTER_H
-#define RIEGEL_AGNUS_BLITTER_H
+#ifndef RIGEL_AGNUS_BLITTER_H
+#define RIGEL_AGNUS_BLITTER_H
 
 #include <stdbool.h>
 #include <stdint.h>

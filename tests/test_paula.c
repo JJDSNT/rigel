@@ -1,40 +1,44 @@
+#include "core/rigel_context.h"
 #include "paula/paula_state.h"
-#include "riegel/riegel.h"
+#include "rigel/rigel.h"
 
-static void test_disk_irq_raise(void *opaque, riegel_u16 mask)
+static rigel_u8 g_test_adf[AMIGA_TRACK_SIZE];
+
+static void test_disk_irq_raise(void *opaque, rigel_u16 mask)
 {
-    riegel_u16 *value = (riegel_u16 *)opaque;
-    *value = (riegel_u16)(*value | mask);
+    rigel_u16 *value = (rigel_u16 *)opaque;
+    *value = (rigel_u16)(*value | mask);
 }
 
 typedef struct TestChipRam {
-    riegel_u16 words[16];
+    rigel_u16 words[16];
 } TestChipRam;
 
-static void test_chip_ram_write16(void *opaque, riegel_u32 addr, riegel_u16 value)
+static void test_chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
 {
     TestChipRam *ram = (TestChipRam *)opaque;
-    riegel_u32 index = (addr >> 1) & 0x0fU;
+    rigel_u32 index = (addr >> 1) & 0x0fU;
     ram->words[index] = value;
 }
 
 int main(void)
 {
-    RiegelPaula paula;
+    RigelPaula paula = { 0 };
+    FloppyDrive drive = { 0 };
     paula_disk_irq_sink_t sink;
-    riegel_u16 irq_mask = 0;
+    rigel_u16 irq_mask = 0;
     TestChipRam ram = { 0 };
-    riegel_chip_ram_if_t chip_ram = { 0 };
-    riegel_config_t cfg = { 0 };
-    RiegelContext *ctx;
+    rigel_chip_ram_if_t chip_ram = { 0 };
+    rigel_config_t cfg = { 0 };
+    RigelContext *ctx;
 
-    riegel_paula_reset(&paula);
+    rigel_paula_reset(&paula);
 
     if (paula.audio.channels != 4) {
         return 1;
     }
 
-    if (paula.disk.inserted != 0) {
+    if (paula.disk.drive != NULL) {
         return 1;
     }
 
@@ -46,27 +50,30 @@ int main(void)
         return 1;
     }
 
-    riegel_paula_raise_irq(&paula, RIEGEL_PAULA_INT_BLIT);
-    if ((paula.interrupts.intreq & RIEGEL_PAULA_INT_BLIT) == 0) {
+    rigel_paula_raise_irq(&paula, RIGEL_PAULA_INT_BLIT);
+    if ((paula.interrupts.intreq & RIGEL_PAULA_INT_BLIT) == 0) {
         return 1;
     }
 
-    riegel_paula_clear_irq(&paula, RIEGEL_PAULA_INT_BLIT);
-    if ((paula.interrupts.intreq & RIEGEL_PAULA_INT_BLIT) != 0) {
+    rigel_paula_clear_irq(&paula, RIGEL_PAULA_INT_BLIT);
+    if ((paula.interrupts.intreq & RIGEL_PAULA_INT_BLIT) != 0) {
         return 1;
     }
 
     sink.opaque = &irq_mask;
     sink.raise = test_disk_irq_raise;
-    riegel_paula_set_disk_irq_sink(&paula, sink);
+    rigel_paula_set_disk_irq_sink(&paula, sink);
+
+    floppy_init(&drive);
+    floppy_insert(&drive, g_test_adf, sizeof(g_test_adf));
 
     chip_ram.opaque = &ram;
     chip_ram.write16 = test_chip_ram_write16;
-    riegel_paula_set_disk_memory_if(&paula, chip_ram);
-    riegel_paula_set_disk_inserted(&paula, 1);
+    rigel_paula_set_disk_memory_if(&paula, chip_ram);
+    rigel_paula_set_disk_drive(&paula, &drive);
 
-    disk_write_dsklen(&paula.disk, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
-    disk_write_dsklen(&paula.disk, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
+    disk_write_dsklen(&paula.disk, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
+    disk_write_dsklen(&paula.disk, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
     if (!paula.disk.dma_active) {
         return 1;
     }
@@ -76,7 +83,11 @@ int main(void)
     }
 
     disk_dma_service_grant(&paula.disk);
-    if (ram.words[0] != 0) {
+    if (ram.words[0] != 0x4489u) {
+        return 1;
+    }
+
+    if (disk_read_dskdatr(&paula.disk) != 0x4489u) {
         return 1;
     }
 
@@ -84,56 +95,61 @@ int main(void)
         return 1;
     }
 
-    riegel_paula_reset(&paula);
-    riegel_paula_set_disk_irq_sink(&paula, sink);
-    disk_write_dsklen(&paula.disk, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
-    disk_write_dsklen(&paula.disk, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
+    rigel_paula_reset(&paula);
+    rigel_paula_set_disk_irq_sink(&paula, sink);
+    rigel_paula_set_disk_drive(&paula, NULL);
+    disk_write_dsklen(&paula.disk, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
+    disk_write_dsklen(&paula.disk, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
 
     if (disk_dma_wants_service(&paula.disk)) {
         return 1;
     }
 
     irq_mask = 0;
-    disk_step(&paula.disk, RIEGEL_PAULA_DISK_FAKE_DMA_CYCLES);
+    disk_step(&paula.disk, RIGEL_PAULA_DISK_FAKE_DMA_CYCLES);
     if ((irq_mask & 0x0002u) == 0) {
         return 1;
     }
 
     cfg.chip_ram = chip_ram;
-    ctx = riegel_create(&cfg);
+    ctx = rigel_create(&cfg);
     if (ctx == NULL) {
         return 1;
     }
 
-    riegel_custom_write16(ctx, RIEGEL_REG_DSKPTH, 0x0000);
-    riegel_custom_write16(ctx, RIEGEL_REG_DSKPTL, 0x0000);
-    riegel_custom_write16(ctx, RIEGEL_REG_ADKCON, RIEGEL_PAULA_ADKCON_SETCLR | RIEGEL_PAULA_ADKCON_WORDSYNC);
-    riegel_custom_write16(ctx, RIEGEL_REG_DSKLEN, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
-    riegel_custom_write16(ctx, RIEGEL_REG_DSKLEN, RIEGEL_PAULA_DSKLEN_DMAEN | 1u);
+    floppy_init(&drive);
+    floppy_insert(&drive, g_test_adf, sizeof(g_test_adf));
+    rigel_paula_set_disk_drive(&ctx->chipset.paula, &drive);
 
-    if ((riegel_custom_read16(ctx, RIEGEL_REG_ADKCONR) & RIEGEL_PAULA_ADKCON_WORDSYNC) == 0) {
-        riegel_destroy(ctx);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKPTH, 0x0000);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKPTL, 0x0000);
+    rigel_custom_write16(ctx, RIGEL_REG_ADKCON, RIGEL_PAULA_ADKCON_SETCLR | RIGEL_PAULA_ADKCON_WORDSYNC);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
+
+    if ((rigel_custom_read16(ctx, RIGEL_REG_ADKCONR) & RIGEL_PAULA_ADKCON_WORDSYNC) == 0) {
+        rigel_destroy(ctx);
         return 1;
     }
 
-    if ((riegel_custom_read16(ctx, RIEGEL_REG_DSKBYTR) & RIEGEL_PAULA_DSKBYTR_DMAON) == 0) {
-        riegel_destroy(ctx);
+    if ((rigel_custom_read16(ctx, RIGEL_REG_DSKBYTR) & RIGEL_PAULA_DSKBYTR_DMAON) == 0) {
+        rigel_destroy(ctx);
         return 1;
     }
 
-    riegel_step(ctx, 1);
+    rigel_step(ctx, 1);
 
-    if (riegel_custom_read16(ctx, RIEGEL_REG_DSKDATR) != 0) {
-        riegel_destroy(ctx);
+    if (rigel_custom_read16(ctx, RIGEL_REG_DSKDATR) != 0x4489u) {
+        rigel_destroy(ctx);
         return 1;
     }
 
-    if ((riegel_get_intreq(ctx) & 0x0002u) == 0) {
-        riegel_destroy(ctx);
+    if ((rigel_get_intreq(ctx) & 0x0002u) == 0) {
+        rigel_destroy(ctx);
         return 1;
     }
 
-    riegel_destroy(ctx);
+    rigel_destroy(ctx);
 
     return 0;
 }

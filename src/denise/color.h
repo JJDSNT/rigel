@@ -1,8 +1,8 @@
 #ifndef COLOR_H
 #define COLOR_H
 
-#include "riegel/riegel_types.h"
+#include "rigel/rigel_types.h"
 
-riegel_u32 color_expand_12bit(riegel_u16 value);
+rigel_u32 color_expand_12bit(rigel_u16 value);
 
 #endif

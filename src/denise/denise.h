@@ -1,8 +1,8 @@
 #ifndef DENISE_H
 #define DENISE_H
 
-struct riegel;
+struct rigel;
 
-void denise_init(struct riegel *rg);
+void denise_init(struct rigel *rg);
 
 #endif

@@ -1,8 +1,8 @@
 #ifndef AGNUS_H
 #define AGNUS_H
 
-struct riegel;
+struct rigel;
 
-void agnus_init(struct riegel *rg);
+void agnus_init(struct rigel *rg);
 
 #endif

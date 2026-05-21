@@ -1,30 +1,30 @@
-#ifndef RIEGEL_CHIPSET_H
-#define RIEGEL_CHIPSET_H
+#ifndef RIGEL_CHIPSET_H
+#define RIGEL_CHIPSET_H
 
 #include "agnus/agnus_state.h"
 #include "paula/paula_state.h"
-#include "riegel/riegel_snapshot.h"
-#include "riegel/riegel_types.h"
+#include "rigel/rigel_snapshot.h"
+#include "rigel/rigel_types.h"
 
 enum {
-    RIEGEL_CUSTOM_SPACE_SIZE = 0x200,
-    RIEGEL_CUSTOM_REG_COUNT = RIEGEL_CUSTOM_SPACE_SIZE / 2
+    RIGEL_CUSTOM_SPACE_SIZE = 0x200,
+    RIGEL_CUSTOM_REG_COUNT = RIGEL_CUSTOM_SPACE_SIZE / 2
 };
 
-struct RiegelChipset {
-    riegel_u64 cycles;
-    RiegelAgnus agnus;
-    RiegelPaula paula;
-    riegel_u16 custom_regs[RIEGEL_CUSTOM_REG_COUNT];
+struct RigelChipset {
+    rigel_u64 cycles;
+    RigelAgnus agnus;
+    RigelPaula paula;
+    rigel_u16 custom_regs[RIGEL_CUSTOM_REG_COUNT];
 };
 
-void riegel_chipset_reset(RiegelChipset *chipset);
-void riegel_chipset_step(RiegelContext *ctx, riegel_u32 cycles);
-void riegel_chipset_take_snapshot(const RiegelChipset *chipset, riegel_snapshot_t *snapshot);
+void rigel_chipset_reset(RigelChipset *chipset);
+void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles);
+void rigel_chipset_take_snapshot(const RigelChipset *chipset, rigel_snapshot_t *snapshot);
 
-riegel_u16 riegel_chipset_read_reg(const RiegelChipset *chipset, riegel_u32 addr);
-void riegel_chipset_write_reg(RiegelChipset *chipset, riegel_u32 addr, riegel_u16 value);
-void riegel_chipset_raise_irq_source(RiegelChipset *chipset, riegel_u16 mask);
-void riegel_chipset_clear_irq_source(RiegelChipset *chipset, riegel_u16 mask);
+rigel_u16 rigel_chipset_read_reg(const RigelChipset *chipset, rigel_u32 addr);
+void rigel_chipset_write_reg(RigelChipset *chipset, rigel_u32 addr, rigel_u16 value);
+void rigel_chipset_raise_irq_source(RigelChipset *chipset, rigel_u16 mask);
+void rigel_chipset_clear_irq_source(RigelChipset *chipset, rigel_u16 mask);
 
 #endif

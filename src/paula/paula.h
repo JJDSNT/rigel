@@ -1,8 +1,8 @@
 #ifndef PAULA_H
 #define PAULA_H
 
-struct riegel;
+struct rigel;
 
-void paula_init(struct riegel *rg);
+void paula_init(struct rigel *rg);
 
 #endif

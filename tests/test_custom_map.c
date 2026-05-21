@@ -1,40 +1,40 @@
-#include "riegel/riegel.h"
+#include "rigel/rigel.h"
 
 int main(void)
 {
-    if (!riegel_custom_is_valid_reg(RIEGEL_REG_DMACON)) {
+    if (!rigel_custom_is_valid_reg(RIGEL_REG_DMACON)) {
         return 1;
     }
 
-    if (riegel_custom_is_valid_reg(0x001)) {
+    if (rigel_custom_is_valid_reg(0x001)) {
         return 1;
     }
 
-    if (riegel_custom_is_valid_reg(0x200)) {
+    if (rigel_custom_is_valid_reg(0x200)) {
         return 1;
     }
 
-    if (riegel_custom_domain_for_reg(RIEGEL_REG_DMACON) != RIEGEL_DOMAIN_AGNUS) {
+    if (rigel_custom_domain_for_reg(RIGEL_REG_DMACON) != RIGEL_DOMAIN_AGNUS) {
         return 1;
     }
 
-    if (riegel_custom_domain_for_reg(RIEGEL_REG_INTENA) != RIEGEL_DOMAIN_PAULA) {
+    if (rigel_custom_domain_for_reg(RIGEL_REG_INTENA) != RIGEL_DOMAIN_PAULA) {
         return 1;
     }
 
-    if (riegel_custom_domain_for_reg(RIEGEL_REG_INTREQ) != RIEGEL_DOMAIN_PAULA) {
+    if (rigel_custom_domain_for_reg(RIGEL_REG_INTREQ) != RIGEL_DOMAIN_PAULA) {
         return 1;
     }
 
-    if (riegel_custom_domain_for_reg(RIEGEL_REG_COLOR00) != RIEGEL_DOMAIN_DENISE) {
+    if (rigel_custom_domain_for_reg(RIGEL_REG_COLOR00) != RIGEL_DOMAIN_DENISE) {
         return 1;
     }
 
-    if (riegel_custom_domain_for_reg(0x002) != RIEGEL_DOMAIN_AGNUS) {
+    if (rigel_custom_domain_for_reg(0x002) != RIGEL_DOMAIN_AGNUS) {
         return 1;
     }
 
-    if (riegel_custom_domain_for_reg(0x004) != RIEGEL_DOMAIN_UNKNOWN) {
+    if (rigel_custom_domain_for_reg(0x004) != RIGEL_DOMAIN_UNKNOWN) {
         return 1;
     }
 

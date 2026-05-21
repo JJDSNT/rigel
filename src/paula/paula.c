@@ -1,6 +1,6 @@
 #include "paula/paula.h"
 
-void paula_init(struct riegel *rg)
+void paula_init(struct rigel *rg)
 {
     (void)rg;
 }
