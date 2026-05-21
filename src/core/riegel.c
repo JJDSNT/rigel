@@ -6,6 +6,7 @@
 #include "chipset/chipset.h"
 #include "core/riegel_context.h"
 #include "paula/paula_interrupts.h"
+#include "paula/paula_state.h"
 
 RiegelContext *riegel_create(const riegel_config_t *config)
 {
@@ -21,6 +22,8 @@ RiegelContext *riegel_create(const riegel_config_t *config)
     }
 
     ctx->config = *config;
+    riegel_paula_set_disk_memory_if(&ctx->chipset.paula, ctx->config.chip_ram);
+    riegel_paula_set_disk_irq_sink(&ctx->chipset.paula, riegel_paula_disk_irq_sink(ctx));
     riegel_reset(ctx);
     return ctx;
 }

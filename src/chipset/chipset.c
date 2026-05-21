@@ -28,6 +28,11 @@ void riegel_chipset_step(RiegelChipset *chipset, riegel_u32 cycles)
     }
 
     chipset->cycles = riegel_timing_advance(chipset->cycles, cycles);
+    riegel_paula_step(&chipset->paula, cycles);
+
+    if (disk_dma_wants_service(&chipset->paula.disk)) {
+        disk_dma_service_grant(&chipset->paula.disk);
+    }
 }
 
 void riegel_chipset_take_snapshot(const RiegelChipset *chipset, riegel_snapshot_t *snapshot)
@@ -71,7 +76,7 @@ void riegel_chipset_raise_irq_source(RiegelChipset *chipset, riegel_u16 mask)
         return;
     }
 
-    riegel_paula_interrupts_raise(&chipset->paula.interrupts, mask);
+    riegel_paula_raise_irq(&chipset->paula, mask);
     riegel_chipset_write_reg(
         chipset,
         RIEGEL_REG_INTREQ,
@@ -85,7 +90,7 @@ void riegel_chipset_clear_irq_source(RiegelChipset *chipset, riegel_u16 mask)
         return;
     }
 
-    riegel_paula_interrupts_clear(&chipset->paula.interrupts, mask);
+    riegel_paula_clear_irq(&chipset->paula, mask);
     riegel_chipset_write_reg(
         chipset,
         RIEGEL_REG_INTREQ,

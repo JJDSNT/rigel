@@ -80,6 +80,7 @@ if(RIEGEL_BUILD_TESTS)
         test_custom_map
         test_beam
         test_cia
+        test_paula
         test_blitter
         test_blitter_dma
         test_copper

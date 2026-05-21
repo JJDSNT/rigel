@@ -20,12 +20,24 @@ riegel_custom_domain_t riegel_custom_domain_for_reg(riegel_u32 addr)
     case RIEGEL_REG_DMACON:
         return RIEGEL_DOMAIN_AGNUS;
     case RIEGEL_REG_INTENA:
+    case RIEGEL_REG_DSKDATR:
+    case RIEGEL_REG_ADKCONR:
+    case RIEGEL_REG_DSKBYTR:
+    case RIEGEL_REG_DSKPTH:
+    case RIEGEL_REG_DSKPTL:
+    case RIEGEL_REG_DSKLEN:
+    case RIEGEL_REG_DSKSYNC:
+    case RIEGEL_REG_ADKCON:
     case RIEGEL_REG_INTREQ:
         return RIEGEL_DOMAIN_PAULA;
     case RIEGEL_REG_COLOR00:
         return RIEGEL_DOMAIN_DENISE;
     default:
-        return agnus_owns_reg(addr) ? RIEGEL_DOMAIN_AGNUS : RIEGEL_DOMAIN_UNKNOWN;
+        if (agnus_owns_reg(addr)) {
+            return RIEGEL_DOMAIN_AGNUS;
+        }
+
+        return paula_owns_reg(addr) ? RIEGEL_DOMAIN_PAULA : RIEGEL_DOMAIN_UNKNOWN;
     }
 }
 
