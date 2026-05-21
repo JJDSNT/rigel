@@ -6,6 +6,7 @@
 #include "agnus/agnus_state.h"
 #include "core/rigel_context.h"
 #include "core/rigel_timing.h"
+#include "domains/disk/disk_domain.h"
 #include "paula/paula_interrupts.h"
 #include "paula/paula_state.h"
 #include "rigel/rigel_custom.h"
@@ -22,6 +23,7 @@ void rigel_chipset_reset(RigelChipset *chipset)
     for (i = 0; i < RIGEL_FLOPPY_DRIVE_COUNT; ++i) {
         floppy_reset(&chipset->floppy[i]);
     }
+    rtc_reset(&chipset->rtc);
     rigel_agnus_reset(&chipset->agnus);
     rigel_paula_reset(&chipset->paula);
     rigel_paula_set_disk_drive(&chipset->paula, &chipset->floppy[RIGEL_FLOPPY_DRIVE_DF0]);
@@ -38,11 +40,12 @@ void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles)
 
     chipset = &ctx->chipset;
     chipset->cycles = rigel_timing_advance(chipset->cycles, cycles);
+    rigel_paula_set_dmacon(&chipset->paula, chipset->agnus.dma.dmacon);
     rigel_agnus_step(ctx, cycles);
     rigel_paula_step(&chipset->paula, cycles);
 
-    if (disk_dma_wants_service(&chipset->paula.disk)) {
-        disk_dma_service_grant(&chipset->paula.disk);
+    if (rigel_disk_domain_dma_wants_service(&chipset->paula.disk)) {
+        rigel_disk_domain_dma_service_grant(&chipset->paula.disk);
     }
 }
 

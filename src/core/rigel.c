@@ -26,6 +26,7 @@ RigelContext *rigel_create(const rigel_config_t *config)
     rigel_reset(ctx);
     rigel_paula_set_disk_memory_if(&ctx->chipset.paula, ctx->config.chip_ram);
     rigel_paula_set_disk_irq_sink(&ctx->chipset.paula, rigel_paula_disk_irq_sink(ctx));
+    rigel_paula_set_serial_irq_sink(&ctx->chipset.paula, rigel_paula_serial_irq_sink(ctx));
     return ctx;
 }
 
@@ -107,6 +108,33 @@ bool rigel_load_state(RigelContext *ctx, const void *buffer, size_t buffer_size)
     rigel_context_write_reg(ctx, 0x009a, rigel_paula_interrupts_read_intena(&ctx->chipset.paula.interrupts));
     rigel_context_write_reg(ctx, 0x009c, rigel_paula_interrupts_read_intreq(&ctx->chipset.paula.interrupts));
     return true;
+}
+
+void rigel_input_set_joydat(RigelContext *ctx, rigel_u32 port, rigel_u16 value)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    rigel_paula_set_joydat(&ctx->chipset.paula, port, value);
+}
+
+void rigel_input_set_pot_button_x(RigelContext *ctx, rigel_u32 port, bool pressed)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    rigel_paula_set_pot_button_x(&ctx->chipset.paula, port, pressed);
+}
+
+void rigel_input_set_pot_button_y(RigelContext *ctx, rigel_u32 port, bool pressed)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    rigel_paula_set_pot_button_y(&ctx->chipset.paula, port, pressed);
 }
 
 rigel_status_t rigel_floppy_insert(
@@ -193,4 +221,59 @@ bool rigel_floppy_get_status(
     status->cylinder = (rigel_u8)target->cylinder;
     status->side = (rigel_u8)target->side;
     return true;
+}
+
+rigel_rtc_model_t rigel_rtc_get_model(const RigelContext *ctx)
+{
+    if (ctx == NULL) {
+        return RIGEL_RTC_MODEL_NONE;
+    }
+
+    return rtc_get_model(&ctx->chipset.rtc);
+}
+
+void rigel_rtc_set_model(RigelContext *ctx, rigel_rtc_model_t model)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    rtc_set_model(&ctx->chipset.rtc, model);
+}
+
+time_t rigel_rtc_get_time(RigelContext *ctx)
+{
+    if (ctx == NULL) {
+        return (time_t)0;
+    }
+
+    return rtc_get_time(&ctx->chipset.rtc);
+}
+
+void rigel_rtc_set_time(RigelContext *ctx, time_t value)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    rtc_set_time(&ctx->chipset.rtc, value);
+    rtc_update(&ctx->chipset.rtc);
+}
+
+rigel_u8 rigel_rtc_read_reg(RigelContext *ctx, rigel_u8 reg)
+{
+    if (ctx == NULL || reg >= 16u) {
+        return 0;
+    }
+
+    return rtc_read_reg(&ctx->chipset.rtc, reg);
+}
+
+void rigel_rtc_write_reg(RigelContext *ctx, rigel_u8 reg, rigel_u8 value)
+{
+    if (ctx == NULL || reg >= 16u) {
+        return;
+    }
+
+    rtc_write_reg(&ctx->chipset.rtc, reg, value);
 }

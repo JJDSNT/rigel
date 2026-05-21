@@ -5,8 +5,10 @@
 #include "rigel_custom.h"
 #include "rigel_events.h"
 #include "rigel_floppy.h"
+#include "rigel_input.h"
 #include "rigel_irq.h"
 #include "rigel_mmio.h"
+#include "rigel_rtc.h"
 #include "rigel_snapshot.h"
 #include "rigel_types.h"
 

@@ -33,7 +33,7 @@ int main(void)
 
     rigel_paula_reset(&paula);
 
-    if (paula.audio.channels != 4) {
+    if (paula.audio.dmacon != 0 || paula.audio.mixed_left != 0 || paula.audio.mixed_right != 0) {
         return 1;
     }
 
@@ -41,7 +41,7 @@ int main(void)
         return 1;
     }
 
-    if (paula.serial.baud_divider != 0) {
+    if (paula.serial.serper != 0 || paula.serial.tx_shift_busy || paula.serial.rx_buffer_full) {
         return 1;
     }
 

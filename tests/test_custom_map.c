@@ -26,6 +26,26 @@ int main(void)
         return 1;
     }
 
+    if (rigel_custom_domain_for_reg(RIGEL_REG_SERDATR) != RIGEL_DOMAIN_PAULA) {
+        return 1;
+    }
+
+    if (rigel_custom_domain_for_reg(RIGEL_REG_SERDAT) != RIGEL_DOMAIN_PAULA) {
+        return 1;
+    }
+
+    if (rigel_custom_domain_for_reg(RIGEL_REG_SERPER) != RIGEL_DOMAIN_PAULA) {
+        return 1;
+    }
+
+    if (rigel_custom_domain_for_reg(RIGEL_REG_JOY0DAT) != RIGEL_DOMAIN_PAULA) {
+        return 1;
+    }
+
+    if (rigel_custom_domain_for_reg(RIGEL_REG_POTGO) != RIGEL_DOMAIN_PAULA) {
+        return 1;
+    }
+
     if (rigel_custom_domain_for_reg(RIGEL_REG_COLOR00) != RIGEL_DOMAIN_DENISE) {
         return 1;
     }

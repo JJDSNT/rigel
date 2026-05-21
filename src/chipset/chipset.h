@@ -4,6 +4,7 @@
 #include "agnus/agnus_state.h"
 #include "floppy/floppy_drive.h"
 #include "paula/paula_state.h"
+#include "rtc/rtc.h"
 #include "rigel/rigel_floppy.h"
 #include "rigel/rigel_snapshot.h"
 #include "rigel/rigel_types.h"
@@ -18,6 +19,7 @@ struct RigelChipset {
     rigel_u64 cycles;
     RigelAgnus agnus;
     RigelPaula paula;
+    RigelRTC rtc;
     FloppyDrive floppy[RIGEL_FLOPPY_DRIVE_COUNT];
     rigel_u16 custom_regs[RIGEL_CUSTOM_REG_COUNT];
 };

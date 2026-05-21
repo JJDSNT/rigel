@@ -21,11 +21,20 @@ rigel_custom_domain_t rigel_custom_domain_for_reg(rigel_u32 addr)
         return RIGEL_DOMAIN_AGNUS;
     case RIGEL_REG_INTENA:
     case RIGEL_REG_DSKDATR:
+    case RIGEL_REG_JOY0DAT:
+    case RIGEL_REG_JOY1DAT:
     case RIGEL_REG_ADKCONR:
+    case RIGEL_REG_POT0DAT:
+    case RIGEL_REG_POT1DAT:
+    case RIGEL_REG_POTGOR:
+    case RIGEL_REG_SERDATR:
     case RIGEL_REG_DSKBYTR:
     case RIGEL_REG_DSKPTH:
     case RIGEL_REG_DSKPTL:
     case RIGEL_REG_DSKLEN:
+    case RIGEL_REG_SERDAT:
+    case RIGEL_REG_SERPER:
+    case RIGEL_REG_POTGO:
     case RIGEL_REG_DSKSYNC:
     case RIGEL_REG_ADKCON:
     case RIGEL_REG_INTREQ:
