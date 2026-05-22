@@ -1,6 +1,7 @@
 #include "slot_scheduler.h"
 #include "vblank.h"
 #include "deadline.h"
+#include "agnus/irq/agnus_irq.h"
 
 #include "core/rigel_context.h"
 #include "agnus/agnus_state.h"
@@ -246,6 +247,8 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
         sched->hpos = beam->hpos;
         if (beam->hpos == 0)
             sched->table_dirty = true;  /* new line: VBL status may change */
+        if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos))
+            agnus_irq_raise_vblank(ctx);
     } else {
         (void)frame_lines;
         hpos = (rigel_u16)(hpos + 1u);

@@ -38,6 +38,13 @@ int main(void)
         return 1;
     }
 
+    /* VERTB fires at vpos=0, hpos=1 (one CCK from reset) */
+    rigel_agnus_step(ctx, 1);
+    if ((rigel_get_intreq(ctx) & 0x0020u) == 0) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
     rigel_destroy(ctx);
     return 0;
 }
