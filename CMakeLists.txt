@@ -162,6 +162,7 @@ if(RIGEL_BUILD_HARNESS)
     set(HARNESS_TESTS
         test_blitter_stall
         test_blitter_timing
+        test_endian
     )
 
     foreach(test_name IN LISTS HARNESS_TESTS)
