@@ -6,7 +6,9 @@
 - `paula_disk`: improve `DSKBYTR`, `DSKDATR`, `DSKSYNC`, `ADKCON`, and real drive-selection flow into `DF0..DF3`
 - `audio`: replace minimal stepping with clearer DMA fetch/service behavior
 - `serial`: keep the current MMIO/IRQ path, then decide what host-facing serial bridge should look like
-- `beam` / `copper`: move more timing policy out of `agnus_state.c` and into domains that already exist
+- `beam` / `copper`: deepen timing policy in the existing domains without rebuilding a parallel Agnus-local hierarchy
+- `denise`: turn the scaffold into a real composition path, starting with palette, playfield modes, and scanline-facing output state
+- `agnus`: keep the chip layer thin and deepen the actual behavior in domains plus real Agnus-owned modules such as MMIO, bitplane-side ownership, and blitter integration
 
 2. Keep the domain split honest
 - every extracted domain must reduce ambiguity, not just add files

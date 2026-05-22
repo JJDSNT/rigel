@@ -21,6 +21,7 @@
 - these domains are currently single-thread coordination surfaces, not parallel runtimes
 - `DMACON` ownership now sits under the DMA domain state instead of the top level of `RigelAgnus`
 - Agnus MMIO reads/writes for `DMACON` already go through DMA-domain helpers
+- chip-facing MMIO now enters directly through Agnus/Denise/Paula entrypoints instead of separate `*regs` wrapper files
 - Paula interrupt policy (`INTREQ`, `INTENA`, `IPL`) now lives in the interrupt domain, with `paula_interrupts.*` acting as the compatibility/wiring surface
 - Paula disk MMIO, stepping and DMA-service routing now go through the disk domain, with `paula_regs.c` and `paula_state.c` reduced to composition/wiring roles
 - Paula serial is now a real migrated domain, not a placeholder:
@@ -42,9 +43,15 @@
 - `src/chipset/paula/paula_old/` is no longer required as functional reference material and has been removed.
 - `RigelChipset` currently composes:
   - `RigelAgnus`
+  - `RigelDenise`
   - `RigelPaula`
+  - `RigelRTC`
+  - `FloppyDrive[4]`
 - `RigelAgnus` already owns:
-  - `dmacon`
+  - `beam`
+  - `dma`
+  - `copper`
+  - `bitplanes`
   - `BlitterState`
 - `RigelPaula` already owns:
   - interrupt model (`INTREQ`, `INTENA`, `IPL`)
@@ -60,6 +67,26 @@
   - insert/eject
   - status query per drive
 - RTC is now considered part of the library scope, but not part of the custom chip family.
+- Denise is now being scaffolded as a visual composition/output subsystem.
+- Denise direction:
+  - Agnus owns time, DMA cadence, and fetch scheduling
+  - Denise owns display-facing registers, palette, composition state, and output staging
+- Denise keeps its internal split as the canonical direction for visual work:
+  - `registers/`
+  - `render/`
+  - `sprites/`
+  - `palette/`
+  - `video/`
+  - `output/`
+  - `debug/`
+- Agnus scaffolding was intentionally reduced back toward the documented architecture:
+  - `domains/` remains the real place for beam, DMA, copper, and blitter coordination
+  - `src/chipset/agnus/` stays focused on composition, MMIO entrypoints, state ownership, and Agnus-specific code
+- speculative chipset-level helper headers that suggested a parallel DMA/event API were removed
+- important rule kept explicit:
+  - there is no `agnus/sprites/`
+  - sprite fetch belongs under Agnus DMA
+  - sprite interpretation/composition belongs outside Agnus
 
 # Working Paths
 
@@ -104,4 +131,4 @@
 - `Rigel` is not being designed as multicore-first.
 - `Rigel` should be concurrency-aware internally, but deterministic and single-thread for the classic chipset path.
 - domains are meant to express ownership and temporal boundaries, not immediate thread boundaries.
-- `RigelAgnus` now owns explicit `beam`, `dma`, `copper` and `blitter` state, with stepping routed through domain wrappers.
+- `RigelAgnus` now owns explicit `beam`, `dma`, `copper`, `bitplanes`, and `blitter` state, with stepping still routed through domains where appropriate.

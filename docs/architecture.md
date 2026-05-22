@@ -85,6 +85,7 @@ acoplamento. Não são threads — são superfícies de ownership.
 `src/chipset/` é a raiz composicional. Concentra:
 - `RigelChipset`: contexto raiz com Agnus, Paula, Denise, RTC, FloppyDrives
 - MMIO routing: `rigel_custom_read16/write16` → domínio correto
+- entrypoints de MMIO por chip, sem uma camada extra separada de `*regs`
 - Wiring interno: IRQ sink, DMA grant, Chip RAM callbacks
 - Mediação: domínios não dependem uns dos outros diretamente
 
@@ -94,7 +95,15 @@ RigelChipset
   │     ├── beam_state_t
   │     ├── dma_state_t
   │     ├── copper_state_t
+  │     ├── bitplanes_state_t
   │     └── BlitterState
+  ├── RigelDenise
+  │     ├── registers
+  │     ├── palette
+  │     ├── render
+  │     ├── sprites
+  │     ├── video
+  │     └── output/debug
   ├── RigelPaula
   │     ├── RigelInterruptDomain
   │     ├── audio domain
