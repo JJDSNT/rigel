@@ -158,11 +158,14 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
     }
 
     /* Bitplane DMA — suppressed during VBL.
-     * TODO(slot_scheduler): derive active range from DDFSTRT/DDFSTOP + BPLCON0 hires bit.
-     * Currently uses a fixed approximation starting at AGNUS_HPOS_BITPLANE_START. */
+     * Range is derived from DDFSTRT/DDFSTOP (written via MMIO).
+     * TODO(slot_scheduler): account for BPLCON0 hires bit (adds 4 extra fetch slots). */
     if (!vbl && dmacon_bplen(sched->dmacon)) {
         rigel_u16 h;
-        for (h = AGNUS_HPOS_BITPLANE_START; h < AGNUS_SLOTS_PER_LINE - 4u; h += 2u)
+        rigel_u16 bpl_start = sched->ddfstrt;
+        rigel_u16 bpl_stop  = sched->ddfstop < (AGNUS_SLOTS_PER_LINE - 4u)
+                              ? sched->ddfstop : (AGNUS_SLOTS_PER_LINE - 4u);
+        for (h = bpl_start; h < bpl_stop; h += 2u)
             fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
     }
 
@@ -187,12 +190,14 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
 void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
 {
     int i;
-    sched->hpos          = 0;
-    sched->dmacon        = 0;
-    sched->line_is_vbl   = false;
-    sched->table_dirty   = true;
-    sched->copper_active = false;
-    sched->blitter_nasty = false;
+    sched->hpos           = 0;
+    sched->dmacon         = 0;
+    sched->ddfstrt        = AGNUS_HPOS_BITPLANE_START;
+    sched->ddfstop        = AGNUS_SLOTS_PER_LINE;    /* no upper limit until host sets it */
+    sched->line_is_vbl    = false;
+    sched->table_dirty    = true;
+    sched->copper_active  = false;
+    sched->blitter_nasty  = false;
     sched->blitter_active = false;
 
     for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++)
@@ -203,6 +208,14 @@ void agnus_slot_scheduler_invalidate(agnus_slot_scheduler_t *sched, rigel_u16 dm
 {
     sched->dmacon       = dmacon;
     sched->table_dirty  = true;
+}
+
+void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
+                                   rigel_u16 ddfstrt, rigel_u16 ddfstop)
+{
+    sched->ddfstrt     = (rigel_u16)(ddfstrt & 0x00FCu);
+    sched->ddfstop     = (rigel_u16)(ddfstop & 0x00FCu);
+    sched->table_dirty = true;
 }
 
 void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,

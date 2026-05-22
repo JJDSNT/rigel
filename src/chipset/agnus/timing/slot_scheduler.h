@@ -114,9 +114,11 @@ typedef struct agnus_slot_scheduler {
 
     /* Cached inputs used to build the current table */
     rigel_u16 dmacon;     /* DMACON value at last rebuild   */
+    rigel_u16 ddfstrt;    /* bitplane fetch start hpos      */
+    rigel_u16 ddfstop;    /* bitplane fetch stop hpos       */
     bool      line_is_vbl; /* true = VBL line, sprite/bpl suppressed */
 
-    /* Set when DMACON is written; clears after next rebuild */
+    /* Set when DMACON/DDF is written; clears after next rebuild */
     bool      table_dirty;
 
     /* Dynamic overrides applied per-step (not baked into table):
@@ -137,6 +139,10 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched);
 
 /* Call whenever DMACON is written — marks the table for rebuild. */
 void agnus_slot_scheduler_invalidate(agnus_slot_scheduler_t *sched, rigel_u16 dmacon);
+
+/* Call whenever DDFSTRT or DDFSTOP is written — marks the table for rebuild. */
+void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
+                                   rigel_u16 ddfstrt, rigel_u16 ddfstop);
 
 /* Rebuild the slot table from the current DMACON and beam vpos.
  * Called automatically by step functions when table_dirty is set. */

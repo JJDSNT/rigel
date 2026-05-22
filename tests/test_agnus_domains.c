@@ -159,6 +159,18 @@ int main(void)
         return 1;
     }
 
+    /* DDFSTRT/DDFSTOP MMIO writes update the slot scheduler DDF range */
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTRT, 0x0050u);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTOP, 0x00c0u);
+
+    if (chipset->agnus.scheduler.ddfstrt != 0x0050u ||
+        chipset->agnus.scheduler.ddfstop != 0x00c0u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_agnus_step(ctx, 4);
+
     rigel_destroy(ctx);
     return 0;
 }
