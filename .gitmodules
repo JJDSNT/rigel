@@ -1,0 +1,3 @@
+[submodule "external/musashi"]
+	path = external/musashi
+	url = https://github.com/kstenerud/Musashi

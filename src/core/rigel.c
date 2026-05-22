@@ -4,10 +4,14 @@
 #include <string.h>
 
 #include "chipset/chipset.h"
+#include "chipset/agnus/blitter/blitter.h"
 #include "core/rigel_context.h"
 #include "floppy/floppy_drive.h"
 #include "paula/paula_interrupts.h"
 #include "paula/paula_state.h"
+
+enum { RIGEL_SCANLINE_CLOCKS = 227 };
+enum { RIGEL_DMACON_BLTPRI = 0x0400u };
 
 RigelContext *rigel_create(const rigel_config_t *config)
 {
@@ -62,13 +66,79 @@ void rigel_reset(RigelContext *ctx)
     rigel_chipset_reset(&ctx->chipset);
 }
 
-void rigel_step(RigelContext *ctx, rigel_u32 cycles)
+rigel_cycle_t rigel_get_time(const RigelContext *ctx)
 {
     if (ctx == NULL) {
-        return;
+        return 0;
     }
 
-    rigel_chipset_step(ctx, cycles);
+    return ctx->chipset.cycles;
+}
+
+rigel_cycle_t rigel_get_next_deadline(const RigelContext *ctx)
+{
+    if (ctx == NULL) {
+        return 0;
+    }
+
+    /* TODO: each domain should expose its next wake time; aggregate here */
+    if (blitter_is_busy(&ctx->chipset.agnus.blitter)) {
+        return ctx->chipset.cycles + ctx->chipset.agnus.blitter.cycles_remaining;
+    }
+
+    return ctx->chipset.cycles + RIGEL_SCANLINE_CLOCKS;
+}
+
+rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
+{
+    rigel_step_result_t result;
+    rigel_u8 ipl_before;
+    bool blit_busy_before;
+
+    result.time = 0;
+    result.events = RIGEL_EVENT_NONE;
+
+    if (ctx == NULL) {
+        return result;
+    }
+
+    ipl_before = rigel_paula_interrupts_current_ipl(&ctx->chipset.paula.interrupts);
+    blit_busy_before = blitter_is_busy(&ctx->chipset.agnus.blitter) != 0;
+
+    rigel_chipset_step(ctx, (rigel_u32)cycles);
+
+    result.time = ctx->chipset.cycles;
+
+    if (rigel_paula_interrupts_current_ipl(&ctx->chipset.paula.interrupts) != ipl_before) {
+        result.events |= (rigel_u32)RIGEL_EVENT_IRQ_CHANGED;
+    }
+
+    if (blit_busy_before && blitter_is_busy(&ctx->chipset.agnus.blitter) == 0) {
+        result.events |= (rigel_u32)RIGEL_EVENT_BLIT_DONE;
+    }
+
+    return result;
+}
+
+rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time)
+{
+    rigel_step_result_t result;
+    rigel_cycle_t current;
+
+    result.time = 0;
+    result.events = RIGEL_EVENT_NONE;
+
+    if (ctx == NULL) {
+        return result;
+    }
+
+    current = ctx->chipset.cycles;
+    if (target_time <= current) {
+        result.time = current;
+        return result;
+    }
+
+    return rigel_step(ctx, target_time - current);
 }
 
 void rigel_take_snapshot(const RigelContext *ctx, rigel_snapshot_t *snapshot)
@@ -276,4 +346,77 @@ void rigel_rtc_write_reg(RigelContext *ctx, rigel_u8 reg, rigel_u8 value)
     }
 
     rtc_write_reg(&ctx->chipset.rtc, reg, value);
+}
+
+/* -------------------------------------------------------------------------
+ * Bus observation
+ * TODO: refine as domains gain slot-level scheduling
+ * ------------------------------------------------------------------------- */
+
+rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx)
+{
+    rigel_bus_state_t state;
+    bool blit_busy;
+    bool blt_pri;
+
+    state.time = 0;
+    state.owner = RIGEL_BUS_OWNER_NONE;
+    state.active_dma = (rigel_u32)RIGEL_BUS_DMA_NONE;
+    state.cpu_can_access_chip_ram = true;
+    state.cpu_can_access_custom = true;
+    state.cpu_would_stall = false;
+    state.next_change = 0;
+
+    if (ctx == NULL) {
+        return state;
+    }
+
+    state.time = ctx->chipset.cycles;
+
+    blit_busy = blitter_is_busy(&ctx->chipset.agnus.blitter) != 0;
+    blt_pri = (ctx->chipset.agnus.dma.dmacon & RIGEL_DMACON_BLTPRI) != 0;
+
+    if (blit_busy) {
+        state.owner = RIGEL_BUS_OWNER_BLITTER;
+        state.active_dma |= (rigel_u32)RIGEL_BUS_DMA_BLITTER;
+        state.cpu_would_stall = blt_pri;
+        state.next_change = ctx->chipset.cycles + ctx->chipset.agnus.blitter.cycles_remaining;
+    } else {
+        state.owner = RIGEL_BUS_OWNER_CPU;
+        state.next_change = ctx->chipset.cycles + RIGEL_SCANLINE_CLOCKS;
+    }
+
+    state.cpu_can_access_chip_ram = !state.cpu_would_stall;
+
+    return state;
+}
+
+rigel_cycle_t rigel_get_next_bus_change(const RigelContext *ctx)
+{
+    return rigel_get_bus_state(ctx).next_change;
+}
+
+bool rigel_cpu_can_access_chip_ram(const RigelContext *ctx)
+{
+    return rigel_get_bus_state(ctx).cpu_can_access_chip_ram;
+}
+
+bool rigel_cpu_can_access_custom(const RigelContext *ctx)
+{
+    if (ctx == NULL) {
+        return false;
+    }
+
+    return true;
+}
+
+rigel_cycle_t rigel_get_cpu_resume_time(const RigelContext *ctx)
+{
+    rigel_bus_state_t state = rigel_get_bus_state(ctx);
+
+    if (!state.cpu_would_stall) {
+        return state.time;
+    }
+
+    return state.next_change;
 }

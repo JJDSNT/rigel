@@ -10,6 +10,8 @@ typedef uint16_t rigel_u16;
 typedef uint32_t rigel_u32;
 typedef uint64_t rigel_u64;
 
+typedef uint64_t rigel_cycle_t;
+
 typedef enum rigel_status {
     RIGEL_STATUS_OK = 0,
     RIGEL_STATUS_ERROR = 1

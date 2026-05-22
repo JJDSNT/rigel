@@ -2,78 +2,125 @@
 
 ## Overview
 
-`rigel` e uma biblioteca C para o chipset classico, organizada para manter fidelidade temporal, separacao de ownership e integracao limpa com um host externo.
+Rigel é uma biblioteca C para o chipset clássico do Amiga, organizada para manter
+fidelidade temporal, separação de ownership e integração limpa com um host externo.
 
-O objetivo principal do core classico nao e paralelizacao agressiva. O objetivo e:
-
-- comportamento deterministico
-- execucao single-thread
+Objetivos do core clássico:
+- comportamento determinístico
+- execução single-thread por padrão
 - fronteiras internas claras entre subsistemas
-- compatibilidade com integracao futura em runtimes maiores
+- portabilidade entre hosts e runtimes
 
-Em resumo:
+Rigel é concurrency-aware internamente, mas não é multicore-first. Para o caminho
+clássico, correção e determinismo importam mais do que paralelismo antecipado.
 
-- `Rigel` nao e `multicore-first`
-- `Rigel` deve ser `concurrency-aware`
+## Camadas internas
 
-## Internal Layers
+```
+include/rigel/       ← superfície pública (host fala só aqui)
+src/chipset/         ← composição, MMIO routing, wiring interno
+src/domains/         ← máquinas de estado do hardware
+src/bus/             ← interfaces de acesso e callbacks de Chip RAM
+src/runtime/         ← política de execução no host
+src/rtc/             ← periférico auxiliar fora do custom MMIO
+```
 
-- `domains/`: subsistemas temporais e funcionais do hardware
-- `chipset/`: composicao, MMIO, wiring interno e ownership
-- `runtime/`: como o core e executado no host
-- `bus/`: superficies de acesso e arbitragem externa
-- `rtc/`: periferico auxiliar fora do custom MMIO
+## Superfície pública
+
+Organizada em headers temáticos, todos reexportados por `rigel.h`:
+
+| Header              | Conteúdo                                      |
+|---------------------|-----------------------------------------------|
+| `rigel_time.h`      | Temporal API: step, deadline, step_result     |
+| `rigel_bus.h`       | Bus observation: estado do barramento clássico |
+| `rigel_events.h`    | Bitmask de eventos (`rigel_event_flags_t`)    |
+| `rigel_irq.h`       | INTREQ, INTENA, IPL                           |
+| `rigel_mmio.h`      | custom_read16 / custom_write16                |
+| `rigel_floppy.h`    | Insert, eject, status por drive               |
+| `rigel_input.h`     | Joystick / pot injection                      |
+| `rigel_rtc.h`       | RTC model e registradores                     |
+| `rigel_config.h`    | Configuração de criação do contexto           |
+
+## Temporal API
+
+Dois contratos principais:
+
+**"quando algo relevante acontece" → para scheduling:**
+```c
+rigel_cycle_t       rigel_get_time(const RigelContext *ctx);
+rigel_cycle_t       rigel_get_next_deadline(const RigelContext *ctx);
+rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles);
+rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time);
+```
+
+**"quem tem o barramento neste instante" → para contenção e wait states:**
+```c
+rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx);
+rigel_cycle_t     rigel_get_next_bus_change(const RigelContext *ctx);
+bool              rigel_cpu_would_stall(const RigelContext *ctx);
+rigel_cycle_t     rigel_get_cpu_resume_time(const RigelContext *ctx);
+```
 
 ## Domains
 
-`domains/` nao deve virar "tudo que e interno". Essa camada deve conter apenas maquinas observaveis do hardware.
+`src/domains/` contém as máquinas de estado do hardware clássico:
 
-Direcao inicial recomendada:
+```
+beam       → posição do feixe (hpos/vpos)
+dma        → DMACON, arbitragem de slots
+copper     → programa copper e WAITs
+blitter    → operações e DMA do blitter
+interrupt  → INTREQ, INTENA, IPL
+disk       → DMA e MMIO de disco
+serial     → SERDAT, SERPER, TX/RX
+audio      → 4 canais, DMA, período
+input      → joystick, POT
+```
 
-- `beam`
-- `dma`
-- `copper`
-- `blitter`
+Domains existem para separar estado, explicitar fronteiras temporais e reduzir
+acoplamento. Não são threads — são superfícies de ownership.
 
-Depois:
+## Chipset layer
 
-- `video`
-- `interrupt`
-- `cia`
-- `audio`
-- `disk`
+`src/chipset/` é a raiz composicional. Concentra:
+- `RigelChipset`: contexto raiz com Agnus, Paula, Denise, RTC, FloppyDrives
+- MMIO routing: `rigel_custom_read16/write16` → domínio correto
+- Wiring interno: IRQ sink, DMA grant, Chip RAM callbacks
+- Mediação: domínios não dependem uns dos outros diretamente
 
-Os domains existem para:
+```
+RigelChipset
+  ├── RigelAgnus
+  │     ├── beam_state_t
+  │     ├── dma_state_t
+  │     ├── copper_state_t
+  │     └── BlitterState
+  ├── RigelPaula
+  │     ├── RigelInterruptDomain
+  │     ├── audio domain
+  │     ├── disk domain
+  │     ├── serial domain
+  │     └── input domain
+  ├── RigelRTC
+  └── FloppyDrive[4]
+```
 
-- separar estado e responsabilidade
-- explicitar fronteiras temporais
-- reduzir acoplamento
-- preparar integracao futura sem tornar o core monolitico
+## Video output
 
-Eles nao significam, neste momento, threads separadas.
+Denise produz pixels a partir de bitplanes, sprites, HAM/EHB e palette.
+Essa lógica pertence ao chipset porque planar→chunky não é conversão de formato —
+é a execução real de Denise durante o DMA slot sequence.
 
-## Chipset Layer
-
-`chipset/` e a raiz composicional do core. Essa camada deve concentrar:
-
-- `RigelChipset`
-- MMIO routing
-- wiring entre domains
-- ownership dos perifericos
-- surfaces internas de mediacao, como IRQ e DMA
-
-Os domains nao devem depender livremente uns dos outros por estado global. Comunicacao entre eles deve passar por wiring, interfaces estreitas ou superfícies explicitas do chipset.
-
-## RTC
-
-O RTC faz sentido dentro da biblioteca por conveniencia, mas nao como parte da familia de custom chips.
-
-Portanto:
-
-- RTC entra no escopo do `rigel`
-- RTC fica fora de `rigel_custom_read16/write16`
-- RTC deve ter surface propria
+O host recebe um `rigel_frame_t` com pixels prontos, metadata (`flags`) e
+dirty tracking (`delta`). Ver `docs/video_output.md`.
 
 ## Boundary
 
-Este projeto representa apenas o chipset e seu estado interno. Integracao com CPU, memoria global e plataforma fica fora do nucleo.
+Rigel não possui:
+- mapa global de memória
+- CPU
+- ROM / Fast RAM
+- dispositivos de plataforma
+- lógica de apresentação (scale, vsync real, SDL, OpenGL)
+
+O host integra tudo isso. Ver `docs/integration.md`.

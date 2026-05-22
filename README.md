@@ -1,28 +1,9 @@
 # Rigel
 
-Rigel is a C library for classic Amiga-side chipset and peripheral behavior.
+Rigel is a C library for classic Amiga chipset and peripheral emulation.
 
-The project is built as a reusable hardware-facing core: the host does not talk to high-level chip objects directly. Instead, it drives the library through interfaces that resemble the machine-visible hardware surface, mainly custom-register MMIO, stepping, IRQ state, Chip RAM callbacks, and a few convenience APIs for peripherals such as floppy, input, and RTC.
-
-Rigel is intended to be:
-- deterministic on the classic chipset path
-- single-thread by default
-- internally organized by execution domains
-- portable across hosts and runtimes
-
-Rigel is not intended to own the whole machine. The host remains responsible for global memory-map decode, CPU integration, ROM/Fast RAM ownership, platform devices, and frontend/backend concerns.
-
-## Current Direction
-
-The internal architecture is split into a few clear layers:
-
-- `src/domains/`: hardware execution domains such as `beam`, `dma`, `copper`, `blitter`, `interrupt`, `disk`, `serial`, `audio`, and `input`
-- `src/chipset/`: composition, MMIO routing, ownership, and internal wiring
-- `src/runtime/`: execution policy for the core
-- `src/bus/`: access surfaces and bus-facing helpers
-- `src/rtc/`: RTC support kept outside custom MMIO
-
-The project is concurrency-aware internally, but it is not multicore-first. For the classic chipset path, correctness, determinism, and clear ownership matter more than early parallelism.
+The library provides a deterministic, single-threaded hardware-facing core. The host
+owns the CPU, memory map, ROM, and presentation layer; Rigel owns the chipset behavior.
 
 ## Build
 
@@ -30,45 +11,83 @@ The project is concurrency-aware internally, but it is not multicore-first. For 
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+./build/test_blitter       # run a single test
+```
+
+Optional: Musashi integration harness for timing verification:
+
+```sh
+cmake -S . -B build-harness -DRIGEL_BUILD_HARNESS=ON -DRIGEL_BUILD_TESTS=OFF
+cmake --build build-harness
 ```
 
 ## Public API
 
-The main entry point is `RigelContext`.
+All headers are included via `<rigel/rigel.h>`.
 
-Core lifecycle:
-- `rigel_create`
-- `rigel_destroy`
-- `rigel_reset`
-- `rigel_step`
+**Lifecycle:**
+```c
+RigelContext *rigel_create(const rigel_config_t *config);
+void          rigel_destroy(RigelContext *ctx);
+void          rigel_reset(RigelContext *ctx);
+```
 
-Custom register MMIO:
-- `rigel_custom_read16`
-- `rigel_custom_write16`
+**Temporal API** — scheduling and synchronization:
+```c
+rigel_cycle_t       rigel_get_time(const RigelContext *ctx);
+rigel_cycle_t       rigel_get_next_deadline(const RigelContext *ctx);
+rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles);
+rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time);
+```
 
-IRQ state:
-- `rigel_get_intreq`
-- `rigel_get_intena`
-- `rigel_get_ipl`
+`rigel_step_result_t` carries the current time and a bitmask of what changed
+(`RIGEL_EVENT_IRQ_CHANGED`, `RIGEL_EVENT_FRAME_READY`, `RIGEL_EVENT_BLIT_DONE`, etc.).
 
-Convenience peripherals:
-- `rigel_floppy_*`
-- `rigel_input_*`
-- `rigel_rtc_*`
+**Bus observation** — contention and wait states:
+```c
+rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx);
+rigel_cycle_t     rigel_get_next_bus_change(const RigelContext *ctx);
+bool              rigel_cpu_can_access_chip_ram(const RigelContext *ctx);
+rigel_cycle_t     rigel_get_cpu_resume_time(const RigelContext *ctx);
+```
 
-## Host Integration Model
+**Custom register MMIO:**
+```c
+rigel_u16 rigel_custom_read16(const RigelContext *ctx, rigel_u32 offset);
+void      rigel_custom_write16(RigelContext *ctx, rigel_u32 offset, rigel_u16 value);
+```
 
-The host decodes the global machine memory map and forwards only the parts that belong to Rigel.
+**IRQ state:**
+```c
+rigel_u16 rigel_get_intreq(const RigelContext *ctx);
+rigel_u16 rigel_get_intena(const RigelContext *ctx);
+rigel_u8  rigel_get_ipl(const RigelContext *ctx);
+```
 
-Example flow:
+**Peripherals:** `rigel_floppy_*`, `rigel_input_*`, `rigel_rtc_*`
 
-1. The CPU writes `0x00DFF096`.
-2. The host decodes that address as custom-chip space.
-3. The host forwards the write as `rigel_custom_write16(ctx, 0x096, value)`.
+## Host loop
 
-Rigel only understands its own internal chipset/peripheral surfaces. It does not own the machine-wide memory map.
+```c
+while (running) {
+    rigel_cycle_t until = rigel_get_next_deadline(rigel);
 
-## Minimal Example
+    cpu_run_until(cpu, until);
+
+    rigel_step_result_t r = rigel_step_until(rigel, cpu_get_time(cpu));
+
+    if (r.events & RIGEL_EVENT_IRQ_CHANGED)
+        cpu_set_ipl(cpu, rigel_get_ipl(rigel));
+
+    if (r.events & RIGEL_EVENT_FRAME_READY)
+        host_present_frame(rigel_get_frame(rigel));
+}
+```
+
+For fine-grained bus integration (PiStorm/Emu68 style), also consult
+`rigel_get_bus_state()` and `rigel_get_next_bus_change()`.
+
+## Minimal example
 
 ```c
 #include <rigel/rigel.h>
@@ -76,55 +95,54 @@ Rigel only understands its own internal chipset/peripheral surfaces. It does not
 static rigel_u16 chip_ram_read16(void *opaque, rigel_u32 addr)
 {
     rigel_u16 *ram = opaque;
-    return ram[(addr >> 1)];
+    return ram[addr >> 1];
 }
 
 static void chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
 {
     rigel_u16 *ram = opaque;
-    ram[(addr >> 1)] = value;
+    ram[addr >> 1] = value;
 }
 
 int main(void)
 {
-    rigel_u16 chip_ram_words[256 * 1024] = {0};
+    rigel_u16 chip_ram[256 * 1024] = {0};
     rigel_config_t config = {
-        .clock_hz = 7093790,
-        .chip_ram_size = sizeof(chip_ram_words),
-        .enable_trace = false,
-        .chip_ram = {
-            .opaque = chip_ram_words,
-            .read16 = chip_ram_read16,
-            .write16 = chip_ram_write16,
-        },
+        .clock_hz      = 7093790,
+        .chip_ram_size = sizeof(chip_ram),
+        .chip_ram      = { .opaque = chip_ram,
+                           .read16 = chip_ram_read16,
+                           .write16 = chip_ram_write16 },
     };
 
     RigelContext *ctx = rigel_create(&config);
-    if (!ctx) {
-        return 1;
-    }
 
     rigel_custom_write16(ctx, 0x096, 0x8200); /* DMACON */
     rigel_custom_write16(ctx, 0x09a, 0x8020); /* INTENA */
-    rigel_custom_write16(ctx, 0x180, 0x0f00); /* COLOR00 */
 
-    rigel_step(ctx, 64);
+    rigel_step_result_t r = rigel_step(ctx, 227); /* one scanline */
+
+    if (r.events & RIGEL_EVENT_IRQ_CHANGED)
+        handle_ipl(rigel_get_ipl(ctx));
 
     rigel_destroy(ctx);
     return 0;
 }
 ```
 
-## Floppy, Input, and RTC
+## Architecture
 
-Rigel already exposes a small host-facing surface for a few peripherals that are convenient to manage from the embedding application:
+See `docs/` for detailed documentation:
 
-- floppy media insertion/ejection and drive status via `rigel_floppy_*`
-- joystick/pot input injection via `rigel_input_*`
-- RTC model, time, and register access via `rigel_rtc_*`
-
-These APIs are separate from custom-register MMIO on purpose. They represent host integration points, not the custom-chip register family.
+- `architecture.md` — layers, domains, chipset composition
+- `integration.md` — host loop, memory-map forwarding, bus observation
+- `timing_model.md` — DMA slot sequence, Temporal API, frame pacing
+- `video_output.md` — video pipeline, frame struct, pixel formats, dirty tracking
+- `irq_model.md` — interrupt sources, INTREQ/INTENA, host delivery
+- `memory_map.md` — custom register offsets
 
 ## Status
 
-Rigel is under active construction. The core structure is in place, the test suite is growing with each migrated area, and the main near-term work is improving fidelity in the domains that already exist rather than expanding the public API aggressively.
+Under active construction. Core structure and domain split are in place.
+Near-term focus: beam model completion (line/frame wrapping), slot scheduler,
+and video output pipeline via Denise.

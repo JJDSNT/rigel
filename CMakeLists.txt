@@ -10,7 +10,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-option(RIGEL_BUILD_TESTS "Build Rigel unit tests" ON)
+option(RIGEL_BUILD_TESTS    "Build Rigel unit tests"          ON)
+option(RIGEL_BUILD_HARNESS  "Build Musashi integration harness" OFF)
 
 add_library(rigel
     src/chipset/chipset.c
@@ -114,5 +115,55 @@ if(RIGEL_BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/src/chipset
         )
         add_test(NAME ${test_name} COMMAND ${test_name})
+    endforeach()
+endif()
+
+if(RIGEL_BUILD_HARNESS)
+    set(MUSASHI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/musashi)
+
+    # Generate m68kops.c / m68kops.h from m68k_in.c
+    add_executable(m68kmake ${MUSASHI_DIR}/m68kmake.c)
+    set(MUSASHI_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/musashi_gen)
+    file(MAKE_DIRECTORY ${MUSASHI_GEN_DIR})
+    add_custom_command(
+        OUTPUT  ${MUSASHI_GEN_DIR}/m68kops.c ${MUSASHI_GEN_DIR}/m68kops.h
+        COMMAND m68kmake ${MUSASHI_GEN_DIR} ${MUSASHI_DIR}/m68k_in.c
+        DEPENDS m68kmake ${MUSASHI_DIR}/m68k_in.c
+    )
+
+    add_library(musashi STATIC
+        ${MUSASHI_DIR}/m68kcpu.c
+        ${MUSASHI_DIR}/m68kdasm.c
+        ${MUSASHI_DIR}/m68kfpu.c
+        ${MUSASHI_DIR}/softfloat/softfloat.c
+        ${MUSASHI_GEN_DIR}/m68kops.c
+    )
+    target_include_directories(musashi PUBLIC
+        ${MUSASHI_DIR}
+        ${MUSASHI_GEN_DIR}
+    )
+    target_compile_options(musashi PRIVATE
+        $<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-parameter -Wno-sign-compare>
+    )
+    target_link_libraries(musashi PUBLIC m)
+
+    add_library(rigel_harness STATIC
+        harness/harness.c
+    )
+    target_link_libraries(rigel_harness PUBLIC rigel musashi)
+    target_include_directories(rigel_harness PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/harness
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${MUSASHI_DIR}
+    )
+
+    set(HARNESS_TESTS
+        test_blitter_stall
+    )
+
+    foreach(test_name IN LISTS HARNESS_TESTS)
+        add_executable(harness_${test_name} harness/tests/${test_name}.c)
+        target_link_libraries(harness_${test_name} PRIVATE rigel_harness)
+        add_test(NAME harness_${test_name} COMMAND harness_${test_name})
     endforeach()
 endif()
