@@ -29,3 +29,22 @@ bool rigel_denise_get_debug_state(const RigelContext *ctx, rigel_denise_debug_st
     *state = ctx->chipset.denise.debug;
     return true;
 }
+
+bool rigel_denise_get_current_scanline(const RigelContext *ctx, rigel_denise_scanline_t *scanline)
+{
+    const RigelDenise *denise;
+
+    if (ctx == NULL || scanline == NULL) {
+        return false;
+    }
+
+    denise = &ctx->chipset.denise;
+    scanline->frame_counter = denise->output.frame_counter;
+    scanline->y = denise->output.current_scanline;
+    scanline->width = denise->output.scanline_width;
+    scanline->pixels_rgba = denise->output.scanline_rgba;
+    scanline->last_rgb32 = denise->output.last_rgb;
+    scanline->visible = denise->output.visible_scanline;
+    scanline->dirty = denise->output.scanline_dirty;
+    return true;
+}

@@ -102,7 +102,7 @@ if (r.events & RIGEL_EVENT_IRQ_CHANGED)
 
 ## Frame pacing
 
-Ver `timing_model.md`. Em resumo: Rigel expõe `clock_hz` e `frame_cycles`;
+Ver `timing_model.md`. Em resumo: Rigel expõe `clock_hz`, `line_cycles` e `frame_cycles`;
 o host mede o tempo real e aplica sua própria política de correção (sleep/skip).
 
 ## Harness de teste (Musashi)

@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "agnus/copper/copper_regs.h"
 #include "core/rigel_context.h"
 #include "domains/blitter/blitter_domain.h"
 #include "domains/dma/dma_domain.h"
@@ -15,6 +16,10 @@ rigel_u16 rigel_agnus_mmio_read_impl(RigelContext *ctx, rigel_u32 addr)
 
     if (rigel_blitter_domain_owns_reg(addr)) {
         return rigel_blitter_domain_read_reg(&ctx->chipset.agnus.blitter, addr);
+    }
+
+    if (rigel_copper_regs_owns_reg(addr)) {
+        return rigel_copper_regs_read(ctx, addr);
     }
 
     switch (addr) {

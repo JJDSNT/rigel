@@ -3,9 +3,10 @@
 
 #include "agnus/beam.h"
 #include "agnus/bitplanes.h"
-#include "agnus/copper.h"
+#include "agnus/copper/copper.h"
 #include "agnus/dma.h"
 #include "agnus/blitter/blitter.h"
+#include "agnus/timing/slot_scheduler.h"
 #include "rigel/rigel_types.h"
 
 typedef struct RigelContext RigelContext;
@@ -16,6 +17,7 @@ typedef struct RigelAgnus {
     copper_state_t copper;
     bitplanes_state_t bitplanes;
     BlitterState blitter;
+    agnus_slot_scheduler_t scheduler;
 } RigelAgnus;
 
 void rigel_agnus_reset(RigelAgnus *agnus);

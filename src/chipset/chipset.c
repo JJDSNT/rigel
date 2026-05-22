@@ -44,7 +44,7 @@ void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles)
     chipset->cycles = rigel_timing_advance(chipset->cycles, cycles);
     rigel_paula_set_dmacon(&chipset->paula, chipset->agnus.dma.dmacon);
     rigel_agnus_step(ctx, cycles);
-    rigel_denise_step(&chipset->denise, cycles);
+    rigel_denise_step(&chipset->denise, &chipset->agnus.beam, cycles);
     rigel_paula_step(&chipset->paula, cycles);
 
     if (rigel_disk_domain_dma_wants_service(&chipset->paula.disk)) {

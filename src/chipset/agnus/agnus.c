@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "chipset/chipset.h"
+#include "agnus/copper/copper_service.h"
 #include "core/rigel_context.h"
 #include "domains/beam/beam_domain.h"
 #include "domains/blitter/blitter_domain.h"
@@ -31,6 +32,7 @@ void rigel_agnus_reset(RigelAgnus *agnus)
     rigel_copper_domain_reset(&agnus->copper);
     rigel_blitter_domain_reset(&agnus->blitter);
     bitplanes_set_depth(&agnus->bitplanes, 0);
+    agnus_slot_scheduler_init(&agnus->scheduler);
 }
 
 BlitterMemory rigel_agnus_blitter_memory(RigelContext *ctx)
@@ -77,7 +79,8 @@ void rigel_agnus_step(RigelContext *ctx, rigel_u32 cycles)
 
     rigel_beam_domain_step(&agnus->beam, (rigel_u16)cycles);
     rigel_dma_domain_sync_dmacon(&agnus->dma, agnus->dma.dmacon);
-    rigel_copper_domain_step(&agnus->copper, cycles);
+    rigel_copper_domain_step(&agnus->copper, &agnus->beam, &agnus->dma);
+    rigel_copper_service_step_program(ctx);
     blitter_grants = rigel_dma_domain_blitter_grants(&agnus->dma, cycles);
     rigel_agnus_blitter_step_dma(ctx, blitter_grants);
 }

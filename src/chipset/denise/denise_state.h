@@ -3,6 +3,11 @@
 
 #include "rigel/rigel_denise_types.h"
 #include "rigel/rigel_types.h"
+#include "agnus/beam.h"
+
+enum {
+    RIGEL_DENISE_MAX_SCANLINE_PIXELS = 1024
+};
 
 typedef struct rigel_denise_register_file {
     rigel_u16 color[32];
@@ -32,9 +37,17 @@ typedef struct rigel_denise_video_state {
 } rigel_denise_video_state_t;
 
 typedef struct rigel_denise_output_state {
+    rigel_u64 frame_counter;
+    rigel_u16 beam_hpos;
+    rigel_u16 beam_vpos;
     rigel_u16 current_scanline;
     rigel_u16 current_pixel;
+    rigel_u16 scanline_width;
     rigel_u32 last_rgb;
+    rigel_u32 scanline_rgba[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
+    bool visible_scanline;
+    bool scanline_dirty;
+    bool frame_dirty;
 } rigel_denise_output_state_t;
 
 typedef struct RigelDenise {
@@ -47,6 +60,6 @@ typedef struct RigelDenise {
 } RigelDenise;
 
 void rigel_denise_reset(RigelDenise *denise);
-void rigel_denise_step(RigelDenise *denise, rigel_u32 cycles);
+void rigel_denise_step(RigelDenise *denise, const beam_state_t *beam, rigel_u32 cycles);
 
 #endif

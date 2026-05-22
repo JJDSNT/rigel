@@ -69,8 +69,10 @@ com o tempo simulado e aplica a correção. Rigel expõe os fatos de que o host 
 
 ```c
 uint32_t rigel_get_clock_hz(const RigelContext *ctx);    /* 7093790 PAL / 7159090 NTSC */
+uint32_t rigel_get_line_cycles(const RigelContext *ctx); /* ciclos por scanline atual */
 uint32_t rigel_get_frame_cycles(const RigelContext *ctx); /* ciclos por frame completo */
 uint64_t rigel_cycles_to_us(rigel_cycle_t cycles, uint32_t clock_hz);
+rigel_cycle_t rigel_us_to_cycles(uint64_t microseconds, uint32_t clock_hz);
 ```
 
 Loop canônico:

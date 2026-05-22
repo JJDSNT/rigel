@@ -8,6 +8,16 @@ Current direction:
 - `Denise` consumes already-timed state and handles visual composition
 - `Paula` handles IRQ policy, disk-controller logic, audio finalization, and serial/input behavior
 
+Current implemented baseline:
+
+- beam now wraps across scanlines and frames with visible-area information
+- DMA ownership is explicit through the DMA domain
+- copper now has a first timing-aware path:
+  - pointer registers (`COP1LC/COP2LC`)
+  - jump registers (`COPJMP1/COPJMP2`)
+  - a beam-bound wait target
+  - wake/event publication when the beam reaches the armed point under `DMAEN|COPEN`
+
 Important rule:
 
 - there is no visual `sprites/` subsystem inside `Agnus`

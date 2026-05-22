@@ -4,14 +4,17 @@
 #include <string.h>
 
 #include "chipset/chipset.h"
+#include "chipset/agnus/beam.h"
 #include "chipset/agnus/blitter/blitter.h"
+#include "chipset/agnus/timing/deadline.h"
+#include "chipset/agnus/timing/vblank.h"
 #include "core/rigel_context.h"
 #include "floppy/floppy_drive.h"
 #include "paula/paula_interrupts.h"
 #include "paula/paula_state.h"
 
-enum { RIGEL_SCANLINE_CLOCKS = 227 };
 enum { RIGEL_DMACON_BLTPRI = 0x0400u };
+enum { RIGEL_DEFAULT_CLOCK_HZ = 7093790u };
 
 RigelContext *rigel_create(const rigel_config_t *config)
 {
@@ -66,6 +69,57 @@ void rigel_reset(RigelContext *ctx)
     rigel_chipset_reset(&ctx->chipset);
 }
 
+rigel_u32 rigel_get_clock_hz(const RigelContext *ctx)
+{
+    if (ctx == NULL || ctx->config.clock_hz == 0) {
+        return RIGEL_DEFAULT_CLOCK_HZ;
+    }
+
+    return ctx->config.clock_hz;
+}
+
+rigel_u32 rigel_get_line_cycles(const RigelContext *ctx)
+{
+    if (ctx == NULL || ctx->chipset.agnus.beam.line_clocks == 0) {
+        return RIGEL_BEAM_DEFAULT_LINE_CLOCKS;
+    }
+
+    return ctx->chipset.agnus.beam.line_clocks;
+}
+
+rigel_u32 rigel_get_frame_cycles(const RigelContext *ctx)
+{
+    rigel_u32 line_cycles;
+    rigel_u32 frame_lines;
+
+    line_cycles = rigel_get_line_cycles(ctx);
+    if (ctx == NULL || ctx->chipset.agnus.beam.frame_lines == 0) {
+        frame_lines = RIGEL_BEAM_DEFAULT_FRAME_LINES;
+    } else {
+        frame_lines = ctx->chipset.agnus.beam.frame_lines;
+    }
+
+    return line_cycles * frame_lines;
+}
+
+rigel_u64 rigel_cycles_to_us(rigel_cycle_t cycles, rigel_u32 clock_hz)
+{
+    if (clock_hz == 0) {
+        clock_hz = RIGEL_DEFAULT_CLOCK_HZ;
+    }
+
+    return (rigel_u64)((cycles * 1000000u) / clock_hz);
+}
+
+rigel_cycle_t rigel_us_to_cycles(rigel_u64 microseconds, rigel_u32 clock_hz)
+{
+    if (clock_hz == 0) {
+        clock_hz = RIGEL_DEFAULT_CLOCK_HZ;
+    }
+
+    return (rigel_cycle_t)((microseconds * clock_hz) / 1000000u);
+}
+
 rigel_cycle_t rigel_get_time(const RigelContext *ctx)
 {
     if (ctx == NULL) {
@@ -77,16 +131,28 @@ rigel_cycle_t rigel_get_time(const RigelContext *ctx)
 
 rigel_cycle_t rigel_get_next_deadline(const RigelContext *ctx)
 {
+    agnus_deadlines_t d;
+    rigel_u16 line_end;
+
     if (ctx == NULL) {
         return 0;
     }
 
-    /* TODO: each domain should expose its next wake time; aggregate here */
+    agnus_deadlines_reset(&d);
+
     if (blitter_is_busy(&ctx->chipset.agnus.blitter)) {
-        return ctx->chipset.cycles + ctx->chipset.agnus.blitter.cycles_remaining;
+        d.blitter = ctx->chipset.agnus.blitter.cycles_remaining;
     }
 
-    return ctx->chipset.cycles + RIGEL_SCANLINE_CLOCKS;
+    line_end = beam_cycles_until_line_end(&ctx->chipset.agnus.beam);
+    if (line_end == 0) {
+        line_end = RIGEL_BEAM_DEFAULT_LINE_CLOCKS;
+    }
+    d.beam_line_end = line_end;
+
+    d.vertb = agnus_cycles_to_vertb(&ctx->chipset.agnus.beam);
+
+    return ctx->chipset.cycles + agnus_deadlines_min(&d);
 }
 
 rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
@@ -94,6 +160,10 @@ rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
     rigel_step_result_t result;
     rigel_u8 ipl_before;
     bool blit_busy_before;
+    bool copper_triggered_before;
+    rigel_u16 vpos_before;
+    rigel_u64 frame_before;
+    bool vblank_before;
 
     result.time = 0;
     result.events = RIGEL_EVENT_NONE;
@@ -104,6 +174,10 @@ rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
 
     ipl_before = rigel_paula_interrupts_current_ipl(&ctx->chipset.paula.interrupts);
     blit_busy_before = blitter_is_busy(&ctx->chipset.agnus.blitter) != 0;
+    copper_triggered_before = ctx->chipset.agnus.copper.triggered;
+    vpos_before = ctx->chipset.agnus.beam.vpos;
+    frame_before = ctx->chipset.agnus.beam.frame_count;
+    vblank_before = beam_in_vblank(&ctx->chipset.agnus.beam);
 
     rigel_chipset_step(ctx, (rigel_u32)cycles);
 
@@ -115,6 +189,22 @@ rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
 
     if (blit_busy_before && blitter_is_busy(&ctx->chipset.agnus.blitter) == 0) {
         result.events |= (rigel_u32)RIGEL_EVENT_BLIT_DONE;
+    }
+
+    if (!copper_triggered_before && ctx->chipset.agnus.copper.triggered) {
+        result.events |= (rigel_u32)RIGEL_EVENT_COPPER;
+    }
+
+    if (ctx->chipset.agnus.beam.frame_count != frame_before) {
+        result.events |= (rigel_u32)RIGEL_EVENT_FRAME_READY;
+    }
+
+    if (ctx->chipset.agnus.beam.vpos != vpos_before || ctx->chipset.agnus.beam.frame_count != frame_before) {
+        result.events |= (rigel_u32)RIGEL_EVENT_HBLANK;
+    }
+
+    if (!vblank_before && beam_in_vblank(&ctx->chipset.agnus.beam)) {
+        result.events |= (rigel_u32)RIGEL_EVENT_VBLANK;
     }
 
     return result;
@@ -383,7 +473,7 @@ rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx)
         state.next_change = ctx->chipset.cycles + ctx->chipset.agnus.blitter.cycles_remaining;
     } else {
         state.owner = RIGEL_BUS_OWNER_CPU;
-        state.next_change = ctx->chipset.cycles + RIGEL_SCANLINE_CLOCKS;
+        state.next_change = ctx->chipset.cycles + beam_cycles_until_line_end(&ctx->chipset.agnus.beam);
     }
 
     state.cpu_can_access_chip_ram = !state.cpu_would_stall;

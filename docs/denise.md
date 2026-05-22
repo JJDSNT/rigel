@@ -15,6 +15,13 @@ This means `Denise` should gradually become the owner of:
 - display window state
 - scanline/output-facing staging
 
+Current implemented baseline:
+
+- palette writes already expand to RGB32
+- playfield mode flags already derive from `BPLCON0`
+- display window state now derives width/height and visible bounds from `DIWSTRT/DIWSTOP`
+- output state now mirrors current beam position into visible-scanline state and a minimal scanline buffer
+
 It should not become the owner of:
 
 - DMA arbitration

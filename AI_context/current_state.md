@@ -53,6 +53,22 @@
   - `copper`
   - `bitplanes`
   - `BlitterState`
+  - `agnus_slot_scheduler_t scheduler` (Approach C foundation)
+- `copper` now has a timing-aware path:
+  - `COP1LC/COP2LC`
+  - `COPJMP1/COPJMP2`
+  - internal wait target bound to beam position with VP/HP mask from IR2
+  - `RIGEL_EVENT_COPPER` when the beam reaches an armed wait point under `DMAEN|COPEN`
+  - Chip RAM fetch path for copper list words
+  - full decode path:
+    - `MOVE` writes to custom register space
+    - `WAIT` arms a beam-bound wait point with correct masked comparison
+    - `SKIP` evaluates beam condition immediately; skips or does not skip next instruction
+- timing scaffolding wired (Approach C foundation):
+  - `beam_in_vblank()` corrected to use Agnus VBL zone (lines 0–25), not Denise display window
+  - `rigel_get_next_deadline()` aggregates blitter + beam_line_end + VERTB via `agnus_deadlines_t`
+  - slot scheduler initialized on reset, invalidated on DMACON writes; table rebuilds lazily
+  - `timing/vblank.c`, `timing/deadline.c`, `timing/slot_scheduler.c` compiled into the library
 - `RigelPaula` already owns:
   - interrupt model (`INTREQ`, `INTENA`, `IPL`)
   - `audio` state
@@ -71,6 +87,11 @@
 - Denise direction:
   - Agnus owns time, DMA cadence, and fetch scheduling
   - Denise owns display-facing registers, palette, composition state, and output staging
+- Denise now has a first real scanline-facing output state:
+  - display window width/height are derived from `DIWSTRT/DIWSTOP`
+  - framebuffer/output state tracks current beam position, visible scanline, current pixel, and last RGB
+  - composition currently mirrors a minimal visible-line fill from the active palette entry
+  - public inspection API now exposes the current scanline buffer without requiring a display backend
 - Denise keeps its internal split as the canonical direction for visual work:
   - `registers/`
   - `render/`
@@ -93,6 +114,15 @@
 - Blitter path:
   - MMIO -> Agnus -> Blitter registers
   - DMA step -> IRQ publish -> chipset IRQ surface -> Paula interrupts
+
+- Copper path:
+  - MMIO -> Agnus copper pointers/jumps
+  - beam advances in Agnus
+  - copper fetches words from Chip RAM through host callbacks
+  - copper executes minimal `MOVE` / arms minimal `WAIT`
+  - copper domain wakes when beam reaches the armed wait point
+  - core publishes `RIGEL_EVENT_COPPER`
+  - Denise current-scanline inspection can now observe copper-driven color changes without a display
 
 - Paula disk path:
   - MMIO -> Paula -> disk registers
@@ -132,3 +162,10 @@
 - `Rigel` should be concurrency-aware internally, but deterministic and single-thread for the classic chipset path.
 - domains are meant to express ownership and temporal boundaries, not immediate thread boundaries.
 - `RigelAgnus` now owns explicit `beam`, `dma`, `copper`, `bitplanes`, and `blitter` state, with stepping still routed through domains where appropriate.
+- the public timing surface now exposes:
+  - `rigel_get_clock_hz()`
+  - `rigel_get_line_cycles()`
+  - `rigel_get_frame_cycles()`
+  - `rigel_cycles_to_us()`
+  - `rigel_us_to_cycles()`
+- this is intended to let hosts monitor drift and frame pacing early without depending on internal state layout

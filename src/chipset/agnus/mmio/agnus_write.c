@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "agnus/copper/copper_regs.h"
 #include "core/rigel_context.h"
 #include "domains/blitter/blitter_domain.h"
 #include "domains/dma/dma_domain.h"
@@ -19,12 +20,21 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
         return;
     }
 
+    if (rigel_copper_regs_owns_reg(addr)) {
+        rigel_copper_regs_write(ctx, addr, value);
+        return;
+    }
+
     switch (addr) {
     case RIGEL_REG_DMACON:
         rigel_dma_domain_write_dmacon(&ctx->chipset.agnus.dma, value);
         rigel_context_write_reg(
             ctx,
             addr,
+            rigel_dma_domain_read_dmacon(&ctx->chipset.agnus.dma)
+        );
+        agnus_slot_scheduler_invalidate(
+            &ctx->chipset.agnus.scheduler,
             rigel_dma_domain_read_dmacon(&ctx->chipset.agnus.dma)
         );
         break;

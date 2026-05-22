@@ -28,16 +28,29 @@ void rigel_denise_reset(RigelDenise *denise)
     denise->debug.scanline_counter = 0;
     denise->debug.active_mode_flags = 0;
     denise->debug.last_color_index = 0;
+    denise->debug.beam_hpos = 0;
+    denise->debug.beam_vpos = 0;
+    denise->debug.current_scanline = 0;
+    denise->debug.current_pixel = 0;
+    denise->debug.last_rgb32 = 0;
+    denise->debug.visible_scanline = false;
 }
 
-void rigel_denise_step(RigelDenise *denise, rigel_u32 cycles)
+void rigel_denise_step(RigelDenise *denise, const beam_state_t *beam, rigel_u32 cycles)
 {
     if (denise == NULL) {
         return;
     }
 
-    rigel_denise_compositor_tick(denise, cycles);
+    rigel_denise_compositor_tick(denise, beam, cycles);
     rigel_denise_trace_tick(&denise->debug, cycles);
+    denise->debug.frame_counter = (rigel_u32)denise->output.frame_counter;
+    denise->debug.beam_hpos = denise->output.beam_hpos;
+    denise->debug.beam_vpos = denise->output.beam_vpos;
+    denise->debug.current_scanline = denise->output.current_scanline;
+    denise->debug.current_pixel = denise->output.current_pixel;
+    denise->debug.last_rgb32 = denise->output.last_rgb;
+    denise->debug.visible_scanline = denise->output.visible_scanline;
 }
 
 bool rigel_denise_owns_reg(rigel_u32 addr)

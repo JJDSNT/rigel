@@ -56,6 +56,17 @@ const rigel_frame_t    *rigel_get_frame(const RigelContext *ctx);
 const rigel_scanline_t *rigel_get_scanline(const RigelContext *ctx, uint32_t y);
 ```
 
+Current implemented baseline:
+
+```c
+bool rigel_denise_get_current_scanline(const RigelContext *ctx,
+                                       rigel_denise_scanline_t *scanline);
+```
+
+Hoje o projeto expõe a linha atual montada por Denise para inspeção e teste
+headless. Isso já permite validar efeitos dirigidos por copper e palette sem
+backend gráfico, enquanto a API de frame/scanline completa ainda amadurece.
+
 O formato é configurado em `rigel_create` via `rigel_config_t` — não por frame.
 Isso permite que o chipset otimize seu pipeline interno para um único target.
 

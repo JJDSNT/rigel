@@ -31,7 +31,9 @@ add_library(rigel
     src/chipset/agnus/agnus.c
     src/chipset/agnus/beam.c
     src/chipset/agnus/dma.c
-    src/chipset/agnus/copper.c
+    src/chipset/agnus/copper/copper.c
+    src/chipset/agnus/copper/copper_regs.c
+    src/chipset/agnus/copper/copper_service.c
     src/chipset/agnus/blitter.c
     src/chipset/agnus/mmio/agnus_mmio.c
     src/chipset/agnus/mmio/agnus_read.c
@@ -50,6 +52,9 @@ add_library(rigel
     src/chipset/agnus/blitter/blitter_ref.c
     src/chipset/agnus/blitter/blitter_regs.c
     src/chipset/agnus/blitter/blitter_timing.c
+    src/chipset/agnus/timing/vblank.c
+    src/chipset/agnus/timing/deadline.c
+    src/chipset/agnus/timing/slot_scheduler.c
     src/chipset/agnus/bitplanes.c
     src/chipset/denise/denise.c
     src/chipset/denise/registers/denise_registers.c
@@ -103,6 +108,7 @@ if(RIGEL_BUILD_TESTS)
         test_mmio
         test_irq
         test_custom_map
+        test_timing
         test_beam
         test_agnus_domains
         test_cia

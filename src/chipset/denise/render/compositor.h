@@ -3,6 +3,6 @@
 
 #include "denise/denise_state.h"
 
-void rigel_denise_compositor_tick(RigelDenise *denise, rigel_u32 cycles);
+void rigel_denise_compositor_tick(RigelDenise *denise, const beam_state_t *beam, rigel_u32 cycles);
 
 #endif

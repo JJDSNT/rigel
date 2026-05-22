@@ -18,11 +18,27 @@ typedef struct rigel_denise_video_desc {
     rigel_u16 visible_y_stop;
 } rigel_denise_video_desc_t;
 
+typedef struct rigel_denise_scanline {
+    rigel_u64 frame_counter;
+    rigel_u16 y;
+    rigel_u16 width;
+    const rigel_u32 *pixels_rgba;
+    rigel_u32 last_rgb32;
+    bool visible;
+    bool dirty;
+} rigel_denise_scanline_t;
+
 typedef struct rigel_denise_debug_state {
     rigel_u32 frame_counter;
     rigel_u32 scanline_counter;
     rigel_u16 active_mode_flags;
     rigel_u16 last_color_index;
+    rigel_u16 beam_hpos;
+    rigel_u16 beam_vpos;
+    rigel_u16 current_scanline;
+    rigel_u16 current_pixel;
+    rigel_u32 last_rgb32;
+    bool visible_scanline;
 } rigel_denise_debug_state_t;
 
 #endif
