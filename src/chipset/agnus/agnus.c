@@ -3,8 +3,7 @@
 #include <stddef.h>
 
 #include "chipset/chipset.h"
-#include "agnus/copper/copper_service.h"
-#include "agnus/dma/dmacon.h"
+#include "agnus/blitter/blitter.h"
 #include "core/rigel_context.h"
 #include "domains/beam/beam_domain.h"
 #include "domains/blitter/blitter_domain.h"
@@ -70,7 +69,6 @@ void rigel_agnus_blitter_step_dma(RigelContext *ctx, rigel_u32 dma_slots)
 void rigel_agnus_step(RigelContext *ctx, rigel_u32 cycles)
 {
     RigelAgnus *agnus;
-    rigel_u32 blitter_grants;
 
     if (ctx == NULL || cycles == 0) {
         return;
@@ -78,18 +76,9 @@ void rigel_agnus_step(RigelContext *ctx, rigel_u32 cycles)
 
     agnus = &ctx->chipset.agnus;
 
-    rigel_beam_domain_step(&agnus->beam, (rigel_u16)cycles);
     rigel_dma_domain_sync_dmacon(&agnus->dma, agnus->dma.dmacon);
-    rigel_copper_domain_step(&agnus->copper, &agnus->beam, &agnus->dma);
-    rigel_copper_service_step_program(ctx);
-    blitter_grants = rigel_dma_domain_blitter_grants(&agnus->dma, cycles);
-    rigel_agnus_blitter_step_dma(ctx, blitter_grants);
 
-    /* Sync scheduler dynamic state so bus/deadline queries are accurate */
-    agnus->scheduler.hpos           = agnus->beam.hpos;
-    agnus->scheduler.blitter_active = blitter_is_busy(&agnus->blitter) != 0;
-    agnus->scheduler.copper_active  = agnus->copper.enabled;
-    agnus->scheduler.blitter_nasty  = (agnus->dma.dmacon & DMACON_BLTPRI) != 0;
-    if (agnus->scheduler.table_dirty)
-        agnus_slot_scheduler_rebuild(&agnus->scheduler, agnus->beam.vpos);
+    /* Slot loop drives beam CCK-by-CCK, dispatches copper and blitter (Approach C) */
+    agnus_slot_scheduler_step_until(&agnus->scheduler, ctx, cycles,
+                                     agnus->beam.line_clocks, agnus->beam.frame_lines);
 }

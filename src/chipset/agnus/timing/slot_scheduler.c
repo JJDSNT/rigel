@@ -3,14 +3,17 @@
 #include "deadline.h"
 
 #include "core/rigel_context.h"
+#include "agnus/agnus_state.h"
+#include "agnus/dma/dmacon.h"
+#include "agnus/blitter/blitter.h"
+#include "agnus/copper/copper_service.h"
+#include "agnus/dma/sprite_dma.h"
 #include "domains/beam/beam_domain.h"
 #include "domains/dma/dma_domain.h"
 #include "domains/copper/copper_domain.h"
 #include "domains/blitter/blitter_domain.h"
 #include "domains/disk/disk_domain.h"
 #include "domains/audio/audio_domain.h"
-#include "agnus/dma/sprite_dma.h"
-#include "agnus/blitter/blitter.h"
 
 /* =========================================================================
  * Internal: slot dispatch
@@ -24,14 +27,13 @@ static void dispatch_slot(agnus_slot_owner_t owner,
                           RigelContext *ctx,
                           rigel_u16 hpos)
 {
-    (void)ctx;
     (void)hpos;
 
     switch (owner) {
 
     case AGNUS_SLOT_FREE:
-        /* CPU has the bus. Copper may steal it if DMA-enabled.
-         * TODO(slot_scheduler): check copper_active and call copper fetch if so. */
+    case AGNUS_SLOT_CPU:
+        /* CPU has the bus — no DMA action. */
         break;
 
     case AGNUS_SLOT_REFRESH:
@@ -75,15 +77,20 @@ static void dispatch_slot(agnus_slot_owner_t owner,
         break;
 
     case AGNUS_SLOT_COPPER:
-        /* TODO(slot_scheduler): rigel_copper_domain_step_slot(ctx) */
+        if (ctx) {
+            rigel_copper_domain_step(
+                &ctx->chipset.agnus.copper,
+                &ctx->chipset.agnus.beam,
+                &ctx->chipset.agnus.dma
+            );
+            rigel_copper_service_step_program(ctx);
+        }
         break;
 
     case AGNUS_SLOT_BLITTER:
-        /* TODO(slot_scheduler): rigel_blitter_domain_step_slot(ctx) */
-        break;
-
-    case AGNUS_SLOT_CPU:
-        /* CPU owns the bus — no domain action. */
+        if (ctx) {
+            rigel_agnus_blitter_step_dma(ctx, 1);
+        }
         break;
     }
 }
@@ -201,50 +208,59 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
                                rigel_u16 line_clocks, rigel_u16 frame_lines)
 {
     agnus_slot_owner_t owner;
+    beam_state_t *beam = ctx ? &ctx->chipset.agnus.beam : NULL;
     rigel_u16 hpos;
 
-    /* Rebuild table if DMACON changed or we crossed a line boundary */
-    if (sched->table_dirty) {
-        rigel_u16 vpos = ctx ? ctx->chipset.agnus.beam.vpos : 0;
-        agnus_slot_scheduler_rebuild(sched, vpos);
+    /* Derive dynamic flags from live state so queries stay accurate */
+    if (ctx) {
+        sched->blitter_active = blitter_is_busy(&ctx->chipset.agnus.blitter) != 0;
+        sched->copper_active  = dmacon_copen(sched->dmacon);
+        sched->blitter_nasty  = (sched->dmacon & DMACON_BLTPRI) != 0;
+        sched->hpos           = beam->hpos;
+        line_clocks           = beam->line_clocks;
     }
+
+    /* Rebuild slot table if DMACON changed or a new line started */
+    if (sched->table_dirty)
+        agnus_slot_scheduler_rebuild(sched, beam ? beam->vpos : 0);
 
     hpos  = sched->hpos;
-    owner = sched->table[hpos];
+    owner = sched->table[hpos < AGNUS_SLOTS_PER_LINE ? hpos : 0];
 
-    /* Dynamic overrides:
-     *   BLITTER_NASTY: blitter steals CPU/FREE slots while busy */
-    if (sched->blitter_active && sched->blitter_nasty &&
-        (owner == AGNUS_SLOT_CPU || owner == AGNUS_SLOT_FREE)) {
-        owner = AGNUS_SLOT_BLITTER;
-    }
-    /* Copper steals FREE slots when copper DMA is enabled */
-    else if (sched->copper_active && owner == AGNUS_SLOT_FREE) {
+    /* Dynamic slot overrides:
+     *   Blitter steals FREE slots when active; also CPU slots when nasty.
+     *   Copper steals FREE slots only when blitter is not competing. */
+    if (sched->blitter_active) {
+        if (owner == AGNUS_SLOT_FREE ||
+            (sched->blitter_nasty && owner == AGNUS_SLOT_CPU))
+            owner = AGNUS_SLOT_BLITTER;
+    } else if (sched->copper_active && owner == AGNUS_SLOT_FREE) {
         owner = AGNUS_SLOT_COPPER;
     }
 
     dispatch_slot(owner, ctx, hpos);
 
-    /* Advance hpos with line wrap */
-    hpos++;
-    if (hpos >= line_clocks) {
-        hpos = 0;
-        /* TODO(slot_scheduler): trigger line-boundary events (HBLANK, vpos advance)
-         * and rebuild table for the new line's VBL status. */
+    /* Advance beam by one CCK (beam is the canonical position; scheduler follows) */
+    if (beam) {
+        rigel_beam_domain_step(beam, 1);
+        sched->hpos = beam->hpos;
+        if (beam->hpos == 0)
+            sched->table_dirty = true;  /* new line: VBL status may change */
+    } else {
         (void)frame_lines;
-        sched->table_dirty = true;
+        hpos = (rigel_u16)(hpos + 1u);
+        if (hpos >= line_clocks) {
+            hpos = 0;
+            sched->table_dirty = true;
+        }
+        sched->hpos = hpos;
     }
-    sched->hpos = hpos;
 }
 
 void agnus_slot_scheduler_step_until(agnus_slot_scheduler_t *sched, RigelContext *ctx,
                                      rigel_u32 cycles,
                                      rigel_u16 line_clocks, rigel_u16 frame_lines)
 {
-    /* TODO(slot_scheduler): this is the inner loop that replaces rigel_agnus_step().
-     * When wired up:
-     *   rigel_agnus_step(ctx, cycles) will call this instead of the current
-     *   beam_domain_step / dma_domain_sync / copper_domain_step sequence. */
     rigel_u32 i;
     for (i = 0; i < cycles; i++)
         agnus_slot_scheduler_step(sched, ctx, line_clocks, frame_lines);
@@ -267,17 +283,19 @@ rigel_u32 agnus_slot_scheduler_next_event(const agnus_slot_scheduler_t *sched,
 
 agnus_slot_owner_t agnus_slot_scheduler_current_owner(const agnus_slot_scheduler_t *sched)
 {
+    agnus_slot_owner_t o;
+
     if (sched->hpos >= AGNUS_SLOTS_PER_LINE)
         return AGNUS_SLOT_CPU;
 
-    agnus_slot_owner_t o = sched->table[sched->hpos];
+    o = sched->table[sched->hpos];
 
-    if (sched->blitter_active && sched->blitter_nasty &&
-        (o == AGNUS_SLOT_CPU || o == AGNUS_SLOT_FREE))
-        return AGNUS_SLOT_BLITTER;
-
-    if (sched->copper_active && o == AGNUS_SLOT_FREE)
+    if (sched->blitter_active) {
+        if (o == AGNUS_SLOT_FREE || (sched->blitter_nasty && o == AGNUS_SLOT_CPU))
+            return AGNUS_SLOT_BLITTER;
+    } else if (sched->copper_active && o == AGNUS_SLOT_FREE) {
         return AGNUS_SLOT_COPPER;
+    }
 
     return o;
 }

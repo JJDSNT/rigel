@@ -63,7 +63,10 @@ int main(void)
         RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BLTEN
     );
 
-    rigel_agnus_step(ctx, 1);
+    /* Slot-level scheduling: blitter only runs on FREE bus slots.
+     * At vpos=0 (VBL), hpos=1,3,5 are REFRESH. hpos=2,4 are FREE.
+     * Beam is at hpos=1 after the first step; step 4 more to pass a free slot. */
+    rigel_agnus_step(ctx, 4);
 
     if ((rigel_custom_read16(ctx, 0x002) & AGNUS_DMACON_BBUSY) != 0) {
         rigel_destroy(ctx);
