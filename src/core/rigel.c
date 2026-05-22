@@ -7,13 +7,33 @@
 #include "chipset/agnus/beam.h"
 #include "chipset/agnus/blitter/blitter.h"
 #include "chipset/agnus/timing/deadline.h"
+#include "chipset/agnus/timing/slot_scheduler.h"
 #include "chipset/agnus/timing/vblank.h"
+#include "domains/copper/copper_domain.h"
 #include "core/rigel_context.h"
 #include "floppy/floppy_drive.h"
 #include "paula/paula_interrupts.h"
 #include "paula/paula_state.h"
 
 enum { RIGEL_DMACON_BLTPRI = 0x0400u };
+
+static rigel_bus_owner_t slot_to_bus_owner(agnus_slot_owner_t slot)
+{
+    switch (slot) {
+    case AGNUS_SLOT_REFRESH:                              return RIGEL_BUS_OWNER_REFRESH;
+    case AGNUS_SLOT_DISK:                                 return RIGEL_BUS_OWNER_DISK;
+    case AGNUS_SLOT_AUDIO_0: case AGNUS_SLOT_AUDIO_1:
+    case AGNUS_SLOT_AUDIO_2: case AGNUS_SLOT_AUDIO_3:    return RIGEL_BUS_OWNER_AUDIO;
+    case AGNUS_SLOT_SPRITE_0: case AGNUS_SLOT_SPRITE_1:
+    case AGNUS_SLOT_SPRITE_2: case AGNUS_SLOT_SPRITE_3:
+    case AGNUS_SLOT_SPRITE_4: case AGNUS_SLOT_SPRITE_5:
+    case AGNUS_SLOT_SPRITE_6: case AGNUS_SLOT_SPRITE_7:  return RIGEL_BUS_OWNER_SPRITE;
+    case AGNUS_SLOT_BITPLANE:                             return RIGEL_BUS_OWNER_BITPLANE;
+    case AGNUS_SLOT_COPPER:                               return RIGEL_BUS_OWNER_COPPER;
+    case AGNUS_SLOT_BLITTER:                              return RIGEL_BUS_OWNER_BLITTER;
+    case AGNUS_SLOT_FREE: case AGNUS_SLOT_CPU: default:   return RIGEL_BUS_OWNER_CPU;
+    }
+}
 enum { RIGEL_DEFAULT_CLOCK_HZ = 7093790u };
 
 RigelContext *rigel_create(const rigel_config_t *config)
@@ -151,6 +171,11 @@ rigel_cycle_t rigel_get_next_deadline(const RigelContext *ctx)
     d.beam_line_end = line_end;
 
     d.vertb = agnus_cycles_to_vertb(&ctx->chipset.agnus.beam);
+
+    d.copper_wait = rigel_copper_domain_cycles_to_wait(
+        &ctx->chipset.agnus.copper,
+        &ctx->chipset.agnus.beam
+    );
 
     return ctx->chipset.cycles + agnus_deadlines_min(&d);
 }
@@ -472,8 +497,13 @@ rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx)
         state.cpu_would_stall = blt_pri;
         state.next_change = ctx->chipset.cycles + ctx->chipset.agnus.blitter.cycles_remaining;
     } else {
-        state.owner = RIGEL_BUS_OWNER_CPU;
-        state.next_change = ctx->chipset.cycles + beam_cycles_until_line_end(&ctx->chipset.agnus.beam);
+        agnus_slot_owner_t slot_owner =
+            agnus_slot_scheduler_current_owner(&ctx->chipset.agnus.scheduler);
+        state.cpu_would_stall = agnus_slot_scheduler_cpu_stall(&ctx->chipset.agnus.scheduler);
+        state.owner = slot_to_bus_owner(slot_owner);
+        state.next_change = ctx->chipset.cycles +
+            agnus_slot_scheduler_next_event(&ctx->chipset.agnus.scheduler,
+                                            ctx->chipset.agnus.beam.line_clocks);
     }
 
     state.cpu_can_access_chip_ram = !state.cpu_would_stall;

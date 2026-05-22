@@ -7,6 +7,9 @@ enum {
     RIGEL_DMACON_DMAEN = 0x0200u
 };
 
+/* Sentinel: no deadline contribution */
+#define COPPER_DEADLINE_NONE ((rigel_u32)0xFFFFFFFFu)
+
 void rigel_copper_domain_reset(copper_state_t *copper)
 {
     copper_reset(copper);
@@ -49,6 +52,34 @@ void rigel_copper_domain_jump2(copper_state_t *copper)
     copper->triggered = false;
     copper->fetch_pending = true;
     copper->waiting = false;
+}
+
+rigel_u32 rigel_copper_domain_cycles_to_wait(const copper_state_t *copper,
+                                              const beam_state_t *beam)
+{
+    rigel_u32 current, target, frame_total;
+
+    if (copper == NULL || beam == NULL || !copper->waiting)
+        return COPPER_DEADLINE_NONE;
+
+    if (copper_beam_cmp(beam->vpos, beam->hpos,
+                        copper->wait_vpos, copper->wait_hpos,
+                        copper->wait_vpmask, copper->wait_hpmask))
+        return 0;
+
+    /* Full-mask fast path: exact CCK count to wait target */
+    if (copper->wait_vpmask == 0xFFu && copper->wait_hpmask == 0xFEu) {
+        current = (rigel_u32)beam->vpos * beam->line_clocks + beam->hpos;
+        target  = (rigel_u32)copper->wait_vpos * beam->line_clocks + copper->wait_hpos;
+        if (target > current)
+            return target - current;
+        /* Target is in the next frame */
+        frame_total = (rigel_u32)beam->frame_lines * beam->line_clocks;
+        return frame_total - current + target;
+    }
+
+    /* Partial mask: conservative — re-check at the next line boundary */
+    return (rigel_u32)(beam->line_clocks - beam->hpos);
 }
 
 void rigel_copper_domain_step(copper_state_t *copper, const beam_state_t *beam, const dma_state_t *dma)

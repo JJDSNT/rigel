@@ -15,6 +15,7 @@
 
 /* --- Master enable -------------------------------------------------------- */
 #define DMACON_DMAEN    0x0200u  /* bit 9 — master DMA enable; gates all channels */
+#define DMACON_BLTPRI   0x0400u  /* bit 10 — blitter priority (nasty): steals CPU cycles */
 
 /* --- Channel enables ------------------------------------------------------ */
 #define DMACON_BPLEN    0x0100u  /* bit 8 — bitplane DMA                        */

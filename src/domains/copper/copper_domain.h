@@ -14,4 +14,9 @@ void rigel_copper_domain_jump1(copper_state_t *copper);
 void rigel_copper_domain_jump2(copper_state_t *copper);
 void rigel_copper_domain_step(copper_state_t *copper, const beam_state_t *beam, const dma_state_t *dma);
 
+/* Cycles until the armed WAIT condition fires from the given beam position.
+ * Returns 0xFFFFFFFFu if the copper is not waiting or condition already satisfied. */
+rigel_u32 rigel_copper_domain_cycles_to_wait(const copper_state_t *copper,
+                                              const beam_state_t *beam);
+
 #endif

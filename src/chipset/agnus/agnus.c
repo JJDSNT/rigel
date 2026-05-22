@@ -4,6 +4,7 @@
 
 #include "chipset/chipset.h"
 #include "agnus/copper/copper_service.h"
+#include "agnus/dma/dmacon.h"
 #include "core/rigel_context.h"
 #include "domains/beam/beam_domain.h"
 #include "domains/blitter/blitter_domain.h"
@@ -83,4 +84,12 @@ void rigel_agnus_step(RigelContext *ctx, rigel_u32 cycles)
     rigel_copper_service_step_program(ctx);
     blitter_grants = rigel_dma_domain_blitter_grants(&agnus->dma, cycles);
     rigel_agnus_blitter_step_dma(ctx, blitter_grants);
+
+    /* Sync scheduler dynamic state so bus/deadline queries are accurate */
+    agnus->scheduler.hpos           = agnus->beam.hpos;
+    agnus->scheduler.blitter_active = blitter_is_busy(&agnus->blitter) != 0;
+    agnus->scheduler.copper_active  = agnus->copper.enabled;
+    agnus->scheduler.blitter_nasty  = (agnus->dma.dmacon & DMACON_BLTPRI) != 0;
+    if (agnus->scheduler.table_dirty)
+        agnus_slot_scheduler_rebuild(&agnus->scheduler, agnus->beam.vpos);
 }
