@@ -55,7 +55,7 @@ add_library(rigel
     src/chipset/agnus/timing/deadline.c
     src/chipset/agnus/timing/slot_scheduler.c
     src/chipset/agnus/irq/agnus_irq.c
-    src/chipset/agnus/bitplanes.c
+    src/chipset/agnus/bitplanes/bitplanes.c
     src/chipset/agnus/bitplanes/bitplane_fetch.c
     src/chipset/agnus/bitplanes/bitplane_pointers.c
     src/chipset/denise/denise.c

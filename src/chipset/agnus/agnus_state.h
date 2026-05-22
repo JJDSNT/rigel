@@ -2,7 +2,7 @@
 #define RIGEL_AGNUS_STATE_H
 
 #include "agnus/beam.h"
-#include "agnus/bitplanes.h"
+#include "agnus/bitplanes/bitplanes.h"
 #include "agnus/bitplanes/bitplane_fetch.h"
 #include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/copper/copper.h"
