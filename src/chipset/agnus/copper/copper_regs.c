@@ -8,6 +8,7 @@
 bool rigel_copper_regs_owns_reg(rigel_u32 addr)
 {
     switch (addr) {
+    case RIGEL_REG_COPCON:
     case RIGEL_REG_COP1LCH:
     case RIGEL_REG_COP1LCL:
     case RIGEL_REG_COP2LCH:
@@ -47,6 +48,9 @@ void rigel_copper_regs_write(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
     }
 
     switch (addr) {
+    case RIGEL_REG_COPCON:
+        ctx->chipset.agnus.copper.copcon = value;
+        break;
     case RIGEL_REG_COP1LCH:
         copper_set_pointer_hi(&ctx->chipset.agnus.copper.cop1lc, value);
         break;

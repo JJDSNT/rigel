@@ -87,7 +87,7 @@
 #define AGNUS_COPJMP1   0x088   /* W  restart copper list 1     */
 #define AGNUS_COPJMP2   0x08A   /* W  restart copper list 2     */
 #define AGNUS_COPINS    0x08C   /* W  copper instruction        */
-#define AGNUS_COPCON    0x09E   /* W  copper danger bit         */
+#define AGNUS_COPCON    0x02E   /* W  copper danger bit (CDANG) */
 
 /* Blitter offsets are defined in blitter/blitter.h */
 

@@ -15,6 +15,7 @@ void copper_reset(copper_state_t *copper)
     copper->wait_vpos   = 0;
     copper->wait_vpmask = 0xFFu;
     copper->wait_hpmask = 0xFEu;
+    copper->copcon      = 0;
     copper->waiting     = false;
     copper->enabled = false;
     copper->triggered = false;

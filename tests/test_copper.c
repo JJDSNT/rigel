@@ -58,5 +58,17 @@ int main(void)
         return 1;
     }
 
+    /* COPCON: copcon field initialises to 0 (CDANG clear = danger registers blocked) */
+    copper_reset(&copper);
+    if (copper.copcon != 0) {
+        return 1;
+    }
+
+    /* Setting CDANG lets the copper write to low registers */
+    copper.copcon = 0x0002u;
+    if ((copper.copcon & 0x0002u) == 0) {
+        return 1;
+    }
+
     return 0;
 }

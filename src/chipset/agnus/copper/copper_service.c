@@ -59,7 +59,11 @@ void rigel_copper_service_step_program(RigelContext *ctx)
 
     reg = (rigel_u32)(ir2 & 0x01feu);
     if (rigel_custom_is_valid_reg(reg)) {
-        custom_regs_write16(ctx, reg, ir1);
+        /* COPCON CDANG (bit 1): when clear, block writes to registers < 0x40 */
+        bool cdang = (copper->copcon & 0x0002u) != 0;
+        if (reg >= 0x40u || cdang) {
+            custom_regs_write16(ctx, reg, ir1);
+        }
     }
 
     copper->program_counter += 4u;
