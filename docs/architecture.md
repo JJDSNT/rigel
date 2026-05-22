@@ -2,50 +2,50 @@
 
 ## Overview
 
-Rigel é uma biblioteca C para o chipset clássico do Amiga, organizada para manter
-fidelidade temporal, separação de ownership e integração limpa com um host externo.
+Rigel is a C library for the classic Amiga chipset, designed for temporal fidelity,
+ownership separation, and clean integration with an external host.
 
-Objetivos do core clássico:
-- comportamento determinístico
-- execução single-thread por padrão
-- fronteiras internas claras entre subsistemas
-- portabilidade entre hosts e runtimes
+Core goals:
+- Deterministic behaviour
+- Single-threaded execution by default
+- Clear internal boundaries between subsystems
+- Portability across hosts and runtimes
 
-Rigel é concurrency-aware internamente, mas não é multicore-first. Para o caminho
-clássico, correção e determinismo importam mais do que paralelismo antecipado.
+Rigel is concurrency-aware internally but not multicore-first. For the classic path,
+correctness and determinism matter more than anticipated parallelism.
 
-## Camadas internas
+## Internal layers
 
 ```
-include/rigel/       ← superfície pública (host fala só aqui)
-src/chipset/         ← composição, MMIO routing, wiring interno
-src/domains/         ← máquinas de estado do hardware
-src/bus/             ← interfaces de acesso e callbacks de Chip RAM
-src/runtime/         ← política de execução no host
-src/rtc/             ← periférico auxiliar fora do custom MMIO
+include/rigel/       ← public surface (host speaks only here)
+src/chipset/         ← composition, MMIO routing, internal wiring
+src/domains/         ← hardware state machines
+src/bus/             ← access interfaces and Chip RAM callbacks
+src/runtime/         ← host execution policy
+src/rtc/             ← auxiliary peripheral outside custom MMIO
 ```
 
-## Superfície pública
+## Public surface
 
-Organizada em headers temáticos, todos reexportados por `rigel.h`:
+Organized into thematic headers, all re-exported by `rigel.h`:
 
-| Header              | Conteúdo                                      |
-|---------------------|-----------------------------------------------|
-| `rigel_time.h`      | Temporal API: step, deadline, step_result     |
-| `rigel_bus.h`       | Bus observation: estado do barramento clássico |
-| `rigel_events.h`    | Bitmask de eventos (`rigel_event_flags_t`)    |
-| `rigel_irq.h`       | INTREQ, INTENA, IPL                           |
-| `rigel_mmio.h`      | custom_read16 / custom_write16                |
-| `rigel_floppy.h`    | Insert, eject, status por drive               |
-| `rigel_input.h`     | Joystick / pot injection                      |
-| `rigel_rtc.h`       | RTC model e registradores                     |
-| `rigel_config.h`    | Configuração de criação do contexto           |
+| Header              | Contents                                        |
+|---------------------|-------------------------------------------------|
+| `rigel_time.h`      | Temporal API: step, deadline, step_result       |
+| `rigel_bus.h`       | Bus observation: classic bus state              |
+| `rigel_events.h`    | Event bitmask (`rigel_event_flags_t`)           |
+| `rigel_irq.h`       | INTREQ, INTENA, IPL                             |
+| `rigel_mmio.h`      | custom_read16 / custom_write16                  |
+| `rigel_floppy.h`    | Insert, eject, drive status                     |
+| `rigel_input.h`     | Joystick / pot injection                        |
+| `rigel_rtc.h`       | RTC model and registers                         |
+| `rigel_config.h`    | Context creation configuration                  |
 
 ## Temporal API
 
-Dois contratos principais:
+Two main contracts:
 
-**"quando algo relevante acontece" → para scheduling:**
+**"when does something relevant happen" → for scheduling:**
 ```c
 rigel_cycle_t       rigel_get_time(const RigelContext *ctx);
 rigel_cycle_t       rigel_get_next_deadline(const RigelContext *ctx);
@@ -53,7 +53,7 @@ rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles);
 rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time);
 ```
 
-**"quem tem o barramento neste instante" → para contenção e wait states:**
+**"who owns the bus right now" → for contention and wait states:**
 ```c
 rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx);
 rigel_cycle_t     rigel_get_next_bus_change(const RigelContext *ctx);
@@ -63,31 +63,31 @@ rigel_cycle_t     rigel_get_cpu_resume_time(const RigelContext *ctx);
 
 ## Domains
 
-`src/domains/` contém as máquinas de estado do hardware clássico:
+`src/domains/` contains the classic hardware state machines:
 
 ```
-beam       → posição do feixe (hpos/vpos)
-dma        → DMACON, arbitragem de slots
-copper     → programa copper e WAITs
-blitter    → operações e DMA do blitter
+beam       → raster position (hpos/vpos)
+dma        → DMACON, slot arbitration
+copper     → copper program and WAITs
+blitter    → operations and blitter DMA
 interrupt  → INTREQ, INTENA, IPL
-disk       → DMA e MMIO de disco
+disk       → disk DMA and MMIO
 serial     → SERDAT, SERPER, TX/RX
-audio      → 4 canais, DMA, período
+audio      → 4 channels, DMA, period
 input      → joystick, POT
 ```
 
-Domains existem para separar estado, explicitar fronteiras temporais e reduzir
-acoplamento. Não são threads — são superfícies de ownership.
+Domains exist to separate state, make temporal boundaries explicit, and reduce
+coupling. They are not threads — they are ownership surfaces.
 
 ## Chipset layer
 
-`src/chipset/` é a raiz composicional. Concentra:
-- `RigelChipset`: contexto raiz com Agnus, Paula, Denise, RTC, FloppyDrives
-- MMIO routing: `rigel_custom_read16/write16` → domínio correto
-- entrypoints de MMIO por chip, sem uma camada extra separada de `*regs`
-- Wiring interno: IRQ sink, DMA grant, Chip RAM callbacks
-- Mediação: domínios não dependem uns dos outros diretamente
+`src/chipset/` is the compositional root. It holds:
+- `RigelChipset`: root context containing Agnus, Paula, Denise, RTC, FloppyDrives
+- MMIO routing: `rigel_custom_read16/write16` → correct domain
+- Per-chip MMIO entrypoints
+- Internal wiring: IRQ sink, DMA grant, Chip RAM callbacks
+- Mediation: domains do not depend on each other directly
 
 ```
 RigelChipset
@@ -114,22 +114,41 @@ RigelChipset
   └── FloppyDrive[4]
 ```
 
+## DMA slot scheduler
+
+Agnus divides each raster line into fixed slots. The slot scheduler
+(`agnus_slot_scheduler_t`) dispatches the correct domain at each CCK:
+
+| Slot type  | Domain call                            |
+|------------|----------------------------------------|
+| REFRESH    | transparent, no domain call            |
+| DISK       | `rigel_disk_domain_step_slot(ctx)`     |
+| AUDIO_0–3  | `rigel_audio_domain_step_slot(ctx, n)` |
+| SPRITE_0–7 | sprite DMA (TODO)                      |
+| BITPLANE   | `bitplane_fetch_step()`                |
+| COPPER     | `rigel_copper_service_step_program()`  |
+| BLITTER    | `rigel_agnus_blitter_step_dma()`       |
+
+The slot table is rebuilt whenever DMACON changes or a new line starts.
+Disk and audio DMA require `DMAEN` (master enable) plus their channel
+enable bits in DMACON; the slot scheduler enforces this automatically.
+
 ## Video output
 
-Denise produz pixels a partir de bitplanes, sprites, HAM/EHB e palette.
-Essa lógica pertence ao chipset porque planar→chunky não é conversão de formato —
-é a execução real de Denise durante o DMA slot sequence.
+Denise produces pixels from bitplanes, sprites, HAM/EHB and palette.
+This logic belongs to the chipset because planar→chunky is not a format
+conversion — it is Denise's actual execution during the DMA slot sequence.
 
-O host recebe um `rigel_frame_t` com pixels prontos, metadata (`flags`) e
-dirty tracking (`delta`). Ver `docs/video_output.md`.
+The host receives a `rigel_frame_t` with ready pixels, metadata (`flags`) and
+dirty tracking (`delta`). See `docs/video_output.md`.
 
 ## Boundary
 
-Rigel não possui:
-- mapa global de memória
-- CPU
+Rigel does not own:
+- the global memory map
+- the CPU
 - ROM / Fast RAM
-- dispositivos de plataforma
-- lógica de apresentação (scale, vsync real, SDL, OpenGL)
+- platform devices
+- presentation logic (scale, real vsync, SDL, OpenGL)
 
-O host integra tudo isso. Ver `docs/integration.md`.
+The host integrates all of that. See `docs/integration.md`.

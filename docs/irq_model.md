@@ -2,21 +2,21 @@
 
 ## Scope
 
-O modelo de interrupção cobre requisição, máscara e consulta de estado pendente.
-A entrega ao processador pertence ao host.
+The interrupt model covers request, masking, and pending-state queries.
+Delivery to the processor belongs to the host.
 
-## Registradores
+## Registers
 
-- `INTREQ` (`0x09C`): fontes requisitadas
-- `INTENA` (`0x09A`): fontes habilitadas (bit 14 = INTEN master enable)
-- IPL: nível de prioridade resultante (0–6)
+- `INTREQ` (`0x09C`): requested sources
+- `INTENA` (`0x09A`): enabled sources (bit 14 = INTEN master enable)
+- IPL: resulting priority level (0–6)
 
-Estado pendente = `INTREQ & INTENA & INTEN`. O IPL é derivado da prioridade mais
-alta entre as fontes pendentes.
+Pending state = `INTREQ & INTENA & INTEN`. IPL is derived from the highest
+priority pending source.
 
-## Fontes de interrupção
+## Interrupt sources
 
-| Bit  | Nome    | Fonte                          |
+| Bit  | Name    | Source                         |
 |------|---------|--------------------------------|
 | 0    | TBE     | Serial transmit buffer empty   |
 | 1    | DSKBLK  | Disk DMA block done            |
@@ -30,10 +30,22 @@ alta entre as fontes pendentes.
 | 12   | DSKSYN  | Disk sync word match           |
 | 13   | EXTER   | CIA-B / external               |
 
-## Integração com o host
+## IRQ sources wired in Rigel
 
-Rigel notifica mudanças via `RIGEL_EVENT_IRQ_CHANGED` no `rigel_step_result_t`.
-O host consulta `rigel_get_ipl()` e entrega a interrupção ao CPU core:
+All sources listed above fire through the same interrupt domain. The following
+are actively driven by the chipset:
+
+- **DSKBLK** — fired by disk DMA at the end of a DMA block
+- **DSKSYN** — fired when the disk sync word matches DSKSYNC
+- **BLIT** — fired by the blitter when it finishes an operation
+- **COPER** — fired by copper when a WAIT/SKIP triggers the IRQ path
+- **VERTB** — fired at the start of vertical blank
+- **AUD0–3** — fired by each audio channel when its DMA buffer is exhausted
+
+## Host integration
+
+Rigel notifies changes via `RIGEL_EVENT_IRQ_CHANGED` in `rigel_step_result_t`.
+The host queries `rigel_get_ipl()` and delivers the interrupt to the CPU core:
 
 ```c
 rigel_step_result_t r = rigel_step_until(rigel, target);
@@ -42,10 +54,10 @@ if (r.events & RIGEL_EVENT_IRQ_CHANGED)
     cpu_set_ipl(cpu, rigel_get_ipl(rigel));
 ```
 
-Rigel não sabe o que é autovector, IACK ou ciclo de interrupção — isso é
-responsabilidade do host e do CPU core integrado.
+Rigel does not know about autovectors, IACK cycles, or interrupt acknowledgement
+— those are the responsibility of the host and the integrated CPU core.
 
-## Queries diretas
+## Direct queries
 
 ```c
 rigel_u16 rigel_get_intreq(const RigelContext *ctx);

@@ -1,35 +1,55 @@
 # Video Output
 
-## Divisão de responsabilidades
+## Responsibility split
 
-**Rigel produz vídeo clássico correto.** Host apresenta vídeo.
+**Rigel produces correct classic video.** The host presents video.
 
 ```
-Rigel/chipset:                    Host:
-  bitplane DMA fetch                pixels Rigel → framebuffer
-  BPLCONx (modo, resolução)         scale, aspect ratio
-  dual playfield                    vsync real
-  HAM / EHB                         RGB565 / RGBA8888 para hardware
+Rigel / chipset:                  Host:
+  bitplane DMA fetch                Rigel pixels → framebuffer
+  BPLCONx (mode, resolution)        scale, aspect ratio
+  dual playfield                    real vsync
+  HAM / EHB                         RGB565 / RGBA8888 for hardware
   sprites (priority, collision)     overlay / debug UI
   palette (COLOR00–COLOR31)
-  saída raster linha a linha
+  raster output line by line
 ```
 
-Planar→chunky não é conversão de formato — é a materialização do que Denise
-realmente faz durante o DMA slot sequence. Essa lógica pertence ao chipset.
+Planar→chunky is not a format conversion — it is the materialisation of what
+Denise actually does during the DMA slot sequence. This logic belongs to the
+chipset.
 
-## API de saída
+## Current implemented baseline
+
+```c
+bool rigel_denise_get_current_scanline(const RigelContext *ctx,
+                                       rigel_denise_scanline_t *scanline);
+```
+
+The project currently exposes the current scanline assembled by Denise for
+inspection and headless testing. This already allows validating copper-driven
+effects and palette changes without a graphics backend, while the full
+frame/scanline API matures.
+
+The compositor (`rigel_denise_compositor_tick`) is called once per `rigel_step`
+with the final beam position. It:
+- calls `compose_line()` on leaving a visible scanline (line-exit)
+- calls `compose_line()` on entering a visible scanline from a non-visible one (line-enter)
+
+This handles the case where a single `rigel_step` crosses multiple raster lines.
+
+## Planned API
 
 ```c
 typedef enum rigel_pixel_format {
-    RIGEL_PIXEL_INDEXED_8BIT,   /* índice 0–31 (OCS) / 0–255 (AGA) — pré-palette */
-    RIGEL_PIXEL_RGBA8888,       /* MVP: pronto para o host copiar */
+    RIGEL_PIXEL_INDEXED_8BIT,   /* index 0–31 (OCS) / 0–255 (AGA) — pre-palette */
+    RIGEL_PIXEL_RGBA8888,       /* ready for the host to copy */
     RIGEL_PIXEL_RGB565
 } rigel_pixel_format_t;
 
 typedef struct rigel_frame_delta {
-    uint64_t dirty_lines[4];  /* bitmask 1 bit/linha — cobre 256 linhas */
-    bool     full_redraw;     /* palette global mudou, resolução trocou, etc. */
+    uint64_t dirty_lines[4];  /* bitmask 1 bit/line — covers 256 lines */
+    bool     full_redraw;     /* palette changed globally, resolution switched, etc. */
 } rigel_frame_delta_t;
 
 typedef enum rigel_frame_flags {
@@ -45,84 +65,74 @@ typedef struct rigel_frame {
     uint32_t              width;
     uint32_t              height;
     uint32_t              pitch;
-    uint64_t              frame_count;   /* detectar frames perdidos */
+    uint64_t              frame_count;   /* detect dropped frames */
     rigel_pixel_format_t  format;
     const void           *pixels;
-    rigel_frame_flags_t   flags;         /* o que aconteceu neste frame */
-    rigel_frame_delta_t   delta;         /* quais linhas mudaram */
+    rigel_frame_flags_t   flags;         /* what happened this frame */
+    rigel_frame_delta_t   delta;         /* which lines changed */
 } rigel_frame_t;
 
 const rigel_frame_t    *rigel_get_frame(const RigelContext *ctx);
 const rigel_scanline_t *rigel_get_scanline(const RigelContext *ctx, uint32_t y);
 ```
 
-Current implemented baseline:
+The pixel format is configured at `rigel_create` time via `rigel_config_t`,
+not per frame. This lets the chipset optimise its internal pipeline for a
+single target format.
 
-```c
-bool rigel_denise_get_current_scanline(const RigelContext *ctx,
-                                       rigel_denise_scanline_t *scanline);
-```
+## Buffer lifetime
 
-Hoje o projeto expõe a linha atual montada por Denise para inspeção e teste
-headless. Isso já permite validar efeitos dirigidos por copper e palette sem
-backend gráfico, enquanto a API de frame/scanline completa ainda amadurece.
-
-O formato é configurado em `rigel_create` via `rigel_config_t` — não por frame.
-Isso permite que o chipset otimize seu pipeline interno para um único target.
-
-## Lifetime do buffer
-
-`pixels` é válido entre `RIGEL_EVENT_FRAME_READY` e o próximo `rigel_step` que
-avança além do início do próximo frame. O host deve copiar dentro dessa janela,
-ou usar o ponteiro diretamente se não houver concorrência.
+`pixels` is valid between `RIGEL_EVENT_FRAME_READY` and the next `rigel_step`
+that advances past the start of the next frame. The host must copy within that
+window, or use the pointer directly if there is no concurrency.
 
 ## Dirty lines
 
-`delta.dirty_lines` é um bitmask de quais linhas tiveram saída diferente do frame
-anterior. Implementação correta: Denise marca linhas durante a geração (linha com
-DMA ativo = dirty), não por comparação pós-geração com o frame anterior.
+`delta.dirty_lines` is a bitmask of which lines had output different from the
+previous frame. Correct implementation: Denise marks lines during generation
+(a line with active DMA = dirty), not by post-generation comparison.
 
-`delta.full_redraw = true` quando algo invalida o frame inteiro — troca de resolução
-via BPLCONx, copper escreveu COLOR00 na linha 0, etc. Nesse caso o host deve
-redesenhar tudo, independente do bitmask.
+`delta.full_redraw = true` when something invalidates the whole frame — resolution
+change via BPLCONx, copper writing COLOR00 on line 0, etc. In that case the host
+must redraw everything, regardless of the bitmask.
 
-## Por que `rigel_get_scanline` importa
+## Why `rigel_get_scanline` matters
 
-Efeitos copper-synchronous mudam palette ou resolução no meio do frame. Um host que
-só recebe o frame completo não consegue reproduzir isso sem reconstruir o raster.
-`rigel_get_scanline` expõe a saída linha a linha para hosts copper-aware.
+Copper-synchronous effects change palette or resolution mid-frame. A host that
+only receives the complete frame cannot reproduce this without reconstructing
+the raster. `rigel_get_scanline` exposes line-by-line output for copper-aware hosts.
 
-É também o caminho correto para interlace: campos par/ímpar ficam acessíveis
-individualmente sem post-process no host.
+It is also the correct path for interlace: odd/even fields are accessible
+individually without post-processing on the host.
 
 ## `RIGEL_PIXEL_INDEXED_8BIT`
 
-É a saída natural de Denise antes de aplicar os registradores COLOR. Hosts que
-querem controle total da palette (shader, HDR, análise de debug) precisam desse
-formato. Mais útil do que um `INDEXED_12BIT` porque o índice chunky já foi
-resolvido pelo priority engine de sprites e playfields.
+This is Denise's natural output before applying the COLOR registers. Hosts that
+want full palette control (shader, HDR, debug analysis) need this format. More
+useful than `INDEXED_12BIT` because the chunky index has already been resolved
+by the sprite and playfield priority engine.
 
-## O que não entra no Rigel
+## What does not belong in Rigel
 
 ```c
-rigel_planar_to_chunky_for_sdl()   /* não */
-rigel_scale_2x()                   /* não */
-rigel_apply_scanline_filter()      /* não */
+rigel_planar_to_chunky_for_sdl()   /* no */
+rigel_scale_2x()                   /* no */
+rigel_apply_scanline_filter()      /* no */
 ```
 
-Qualquer função que menciona o host de destino pertence ao host.
+Any function that mentions the target host belongs in the host.
 
 ## Roadmap
 
 ```
 MVP:
-  - rigel_config_t aceita rigel_pixel_format_t (default RGBA8888)
-  - Rigel entrega frame completo em RGBA8888 após RIGEL_EVENT_FRAME_READY
-  - rigel_get_frame() retorna ponteiro para buffer interno
+  - rigel_config_t accepts rigel_pixel_format_t (default RGBA8888)
+  - Rigel delivers a complete frame in RGBA8888 after RIGEL_EVENT_FRAME_READY
+  - rigel_get_frame() returns a pointer to the internal buffer
 
-Depois:
-  - rigel_get_scanline() para hosts copper-aware e interlace
-  - RIGEL_PIXEL_INDEXED_8BIT para hosts com pipeline de cor próprio
-  - Write target via config (zero-copy para Pi/PiStorm streaming)
-  - Double buffering interno
+Later:
+  - rigel_get_scanline() for copper-aware hosts and interlace
+  - RIGEL_PIXEL_INDEXED_8BIT for hosts with their own colour pipeline
+  - Write target via config (zero-copy for Pi/PiStorm streaming)
+  - Internal double buffering
 ```

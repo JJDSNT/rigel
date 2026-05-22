@@ -2,17 +2,17 @@
 
 ## Scope
 
-Rigel integra com um host externo sem depender de CPU, frontend ou plataforma.
-O host é responsável por: memória global, decodificação de endereços, CPU, ROM,
-Fast RAM, e toda a camada de apresentação.
+Rigel integrates with an external host without depending on a CPU, frontend, or
+platform. The host is responsible for: global memory, address decoding, the CPU,
+ROM, Fast RAM, and the entire presentation layer.
 
-## Host loop canônico
+## Canonical host loop
 
 ```c
 while (running) {
-    rigel_cycle_t deadline    = rigel_get_next_deadline(rigel);
-    rigel_cycle_t bus_change  = rigel_get_next_bus_change(rigel);
-    rigel_cycle_t until       = deadline < bus_change ? deadline : bus_change;
+    rigel_cycle_t deadline   = rigel_get_next_deadline(rigel);
+    rigel_cycle_t bus_change = rigel_get_next_bus_change(rigel);
+    rigel_cycle_t until      = deadline < bus_change ? deadline : bus_change;
 
     cpu_run_until(cpu, until);
 
@@ -30,39 +30,39 @@ while (running) {
 }
 ```
 
-Hosts simples podem ignorar `bus_change`, `cpu_would_stall`, e o frame delta —
-a API foi desenhada para que integração fina seja opcional, não obrigatória.
+Simple hosts can ignore `bus_change`, `cpu_would_stall`, and the frame delta —
+the API is designed so that fine integration is optional, not mandatory.
 
-## Dois perfis de host
+## Two host profiles
 
-**Host simples (SDL, headless):**
-- Usa `rigel_step_until` com deadline fixo (1 frame)
-- Checa `RIGEL_EVENT_IRQ_CHANGED` e `RIGEL_EVENT_FRAME_READY`
-- Ignora bus state e scanlines individuais
+**Simple host (SDL, headless):**
+- Uses `rigel_step_until` with a fixed deadline (1 frame)
+- Checks `RIGEL_EVENT_IRQ_CHANGED` and `RIGEL_EVENT_FRAME_READY`
+- Ignores bus state and individual scanlines
 
-**Host avançado (PiStorm, Emu68):**
-- Usa `rigel_get_next_deadline` + `rigel_get_next_bus_change` para passo fino
-- Respeita `cpu_would_stall` para contenção de Chip RAM com BLTPRI
-- Consulta `rigel_get_bus_state` para arbitragem de bus slot a slot
+**Advanced host (PiStorm, Emu68):**
+- Uses `rigel_get_next_deadline` + `rigel_get_next_bus_change` for fine-grained stepping
+- Respects `cpu_would_stall` for Chip RAM contention with BLTPRI
+- Queries `rigel_get_bus_state` for slot-by-slot bus arbitration
 
 ## Memory-mapped I/O
 
-O host decodifica o mapa de memória global e encaminha apenas o que pertence a Rigel.
+The host decodes the global memory map and forwards only what belongs to Rigel.
 
 ```
-CPU escreve 0x00DFF096
-  → host identifica custom space (0xDFF000–0xDFF1FF)
-  → host chama rigel_custom_write16(ctx, 0x096, value)
+CPU writes 0x00DFF096
+  → host identifies custom space (0xDFF000–0xDFF1FF)
+  → host calls rigel_custom_write16(ctx, 0x096, value)
 ```
 
-Rigel não conhece endereços globais. Ele recebe apenas offsets dentro do espaço
-custom (0x000–0x1FE).
+Rigel does not know global addresses. It receives only offsets within the
+custom register space (0x000–0x1FE).
 
 ## Chip RAM
 
-O host fornece callbacks de leitura e escrita para Chip RAM via `rigel_config_t`.
-Rigel usa esses callbacks quando domínios internos precisam acessar memória
-(blitter DMA, disk DMA, bitplane fetch).
+The host supplies read and write callbacks for Chip RAM via `rigel_config_t`.
+Rigel uses these callbacks whenever internal domains need memory access:
+blitter DMA, disk DMA, audio DMA, and bitplane fetch.
 
 ```c
 rigel_config_t config = {
@@ -70,30 +70,32 @@ rigel_config_t config = {
     .chip_ram_size = 512 * 1024,
     .chip_ram = {
         .opaque  = my_ram,
-        .read16  = my_read16,
-        .write16 = my_write16,
+        .read16  = my_read16,   /* used by audio DMA, bitplane fetch */
+        .write16 = my_write16,  /* used by blitter DMA, disk DMA */
     },
 };
 ```
 
-## Bus observation (integração fina)
+## Bus observation (fine integration)
 
-Para hosts que precisam de contenção real de bus:
+For hosts that need real bus contention:
 
 ```c
 rigel_bus_state_t bus = rigel_get_bus_state(rigel);
-/* bus.owner            — quem tem o barramento neste ciclo */
-/* bus.cpu_would_stall  — advisory: condição de stall ativa (BLTPRI + blitter busy) */
+/* bus.owner            — who owns the bus this cycle */
+/* bus.cpu_would_stall  — advisory: stall condition active (BLTPRI + blitter busy) */
 /* bus.cpu_can_access_chip_ram */
-/* bus.next_change      — quando o estado muda */
+/* bus.next_change      — when the state changes */
 ```
 
-`cpu_would_stall` é advisory — Rigel não possui a CPU. O campo diz que a condição
-clássica de stall está ativa; o host decide como aplicá-la ao seu CPU core.
+`cpu_would_stall` is advisory — Rigel does not own the CPU. The field signals
+that the classic stall condition is active; the host decides how to apply it
+to its CPU core.
 
 ## IRQ delivery
 
-Rigel expõe `INTREQ`, `INTENA` e IPL. A entrega ao processador pertence ao host:
+Rigel exposes `INTREQ`, `INTENA`, and IPL. Delivery to the processor belongs
+to the host:
 
 ```c
 if (r.events & RIGEL_EVENT_IRQ_CHANGED)
@@ -102,13 +104,14 @@ if (r.events & RIGEL_EVENT_IRQ_CHANGED)
 
 ## Frame pacing
 
-Ver `timing_model.md`. Em resumo: Rigel expõe `clock_hz`, `line_cycles` e `frame_cycles`;
-o host mede o tempo real e aplica sua própria política de correção (sleep/skip).
+See `timing_model.md`. In short: Rigel exposes `clock_hz`, `line_cycles`, and
+`frame_cycles`; the host measures real time and applies its own correction
+policy (sleep/skip).
 
-## Harness de teste (Musashi)
+## Test harness (Musashi)
 
-`harness/` contém uma integração de referência com o Musashi (68000) para verificar
-empiricamente que timing, bus contention e IRQ delivery estão corretos.
+`harness/` contains a reference integration with Musashi (68000) for empirically
+verifying timing, bus contention, and IRQ delivery.
 
 ```sh
 cmake -S . -B build-harness -DRIGEL_BUILD_HARNESS=ON -DRIGEL_BUILD_TESTS=OFF
