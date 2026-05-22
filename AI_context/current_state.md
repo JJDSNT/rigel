@@ -91,11 +91,18 @@
 - Denise direction:
   - Agnus owns time, DMA cadence, and fetch scheduling
   - Denise owns display-facing registers, palette, composition state, and output staging
-- Denise now has a first real scanline-facing output state:
+- Denise now has a real scanline composition path:
   - display window width/height are derived from `DIWSTRT/DIWSTOP`
   - framebuffer/output state tracks current beam position, visible scanline, current pixel, and last RGB
-  - composition currently mirrors a minimal visible-line fill from the active palette entry
-  - public inspection API now exposes the current scanline buffer without requiring a display backend
+  - `plane_words[6][64]` line buffer accumulates bitplane DMA words fetched by Agnus during each scanline
+  - on line exit (transition from visible to next): `planar_to_chunky` + palette-map into `scanline_rgba`
+  - on entering a visible scanline from a non-visible one: immediate background fill so callers see valid data
+  - public inspection API exposes `scanline_rgba` (RIGEL_DENISE_MAX_SCANLINE_PIXELS=1024 pixels) and `last_rgb`
+- Agnus bitplane DMA fetch is wired end-to-end:
+  - `BPL1PTH–BPL6PTL` (0x0E0–0x0F6) MMIO writes route to `bplpt_set_hi/lo()` in Agnus
+  - at each `AGNUS_SLOT_BITPLANE` CCK, `bitplane_fetch_step()` reads chip RAM, stores the word, advances the pointer
+  - fetched word is written to `denise->output.plane_words[plane][widx]`
+  - `fetch_plane_index` tracks interleaved plane cycling (0→depth-1 per word); `plane_word_count` increments per word-group
 - Denise keeps its internal split as the canonical direction for visual work:
   - `registers/`
   - `render/`

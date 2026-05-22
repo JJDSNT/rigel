@@ -10,8 +10,8 @@
 - `copper` MOVE/WAIT/SKIP are now complete with masked beam comparison — next gains: COPCON danger-register protection, copper list bounds safety, tighter integration with Denise palette effects
 - timing deadlines now aggregate blitter + beam_line_end + VERTB + copper_wait; next gains: audio/disk deadline contributions
 - slot scheduler next gains: disk `_step_slot()`, audio `_step_slot()`, sprite DMA `_step_slot()`; BPLCON0 hires bit (4 extra bitplane slots before DDFSTRT)
-- `denise`: deepen the new scanline-facing output path into a real composition path, starting with better palette usage, playfield interpretation, and line assembly beyond the current placeholder fill
-- `denise`: current-scanline inspection is now enough to validate copper-visible effects headlessly; next gains should come from real line assembly instead of only filling with the last active color
+- `denise`: bitplane fetch + planar→chunky + palette composition now live; next gains: BPLCON0 hires bit (+4 extra slots), BPLCON1 scroll offsets, sprite composition, dual-playfield / HAM modes
+- `denise`: current-scanline inspection validates copper-visible palette effects; extend tests to cover actual bitplane pixel output once bitplane or sprite DMA is exercised end-to-end
 - `agnus`: keep the chip layer thin and deepen the actual behavior in domains plus real Agnus-owned modules such as MMIO, bitplane-side ownership, and blitter integration
 
 2. Keep the domain split honest
