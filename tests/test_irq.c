@@ -1,7 +1,7 @@
 #include "rigel/rigel.h"
 
 #include "agnus/agnus_state.h"
-#include "agnus/blitter.h"
+#include "agnus/blitter/blitter.h"
 
 int main(void)
 {

@@ -1,4 +1,4 @@
-#include "agnus/blitter.h"
+#include "agnus/blitter/blitter.h"
 #include "rigel/rigel.h"
 
 int main(void)

@@ -34,7 +34,6 @@ add_library(rigel
     src/chipset/agnus/copper/copper.c
     src/chipset/agnus/copper/copper_regs.c
     src/chipset/agnus/copper/copper_service.c
-    src/chipset/agnus/blitter.c
     src/chipset/agnus/mmio/agnus_mmio.c
     src/chipset/agnus/mmio/agnus_read.c
     src/chipset/agnus/mmio/agnus_write.c
