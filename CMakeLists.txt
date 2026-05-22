@@ -21,18 +21,21 @@ add_library(rigel
     src/chipset/chipset.c
     src/core/rigel.c
     src/core/rigel_context.c
+    src/core/rigel_denise_api.c
     src/core/rigel_timing.c
     src/mmio/rigel_mmio.c
     src/mmio/custom_regs.c
     src/irq/rigel_irq.c
     src/irq/intreq.c
     src/irq/intena.c
-    src/chipset/agnus/agnus_state.c
-    src/chipset/agnus/agnus_regs.c
+    src/chipset/agnus/agnus.c
     src/chipset/agnus/beam.c
     src/chipset/agnus/dma.c
     src/chipset/agnus/copper.c
     src/chipset/agnus/blitter.c
+    src/chipset/agnus/mmio/agnus_mmio.c
+    src/chipset/agnus/mmio/agnus_read.c
+    src/chipset/agnus/mmio/agnus_write.c
     src/domains/beam/beam_domain.c
     src/domains/dma/dma_domain.c
     src/domains/copper/copper_domain.c
@@ -48,14 +51,19 @@ add_library(rigel
     src/chipset/agnus/blitter/blitter_regs.c
     src/chipset/agnus/blitter/blitter_timing.c
     src/chipset/agnus/bitplanes.c
-    src/chipset/denise/denise_regs.c
-    src/chipset/denise/video.c
-    src/chipset/denise/sprites.c
-    src/chipset/denise/color.c
+    src/chipset/denise/denise.c
+    src/chipset/denise/registers/denise_registers.c
+    src/chipset/denise/render/compositor.c
+    src/chipset/denise/render/playfield.c
+    src/chipset/denise/sprites/sprites_core.c
+    src/chipset/denise/palette/palette.c
+    src/chipset/denise/palette/color_regs.c
+    src/chipset/denise/video/display_window.c
+    src/chipset/denise/output/framebuffer.c
+    src/chipset/denise/debug/denise_trace.c
     src/chipset/paula/paula.c
     src/chipset/paula/paula_state.c
     src/chipset/paula/paula_interrupts.c
-    src/chipset/paula/paula_regs.c
     src/chipset/paula/audio.c
     src/chipset/paula/disk.c
     src/chipset/paula/input.c
@@ -104,6 +112,7 @@ if(RIGEL_BUILD_TESTS)
         test_serial
         test_audio
         test_input
+        test_denise
         test_blitter
         test_blitter_dma
         test_copper

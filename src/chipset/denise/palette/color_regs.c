@@ -1,0 +1,40 @@
+#include "denise/palette/color_regs.h"
+
+#include "rigel/rigel_custom.h"
+
+enum { RIGEL_REG_COLOR31 = 0x1be };
+
+rigel_u32 rigel_denise_color_expand_12bit(rigel_u16 value)
+{
+    rigel_u32 r = (rigel_u32)((value >> 8) & 0x0f);
+    rigel_u32 g = (rigel_u32)((value >> 4) & 0x0f);
+    rigel_u32 b = (rigel_u32)(value & 0x0f);
+
+    return (r << 20) | (r << 16) | (g << 12) | (g << 8) | (b << 4) | b;
+}
+
+rigel_u16 rigel_denise_color_regs_read(const RigelDenise *denise, rigel_u32 addr)
+{
+    rigel_u32 index;
+
+    if (denise == NULL || addr < RIGEL_REG_COLOR00 || addr > RIGEL_REG_COLOR31) {
+        return 0;
+    }
+
+    index = (addr - RIGEL_REG_COLOR00) >> 1;
+    return denise->regs.color[index];
+}
+
+void rigel_denise_color_regs_write(RigelDenise *denise, rigel_u32 addr, rigel_u16 value)
+{
+    rigel_u32 index;
+
+    if (denise == NULL || addr < RIGEL_REG_COLOR00 || addr > RIGEL_REG_COLOR31) {
+        return;
+    }
+
+    index = (addr - RIGEL_REG_COLOR00) >> 1;
+    denise->regs.color[index] = value;
+    denise->palette.rgb32[index] = rigel_denise_color_expand_12bit(value);
+    denise->debug.last_color_index = (rigel_u16)index;
+}

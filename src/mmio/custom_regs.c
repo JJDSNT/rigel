@@ -1,9 +1,9 @@
 #include "mmio/custom_regs.h"
 
-#include "agnus/agnus_regs.h"
+#include "agnus/agnus.h"
 #include "core/rigel_context.h"
-#include "denise/denise_regs.h"
-#include "paula/paula_regs.h"
+#include "denise/denise.h"
+#include "paula/paula.h"
 
 bool rigel_custom_is_valid_reg(rigel_u32 addr)
 {
@@ -42,8 +42,12 @@ rigel_custom_domain_t rigel_custom_domain_for_reg(rigel_u32 addr)
     case RIGEL_REG_COLOR00:
         return RIGEL_DOMAIN_DENISE;
     default:
-        if (agnus_owns_reg(addr)) {
+        if (rigel_agnus_mmio_owns_reg(addr)) {
             return RIGEL_DOMAIN_AGNUS;
+        }
+
+        if (rigel_denise_owns_reg(addr)) {
+            return RIGEL_DOMAIN_DENISE;
         }
 
         return paula_owns_reg(addr) ? RIGEL_DOMAIN_PAULA : RIGEL_DOMAIN_UNKNOWN;
@@ -58,11 +62,11 @@ rigel_u16 custom_regs_read16(RigelContext *ctx, rigel_u32 addr)
 
     switch (rigel_custom_domain_for_reg(addr)) {
     case RIGEL_DOMAIN_AGNUS:
-        return agnus_read_reg(ctx, addr);
+        return rigel_agnus_mmio_read(ctx, addr);
     case RIGEL_DOMAIN_PAULA:
         return paula_read_reg(ctx, addr);
     case RIGEL_DOMAIN_DENISE:
-        return denise_read_reg(ctx, addr);
+        return rigel_denise_read_reg(ctx, addr);
     default:
         return rigel_context_read_reg(ctx, addr);
     }
@@ -76,13 +80,13 @@ void custom_regs_write16(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
 
     switch (rigel_custom_domain_for_reg(addr)) {
     case RIGEL_DOMAIN_AGNUS:
-        agnus_write_reg(ctx, addr, value);
+        rigel_agnus_mmio_write(ctx, addr, value);
         break;
     case RIGEL_DOMAIN_PAULA:
         paula_write_reg(ctx, addr, value);
         break;
     case RIGEL_DOMAIN_DENISE:
-        denise_write_reg(ctx, addr, value);
+        rigel_denise_write_reg(ctx, addr, value);
         break;
     case RIGEL_DOMAIN_UNKNOWN:
     default:

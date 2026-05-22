@@ -3,6 +3,7 @@
 
 #include "rigel_config.h"
 #include "rigel_custom.h"
+#include "rigel_denise.h"
 #include "rigel_bus.h"
 #include "rigel_events.h"
 #include "rigel_floppy.h"

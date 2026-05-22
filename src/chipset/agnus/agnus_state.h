@@ -2,6 +2,7 @@
 #define RIGEL_AGNUS_STATE_H
 
 #include "agnus/beam.h"
+#include "agnus/bitplanes.h"
 #include "agnus/copper.h"
 #include "agnus/dma.h"
 #include "agnus/blitter/blitter.h"
@@ -13,6 +14,7 @@ typedef struct RigelAgnus {
     beam_state_t beam;
     dma_state_t dma;
     copper_state_t copper;
+    bitplanes_state_t bitplanes;
     BlitterState blitter;
 } RigelAgnus;
 

@@ -2,6 +2,7 @@
 #define RIGEL_CHIPSET_H
 
 #include "agnus/agnus_state.h"
+#include "denise/denise_state.h"
 #include "floppy/floppy_drive.h"
 #include "paula/paula_state.h"
 #include "rtc/rtc.h"
@@ -18,6 +19,7 @@ enum {
 struct RigelChipset {
     rigel_u64 cycles;
     RigelAgnus agnus;
+    RigelDenise denise;
     RigelPaula paula;
     RigelRTC rtc;
     FloppyDrive floppy[RIGEL_FLOPPY_DRIVE_COUNT];
