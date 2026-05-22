@@ -64,11 +64,13 @@
     - `MOVE` writes to custom register space
     - `WAIT` arms a beam-bound wait point with correct masked comparison
     - `SKIP` evaluates beam condition immediately; skips or does not skip next instruction
-- timing scaffolding wired (Approach C foundation):
+- timing/Approach C active:
   - `beam_in_vblank()` corrected to use Agnus VBL zone (lines 0–25), not Denise display window
-  - `rigel_get_next_deadline()` aggregates blitter + beam_line_end + VERTB via `agnus_deadlines_t`
-  - slot scheduler initialized on reset, invalidated on DMACON writes; table rebuilds lazily
-  - `timing/vblank.c`, `timing/deadline.c`, `timing/slot_scheduler.c` compiled into the library
+  - `rigel_get_next_deadline()` aggregates blitter + beam_line_end + VERTB + copper_wait via `agnus_deadlines_t`
+  - slot scheduler IS the inner loop of `rigel_agnus_step()`: drives beam CCK-by-CCK, dispatches copper and blitter at correct hardware slots
+  - copper dispatched at COPPER slots only (steals FREE slots); blitter dispatched at BLITTER slots (steals FREE slots; also CPU slots if nasty)
+  - beam is canonical position source; scheduler derives its position from beam after each step
+  - `rigel_get_bus_state()` uses `agnus_slot_scheduler_current_owner()` and `slot_to_bus_owner()` for slot-accurate bus reporting
 - `RigelPaula` already owns:
   - interrupt model (`INTREQ`, `INTENA`, `IPL`)
   - `audio` state
