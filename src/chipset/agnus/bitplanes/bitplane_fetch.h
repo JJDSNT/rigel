@@ -2,6 +2,7 @@
 #define RIGEL_AGNUS_BITPLANE_FETCH_H
 
 #include "rigel/rigel_types.h"
+#include "rigel/rigel_config.h"
 #include "bitplane_pointers.h"
 
 /* Bitplane DMA fetch — drives BPLxPT pointers through chip RAM during the

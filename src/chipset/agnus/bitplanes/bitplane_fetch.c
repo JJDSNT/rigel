@@ -1,6 +1,5 @@
 #include "bitplane_fetch.h"
-
-/* TODO(bitplanes): implement fetch step — read word at bplpt[plane], advance pointer */
+#include "bitplane_pointers.h"
 
 void bitplane_fetch_reset(bitplane_fetch_state_t *f)
 {
@@ -13,11 +12,9 @@ void bitplane_fetch_step(bitplane_fetch_state_t *f,
                          unsigned plane,
                          rigel_chip_ram_if_t mem)
 {
-    (void)f;
-    (void)ptrs;
-    (void)plane;
-    (void)mem;
-    /* TODO */
+    if (plane >= 6 || mem.read16 == NULL) return;
+    f->data[plane] = mem.read16(mem.opaque, ptrs->bplpt[plane]);
+    bplpt_advance(ptrs, plane);
 }
 
 rigel_u16 bitplane_fetch_data(const bitplane_fetch_state_t *f, unsigned plane)

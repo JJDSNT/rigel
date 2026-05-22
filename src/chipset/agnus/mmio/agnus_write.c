@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/copper/copper_regs.h"
 #include "agnus/timing/slot_scheduler.h"
 #include "core/rigel_context.h"
@@ -56,6 +57,14 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
         rigel_context_write_reg(ctx, addr, value);
         break;
     default:
+        /* BPL1PTH-BPL6PTL */
+        if (addr >= RIGEL_REG_BPL1PTH && addr <= RIGEL_REG_BPL6PTL && (addr & 1u) == 0u) {
+            unsigned plane = (unsigned)((addr - RIGEL_REG_BPL1PTH) / 4u);
+            if ((addr & 2u) == 0u)
+                bplpt_set_hi(&ctx->chipset.agnus.bplpt, plane, value);
+            else
+                bplpt_set_lo(&ctx->chipset.agnus.bplpt, plane, value);
+        }
         rigel_context_write_reg(ctx, addr, value);
         break;
     }

@@ -4,6 +4,8 @@
 
 #include "chipset/chipset.h"
 #include "agnus/blitter/blitter.h"
+#include "agnus/bitplanes/bitplane_fetch.h"
+#include "agnus/bitplanes/bitplane_pointers.h"
 #include "core/rigel_context.h"
 #include "domains/beam/beam_domain.h"
 #include "domains/blitter/blitter_domain.h"
@@ -32,6 +34,8 @@ void rigel_agnus_reset(RigelAgnus *agnus)
     rigel_copper_domain_reset(&agnus->copper);
     rigel_blitter_domain_reset(&agnus->blitter);
     bitplanes_set_depth(&agnus->bitplanes, 0);
+    bplpt_reset(&agnus->bplpt);
+    bitplane_fetch_reset(&agnus->fetch);
     agnus_slot_scheduler_init(&agnus->scheduler);
 }
 

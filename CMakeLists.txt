@@ -57,10 +57,14 @@ add_library(rigel
     src/chipset/agnus/timing/slot_scheduler.c
     src/chipset/agnus/irq/agnus_irq.c
     src/chipset/agnus/bitplanes.c
+    src/chipset/agnus/bitplanes/bitplane_fetch.c
+    src/chipset/agnus/bitplanes/bitplane_pointers.c
     src/chipset/denise/denise.c
     src/chipset/denise/registers/denise_registers.c
     src/chipset/denise/render/compositor.c
+    src/chipset/denise/render/pixel_pipeline.c
     src/chipset/denise/render/playfield.c
+    src/chipset/denise/output/planar.c
     src/chipset/denise/sprites/sprites_core.c
     src/chipset/denise/palette/palette.c
     src/chipset/denise/palette/color_regs.c

@@ -127,6 +127,9 @@ typedef struct agnus_slot_scheduler {
     bool      copper_active;
     bool      blitter_nasty;
     bool      blitter_active;
+
+    /* Bitplane fetch cycling: which plane to fetch on the next BITPLANE slot */
+    rigel_u16 fetch_plane_index;
 } agnus_slot_scheduler_t;
 
 /* =========================================================================

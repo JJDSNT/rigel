@@ -3,6 +3,8 @@
 
 #include "agnus/beam.h"
 #include "agnus/bitplanes.h"
+#include "agnus/bitplanes/bitplane_fetch.h"
+#include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/copper/copper.h"
 #include "agnus/dma.h"
 #include "agnus/blitter/blitter.h"
@@ -16,6 +18,8 @@ typedef struct RigelAgnus {
     dma_state_t dma;
     copper_state_t copper;
     bitplanes_state_t bitplanes;
+    bitplane_pointers_t bplpt;
+    bitplane_fetch_state_t fetch;
     BlitterState blitter;
     agnus_slot_scheduler_t scheduler;
 } RigelAgnus;

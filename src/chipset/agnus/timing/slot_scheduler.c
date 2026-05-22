@@ -5,6 +5,8 @@
 
 #include "core/rigel_context.h"
 #include "agnus/agnus_state.h"
+#include "agnus/bitplanes/bitplane_fetch.h"
+#include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/dma/dmacon.h"
 #include "agnus/blitter/blitter.h"
 #include "agnus/copper/copper_service.h"
@@ -15,6 +17,7 @@
 #include "domains/blitter/blitter_domain.h"
 #include "domains/disk/disk_domain.h"
 #include "domains/audio/audio_domain.h"
+#include "denise/denise_state.h"
 
 /* =========================================================================
  * Internal: slot dispatch
@@ -74,7 +77,26 @@ static void dispatch_slot(agnus_slot_owner_t owner,
         break;
 
     case AGNUS_SLOT_BITPLANE:
-        /* TODO(slot_scheduler): agnus_bitplane_fetch_step(ctx, plane_index) */
+        if (ctx) {
+            RigelAgnus *agnus = &ctx->chipset.agnus;
+            rigel_denise_output_state_t *dout = &ctx->chipset.denise.output;
+            unsigned depth = (ctx->chipset.denise.regs.bplcon0 >> 12) & 0x7u;
+            unsigned plane = agnus->scheduler.fetch_plane_index;
+            rigel_u16 widx  = dout->plane_word_count;
+
+            if (depth > 0 && depth <= 6 && plane < depth &&
+                widx < RIGEL_DENISE_MAX_PLANE_WORDS) {
+                bitplane_fetch_step(&agnus->fetch, &agnus->bplpt, plane,
+                                    ctx->config.chip_ram);
+                dout->plane_words[plane][widx] = agnus->fetch.data[plane];
+                plane = (unsigned)(plane + 1u);
+                if (plane >= depth) {
+                    plane = 0;
+                    dout->plane_word_count++;
+                }
+                agnus->scheduler.fetch_plane_index = (rigel_u16)plane;
+            }
+        }
         break;
 
     case AGNUS_SLOT_COPPER:
@@ -190,15 +212,16 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
 void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
 {
     int i;
-    sched->hpos           = 0;
-    sched->dmacon         = 0;
-    sched->ddfstrt        = AGNUS_HPOS_BITPLANE_START;
-    sched->ddfstop        = AGNUS_SLOTS_PER_LINE;    /* no upper limit until host sets it */
-    sched->line_is_vbl    = false;
-    sched->table_dirty    = true;
-    sched->copper_active  = false;
-    sched->blitter_nasty  = false;
-    sched->blitter_active = false;
+    sched->hpos              = 0;
+    sched->dmacon            = 0;
+    sched->ddfstrt           = AGNUS_HPOS_BITPLANE_START;
+    sched->ddfstop           = AGNUS_SLOTS_PER_LINE;    /* no upper limit until host sets it */
+    sched->line_is_vbl       = false;
+    sched->table_dirty       = true;
+    sched->copper_active     = false;
+    sched->blitter_nasty     = false;
+    sched->blitter_active    = false;
+    sched->fetch_plane_index = 0;
 
     for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++)
         sched->table[i] = AGNUS_SLOT_CPU;
@@ -258,8 +281,10 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
     if (beam) {
         rigel_beam_domain_step(beam, 1);
         sched->hpos = beam->hpos;
-        if (beam->hpos == 0)
+        if (beam->hpos == 0) {
             sched->table_dirty = true;  /* new line: VBL status may change */
+            sched->fetch_plane_index = 0;
+        }
         if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos))
             agnus_irq_raise_vblank(ctx);
     } else {

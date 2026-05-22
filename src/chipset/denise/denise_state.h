@@ -6,7 +6,8 @@
 #include "agnus/beam.h"
 
 enum {
-    RIGEL_DENISE_MAX_SCANLINE_PIXELS = 1024
+    RIGEL_DENISE_MAX_SCANLINE_PIXELS = 1024,
+    RIGEL_DENISE_MAX_PLANE_WORDS     = 64
 };
 
 typedef struct rigel_denise_register_file {
@@ -48,6 +49,9 @@ typedef struct rigel_denise_output_state {
     bool visible_scanline;
     bool scanline_dirty;
     bool frame_dirty;
+    /* Bitplane line buffer — words fetched per plane for the current scanline */
+    rigel_u16 plane_words[6][RIGEL_DENISE_MAX_PLANE_WORDS];
+    rigel_u16 plane_word_count;
 } rigel_denise_output_state_t;
 
 typedef struct RigelDenise {

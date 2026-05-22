@@ -1,6 +1,7 @@
 #include "denise/output/framebuffer.h"
 
 #include <string.h>
+#include <stdint.h>
 
 void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
 {
@@ -16,6 +17,8 @@ void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
     output->scanline_width = 0;
     output->last_rgb = 0;
     (void)memset(output->scanline_rgba, 0, sizeof(output->scanline_rgba));
+    (void)memset(output->plane_words, 0, sizeof(output->plane_words));
+    output->plane_word_count = 0;
     output->visible_scanline = false;
     output->scanline_dirty = false;
     output->frame_dirty = true;
@@ -36,8 +39,9 @@ void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_sta
     line_changed = frame_changed || output->beam_vpos != beam->vpos;
 
     if (line_changed) {
-        (void)memset(output->scanline_rgba, 0, sizeof(output->scanline_rgba));
-        output->scanline_dirty = false;
+        /* plane_words cleared here for the new line; compositor manages scanline_rgba and dirty */
+        (void)memset(output->plane_words, 0, sizeof(output->plane_words));
+        output->plane_word_count = 0;
     }
 
     output->frame_counter = beam->frame_count;

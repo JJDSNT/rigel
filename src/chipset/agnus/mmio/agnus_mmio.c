@@ -16,6 +16,11 @@ bool rigel_agnus_mmio_has_reg(rigel_u32 addr)
         return true;
     }
 
+    /* BPL1PTH-BPL6PTL: 0x0E0-0x0F6 (even addresses) */
+    if (addr >= RIGEL_REG_BPL1PTH && addr <= RIGEL_REG_BPL6PTL && (addr & 1u) == 0u) {
+        return true;
+    }
+
     if (rigel_copper_regs_owns_reg(addr)) {
         return true;
     }
