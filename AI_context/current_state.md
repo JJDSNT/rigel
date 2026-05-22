@@ -71,6 +71,8 @@
   - copper dispatched at COPPER slots only (steals FREE slots); blitter dispatched at BLITTER slots (steals FREE slots; also CPU slots if nasty)
   - beam is canonical position source; scheduler derives its position from beam after each step
   - `rigel_get_bus_state()` uses `agnus_slot_scheduler_current_owner()` and `slot_to_bus_owner()` for slot-accurate bus reporting
+  - VERTB interrupt (`AGNUS_INTB_VERTB`) fires at vpos=0, hpos=1 from within the slot scheduler after each beam step
+  - DDFSTRT/DDFSTOP wired: MMIO writes update `scheduler.ddfstrt`/`ddfstop` and invalidate the slot table; bitplane fetch range is now derived from these fields rather than a fixed constant
 - `RigelPaula` already owns:
   - interrupt model (`INTREQ`, `INTENA`, `IPL`)
   - `audio` state

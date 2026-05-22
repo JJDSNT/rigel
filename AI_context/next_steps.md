@@ -8,8 +8,8 @@
 - `serial`: keep the current MMIO/IRQ path, then decide what host-facing serial bridge should look like
 - `beam` / `copper`: deepen timing policy in the existing domains without rebuilding a parallel Agnus-local hierarchy
 - `copper` MOVE/WAIT/SKIP are now complete with masked beam comparison — next gains: COPCON danger-register protection, copper list bounds safety, tighter integration with Denise palette effects
-- timing deadlines now aggregate blitter + beam_line_end + VERTB; next gains: copper_wait deadline contribution (cycles until copper's armed WAIT fires), audio/disk contributions
-- slot scheduler next gains: disk `_step_slot()`, audio `_step_slot()`, sprite DMA `_step_slot()`; bitplane fetch at DDFSTRT-derived range (currently fixed approximation from AGNUS_HPOS_BITPLANE_START)
+- timing deadlines now aggregate blitter + beam_line_end + VERTB + copper_wait; next gains: audio/disk deadline contributions
+- slot scheduler next gains: disk `_step_slot()`, audio `_step_slot()`, sprite DMA `_step_slot()`; BPLCON0 hires bit (4 extra bitplane slots before DDFSTRT)
 - `denise`: deepen the new scanline-facing output path into a real composition path, starting with better palette usage, playfield interpretation, and line assembly beyond the current placeholder fill
 - `denise`: current-scanline inspection is now enough to validate copper-visible effects headlessly; next gains should come from real line assembly instead of only filling with the last active color
 - `agnus`: keep the chip layer thin and deepen the actual behavior in domains plus real Agnus-owned modules such as MMIO, bitplane-side ownership, and blitter integration
