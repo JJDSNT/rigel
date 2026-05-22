@@ -1,5 +1,7 @@
 #include "domains/audio/audio_domain.h"
 
+#include "core/rigel_context.h"
+
 static bool rigel_audio_domain_decode_reg(rigel_u32 addr, int *channel, rigel_u32 *offset)
 {
     rigel_u32 slot;
@@ -41,6 +43,15 @@ void rigel_audio_domain_set_dmacon(audio_state_t *audio, rigel_u16 dmacon)
 void rigel_audio_domain_step(audio_state_t *audio, rigel_u32 cycles)
 {
     audio_step(audio, cycles);
+}
+
+void rigel_audio_domain_step_slot(RigelContext *ctx, int channel)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    audio_dma_step_slot(&ctx->chipset.paula.audio, channel, ctx->config.chip_ram);
 }
 
 void rigel_audio_domain_write_reg(audio_state_t *audio, rigel_u32 addr, rigel_u16 value)

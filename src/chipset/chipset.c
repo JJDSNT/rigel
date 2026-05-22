@@ -46,10 +46,6 @@ void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles)
     rigel_agnus_step(ctx, cycles);
     rigel_denise_step(&chipset->denise, &chipset->agnus.beam, cycles);
     rigel_paula_step(&chipset->paula, cycles);
-
-    if (rigel_disk_domain_dma_wants_service(&chipset->paula.disk)) {
-        rigel_disk_domain_dma_service_grant(&chipset->paula.disk);
-    }
 }
 
 void rigel_chipset_take_snapshot(const RigelChipset *chipset, rigel_snapshot_t *snapshot)

@@ -1,5 +1,7 @@
 #include "domains/disk/disk_domain.h"
 
+#include "core/rigel_context.h"
+
 bool rigel_disk_domain_owns_reg(rigel_u32 addr)
 {
     switch (addr) {
@@ -25,6 +27,17 @@ void rigel_disk_domain_reset(disk_state_t *disk)
 void rigel_disk_domain_step(disk_state_t *disk, rigel_u32 cycles)
 {
     disk_step(disk, cycles);
+}
+
+void rigel_disk_domain_step_slot(RigelContext *ctx)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    if (rigel_disk_domain_dma_wants_service(&ctx->chipset.paula.disk)) {
+        rigel_disk_domain_dma_service_grant(&ctx->chipset.paula.disk);
+    }
 }
 
 int rigel_disk_domain_dma_wants_service(const disk_state_t *disk)

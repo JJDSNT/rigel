@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#include "rigel/rigel_config.h"
 #include "rigel/rigel_types.h"
 
 enum {
@@ -46,6 +47,7 @@ void audio_reset(audio_state_t *audio);
 void audio_set_irq_sink(audio_state_t *audio, rigel_audio_irq_sink_t sink);
 void audio_set_dmacon(audio_state_t *audio, rigel_u16 dmacon);
 void audio_step(audio_state_t *audio, rigel_u32 cycles);
+void audio_dma_step_slot(audio_state_t *audio, int channel, rigel_chip_ram_if_t mem);
 void audio_write_lch(audio_state_t *audio, int channel, rigel_u16 value);
 void audio_write_lcl(audio_state_t *audio, int channel, rigel_u16 value);
 void audio_write_len(audio_state_t *audio, int channel, rigel_u16 value);

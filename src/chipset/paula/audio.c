@@ -215,3 +215,39 @@ int16_t audio_right(const audio_state_t *audio)
 {
     return audio != NULL ? audio->mixed_right : 0;
 }
+
+void audio_dma_step_slot(audio_state_t *audio, int channel, rigel_chip_ram_if_t mem)
+{
+    /* AUDx IRQ bits: channels 0-3 map to INTREQ bits 7-10 */
+    static const rigel_u16 irq_bits[RIGEL_PAULA_AUDIO_CHANNELS] = {
+        0x0080u, 0x0100u, 0x0200u, 0x0400u
+    };
+    rigel_audio_channel_t *ch;
+
+    if (audio == NULL || !audio_valid_channel(channel) || mem.read16 == NULL) {
+        return;
+    }
+
+    ch = &audio->ch[channel];
+    if (!audio_channel_dma_enabled(audio, channel) || ch->dma_word_ready) {
+        return;
+    }
+
+    /* Initialize pointer on first use or after reload */
+    if (ch->current_length == 0) {
+        if (ch->audlen == 0) {
+            return;
+        }
+        ch->current_ptr    = ch->audlc;
+        ch->current_length = ch->audlen;
+    }
+
+    ch->dma_word       = mem.read16(mem.opaque, ch->current_ptr & ~1u);
+    ch->dma_word_ready = true;
+    ch->current_ptr   += 2u;
+    ch->current_length--;
+
+    if (ch->current_length == 0 && audio->irq.raise != NULL) {
+        audio->irq.raise(audio->irq.opaque, irq_bits[channel]);
+    }
+}

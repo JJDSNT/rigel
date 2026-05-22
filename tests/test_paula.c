@@ -120,6 +120,7 @@ int main(void)
         return 1;
     }
 
+    rigel_custom_write16(ctx, RIGEL_REG_DMACON, RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_DSKEN);
     rigel_custom_write16(ctx, RIGEL_REG_DSKPTH, 0x0000);
     rigel_custom_write16(ctx, RIGEL_REG_DSKPTL, 0x0000);
     rigel_custom_write16(ctx, RIGEL_REG_ADKCON, RIGEL_PAULA_ADKCON_SETCLR | RIGEL_PAULA_ADKCON_WORDSYNC);
@@ -136,7 +137,8 @@ int main(void)
         return 1;
     }
 
-    rigel_step(ctx, 1);
+    /* Disk DMA slot is at hpos=7; step 8 CCKs to reach and fire it. */
+    rigel_step(ctx, 8);
 
     if (rigel_custom_read16(ctx, RIGEL_REG_DSKDATR) != 0x4489u) {
         rigel_destroy(ctx);

@@ -45,20 +45,20 @@ static void dispatch_slot(agnus_slot_owner_t owner,
         break;
 
     case AGNUS_SLOT_DISK:
-        /* TODO(slot_scheduler): rigel_disk_domain_step_slot(ctx) */
+        if (ctx) rigel_disk_domain_step_slot(ctx);
         break;
 
     case AGNUS_SLOT_AUDIO_0:
-        /* TODO(slot_scheduler): rigel_audio_domain_step_slot(ctx, 0) */
+        if (ctx) rigel_audio_domain_step_slot(ctx, 0);
         break;
     case AGNUS_SLOT_AUDIO_1:
-        /* TODO(slot_scheduler): rigel_audio_domain_step_slot(ctx, 1) */
+        if (ctx) rigel_audio_domain_step_slot(ctx, 1);
         break;
     case AGNUS_SLOT_AUDIO_2:
-        /* TODO(slot_scheduler): rigel_audio_domain_step_slot(ctx, 2) */
+        if (ctx) rigel_audio_domain_step_slot(ctx, 2);
         break;
     case AGNUS_SLOT_AUDIO_3:
-        /* TODO(slot_scheduler): rigel_audio_domain_step_slot(ctx, 3) */
+        if (ctx) rigel_audio_domain_step_slot(ctx, 3);
         break;
 
     case AGNUS_SLOT_SPRITE_0:
