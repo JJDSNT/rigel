@@ -13,6 +13,10 @@ set(CMAKE_C_EXTENSIONS OFF)
 option(RIGEL_BUILD_TESTS    "Build Rigel unit tests"          ON)
 option(RIGEL_BUILD_HARNESS  "Build Musashi integration harness" OFF)
 
+if(RIGEL_BUILD_TESTS OR RIGEL_BUILD_HARNESS)
+    enable_testing()
+endif()
+
 add_library(rigel
     src/chipset/chipset.c
     src/core/rigel.c
@@ -86,8 +90,6 @@ target_compile_options(rigel PRIVATE
 )
 
 if(RIGEL_BUILD_TESTS)
-    enable_testing()
-
     set(RIGEL_TESTS
         test_chipset
         test_mmio
@@ -159,6 +161,7 @@ if(RIGEL_BUILD_HARNESS)
 
     set(HARNESS_TESTS
         test_blitter_stall
+        test_blitter_timing
     )
 
     foreach(test_name IN LISTS HARNESS_TESTS)
