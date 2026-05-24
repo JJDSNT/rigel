@@ -21,8 +21,11 @@ while (running) {
     if (r.events & RIGEL_EVENT_IRQ_CHANGED)
         cpu_set_ipl(cpu, rigel_get_ipl(rigel));
 
-    if (r.events & RIGEL_EVENT_FRAME_READY)
-        host_present_frame(rigel_get_frame(rigel));
+    if (r.events & RIGEL_EVENT_FRAME_READY) {
+        rigel_frame_t f;
+        rigel_get_frame(rigel, &f);
+        host_present_frame(&f);   /* f.pixels valid until next rigel_step */
+    }
 
     rigel_bus_state_t bus = rigel_get_bus_state(rigel);
     if (bus.cpu_would_stall)
@@ -30,8 +33,8 @@ while (running) {
 }
 ```
 
-Simple hosts can ignore `bus_change`, `cpu_would_stall`, and the frame delta —
-the API is designed so that fine integration is optional, not mandatory.
+Simple hosts can ignore `bus_change`, `cpu_would_stall`, and the per-scanline API —
+the interface is designed so that fine integration is optional, not mandatory.
 
 ## Two host profiles
 
@@ -101,6 +104,35 @@ to the host:
 if (r.events & RIGEL_EVENT_IRQ_CHANGED)
     cpu_set_ipl(cpu, rigel_get_ipl(rigel));
 ```
+
+## Audio output
+
+Rigel mixes Paula's four channels internally. The host reads the current stereo
+sample at whatever rate its audio callback requires:
+
+```c
+rigel_audio_sample_t s = rigel_get_audio_sample(ctx);
+/* s.left / s.right — int16_t, Paula four channels mixed */
+```
+
+**Sample-driven (recommended for most hosts):**
+```c
+/* SDL audio callback — fill num_samples frames at sample_rate Hz */
+for (int i = 0; i < num_samples; i++) {
+    rigel_cycle_t target = base_cycle + (uint64_t)i * clock_hz / sample_rate;
+    rigel_step_until(ctx, target);
+    rigel_audio_sample_t s = rigel_get_audio_sample(ctx);
+    buf[i * 2]     = s.left;
+    buf[i * 2 + 1] = s.right;
+}
+```
+
+**Frame-driven (simpler, lower quality):**
+Call `rigel_get_audio_sample` once per `RIGEL_EVENT_HBLANK` (~15.6 kHz for PAL)
+and resample in the host audio backend.
+
+`RIGEL_EVENT_AUDIO_READY` is reserved for a future DMA-block-complete model and
+is not fired today.
 
 ## Frame pacing
 

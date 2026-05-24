@@ -29,17 +29,21 @@ src/rtc/             ← auxiliary peripheral outside custom MMIO
 
 Organized into thematic headers, all re-exported by `rigel.h`:
 
-| Header              | Contents                                        |
-|---------------------|-------------------------------------------------|
-| `rigel_time.h`      | Temporal API: step, deadline, step_result       |
-| `rigel_bus.h`       | Bus observation: classic bus state              |
-| `rigel_events.h`    | Event bitmask (`rigel_event_flags_t`)           |
-| `rigel_irq.h`       | INTREQ, INTENA, IPL                             |
-| `rigel_mmio.h`      | custom_read16 / custom_write16                  |
-| `rigel_floppy.h`    | Insert, eject, drive status                     |
-| `rigel_input.h`     | Joystick / pot injection                        |
-| `rigel_rtc.h`       | RTC model and registers                         |
-| `rigel_config.h`    | Context creation configuration                  |
+| Header                  | Contents                                            |
+|-------------------------|-----------------------------------------------------|
+| `rigel_time.h`          | Temporal API: step, deadline, step_result           |
+| `rigel_bus.h`           | Bus observation: classic bus state                  |
+| `rigel_events.h`        | Event bitmask (`rigel_event_flags_t`)               |
+| `rigel_irq.h`           | INTREQ, INTENA, IPL                                 |
+| `rigel_mmio.h`          | custom_read16 / custom_write16                      |
+| `rigel_audio.h`         | Mixed stereo sample (`rigel_get_audio_sample`)      |
+| `rigel_denise_video.h`  | Frame and scanline output (`rigel_get_frame`, etc.) |
+| `rigel_floppy.h`        | Insert, eject, drive status                         |
+| `rigel_input.h`         | Joystick / pot injection                            |
+| `rigel_rtc.h`           | RTC model and registers                             |
+| `rigel_config.h`        | Context creation configuration                      |
+| `rigel_snapshot.h`      | Save / load state (preliminary)                     |
+| `rigel_custom.h`        | Register validity and domain query helpers          |
 
 ## Temporal API
 
@@ -57,9 +61,12 @@ rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_tim
 ```c
 rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx);
 rigel_cycle_t     rigel_get_next_bus_change(const RigelContext *ctx);
-bool              rigel_cpu_would_stall(const RigelContext *ctx);
+bool              rigel_cpu_can_access_chip_ram(const RigelContext *ctx);
+bool              rigel_cpu_can_access_custom(const RigelContext *ctx);
 rigel_cycle_t     rigel_get_cpu_resume_time(const RigelContext *ctx);
 ```
+
+`cpu_would_stall` is a field in `rigel_bus_state_t`, not a standalone function.
 
 ## Domains
 

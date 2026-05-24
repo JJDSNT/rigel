@@ -1,45 +1,56 @@
 # Next Steps
 
-## Near-Term Targets
+## Immediate — Host integration blockers (ordered by cost/benefit)
 
-1. Deepen fidelity where the surfaces already exist
-- `paula_disk`: improve `DSKBYTR`, `DSKDATR`, `DSKSYNC`, `ADKCON`, and real drive-selection flow into `DF0..DF3`
-- `audio`: replace minimal stepping with clearer DMA fetch/service behavior
-- `serial`: keep the current MMIO/IRQ path, then decide what host-facing serial bridge should look like
-- `beam` / `copper`: deepen timing policy in the existing domains without rebuilding a parallel Agnus-local hierarchy
-- `copper` MOVE/WAIT/SKIP are now complete with masked beam comparison — next gains: COPCON danger-register protection, copper list bounds safety, tighter integration with Denise palette effects
-- timing deadlines now aggregate blitter + beam_line_end + VERTB + copper_wait; next gains: audio/disk deadline contributions
-- slot scheduler next gains: disk `_step_slot()`, audio `_step_slot()`, sprite DMA `_step_slot()`; BPLCON0 hires bit (4 extra bitplane slots before DDFSTRT)
-- `denise`: bitplane fetch + planar→chunky + palette composition now live; next gains: BPLCON0 hires bit (+4 extra slots), BPLCON1 scroll offsets, sprite composition, dual-playfield / HAM modes
-- `denise`: current-scanline inspection validates copper-visible palette effects; extend tests to cover actual bitplane pixel output once bitplane or sprite DMA is exercised end-to-end
-- `agnus`: keep the chip layer thin and deepen the actual behavior in domains plus real Agnus-owned modules such as MMIO, bitplane-side ownership, and blitter integration
+1. **CIA into chipset** ← maior gap
+   - Add `CIA_State cia[2]` to `RigelChipset`
+   - CIA-A attached to INTREQ PORTS (bit 3), CIA-B to INTREQ EXTER (bit 13)
+   - Step CIA at E-clock rate (CCK / 5) from `rigel_chipset_step`
+   - Pulse CIA-A TOD on VBL
+   - Add `rigel_cia.h`: `rigel_cia_read8 / rigel_cia_write8`
+   - Add `rigel_keyboard.h`: `rigel_keyboard_inject(ctx, keycode, pressed)` via `cia_receive_sdr(cia_b, ...)`
 
-2. Keep the domain split honest
-- every extracted domain must reduce ambiguity, not just add files
-- keep classic chipset execution single-thread and deterministic
-- use `domains/` for ownership, stepping, and state boundaries, not for premature parallelism
-- prefer narrow hooks such as `reset`, `step`, `owns_reg`, `read_reg`, `write_reg`, and service/grant helpers
+2. **Serial public API**
+   - `rigel_serial.h` com `rigel_serial_receive_byte / tx_available / pop_tx_byte`
+   - Wrappers directos sobre `serial_receive_byte / serial_pop_tx_byte` existentes
 
-3. Finish structural cleanup without reopening core API decisions
-- continue cleaning residue from the older layout while keeping build and tests green
-- keep `RigelChipset` as orchestration and mediation, not as a policy blob
-- reduce leftover shared state as Agnus and Paula domains gain stronger ownership
+3. **RTC em `rigel_config_t`**
+   - Adicionar `rtc_model` e `rtc_time` à config
+   - Inicializar em `rigel_create` em vez de exigir chamadas pós-init
 
-## Medium-Term Targets
+4. **`RIGEL_EVENT_AUDIO_READY`**
+   - Flag `sample_ready` em `audio_state_t`, set em `audio_mix()` quando sample muda
+   - Check em `rigel_step()`, disparar o evento, clear a flag
+
+## Near-Term Targets (fidelidade e completude)
+
+- `paula_disk`: melhorar `DSKBYTR`, `DSKDATR`, `DSKSYNC`, `ADKCON`, drive-selection real DF0–DF3
+- `audio`: stepping mais fiel ao DMA fetch/service por canal
+- slot scheduler: disk `_step_slot()`, audio `_step_slot()`, sprite DMA `_step_slot()`
+- `denise`: BPLCON0 hires bit (+4 extra slots), BPLCON1 scroll offsets, sprite composition, dual-playfield / HAM
+- Sprite DMA: fetch em Agnus, interpretação/composição em Denise
+- Timing deadlines: contribuições de audio e disk
+
+## Medium-Term
 
 1. Strengthen Agnus composition
-- make `beam`, `dma`, `copper`, `blitter`, and later `bitplanes` more explicit in ownership and stepping order
-- keep MMIO routing through Agnus-facing handlers while moving behavior into domains
+   - `beam`, `dma`, `copper`, `blitter`, `bitplanes` com ownership e stepping mais explícitos
+   - MMIO routing via Agnus-facing handlers, comportamento nos domains
 
 2. Strengthen Paula composition
-- keep `interrupt`, `disk`, `serial`, `audio`, and `input` behind narrow surfaces
-- prefer deepening fidelity over creating new first-cut submodules
+   - `interrupt`, `disk`, `serial`, `audio`, `input` atrás de superfícies estreitas
+   - Aprofundar fidelidade antes de criar sub-módulos novos
 
-3. Keep RTC and convenience peripherals separate from custom MMIO
-- RTC remains part of `Rigel`, but not part of the custom-chip register family
-- floppy, input, and RTC APIs should stay host-facing and explicit instead of leaking internal state layout
+3. Keep RTC e periféricos fora do custom MMIO
+   - RTC permanece parte do Rigel mas não do custom-chip register family
+   - Floppy, input, RTC APIs devem ficar host-facing e explícitas
 
 ## Architectural Rule Of Thumb
 
-- `Rigel` should remain hardware-facing, deterministic, and single-thread by default
-- the library should stay concurrency-aware internally, but multicore execution is not a near-term goal for the classic chipset path
+- `Rigel` deve permanecer hardware-facing, determinístico e single-thread por defeito
+- A biblioteca deve ser concurrency-aware internamente, mas multicore não é meta próxima
+- Domains expressam ownership e fronteiras temporais, não paralelismo prematuro
+
+## Reference
+
+Documento de status completo: `docs/api_status.md`
