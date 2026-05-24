@@ -21,7 +21,13 @@ void denise_sprite_receive_ctrl(denise_sprites_state_t *s, unsigned sp,
     s->sp[sp].pos   = pos;
     s->sp[sp].ctl   = ctl;
     s->sp[sp].armed = true;
-    /* TODO(sprites): update attached_mask from ctl bit 7 */
+    /* Bit 7 of CTL: attach bit — only valid for odd sprites */
+    if (sp & 1u) {
+        if (ctl & (1u << 7))
+            s->attached_mask |= (rigel_u16)(1u << sp);
+        else
+            s->attached_mask &= (rigel_u16)~(1u << sp);
+    }
 }
 
 void denise_sprite_receive_data(denise_sprites_state_t *s, unsigned sp,
@@ -34,11 +40,22 @@ void denise_sprite_receive_data(denise_sprites_state_t *s, unsigned sp,
 
 uint8_t denise_sprite_pixel(const denise_sprites_state_t *s, unsigned sp, rigel_u16 hpos)
 {
-    (void)s;
-    (void)sp;
-    (void)hpos;
-    /* TODO(sprites): shift out pixel based on hpos vs hstart */
-    return 0;
+    const denise_sprite_t *ch;
+    rigel_u16 hstart;
+    unsigned offset, shift, data_bit, datb_bit;
+
+    if (sp >= DENISE_SPRITE_COUNT) return 0;
+    ch = &s->sp[sp];
+    if (!ch->armed) return 0;
+
+    hstart = denise_sprite_hstart(ch);
+    if (hpos < hstart || hpos >= hstart + 16u) return 0;
+
+    offset   = (unsigned)(hpos - hstart);
+    shift    = 15u - offset;
+    data_bit = (ch->data >> shift) & 1u;
+    datb_bit = (ch->datb >> shift) & 1u;
+    return (uint8_t)((datb_bit << 1) | data_bit);
 }
 
 bool denise_sprite_is_attached(const denise_sprites_state_t *s, unsigned odd_sp)

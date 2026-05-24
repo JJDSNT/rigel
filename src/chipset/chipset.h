@@ -2,6 +2,7 @@
 #define RIGEL_CHIPSET_H
 
 #include "agnus/agnus_state.h"
+#include "cia/cia.h"
 #include "denise/denise_state.h"
 #include "floppy/floppy_drive.h"
 #include "paula/paula_state.h"
@@ -12,18 +13,22 @@
 
 enum {
     RIGEL_CUSTOM_SPACE_SIZE = 0x200,
-    RIGEL_CUSTOM_REG_COUNT = RIGEL_CUSTOM_SPACE_SIZE / 2,
-    RIGEL_FLOPPY_DRIVE_COUNT = 4
+    RIGEL_CUSTOM_REG_COUNT  = RIGEL_CUSTOM_SPACE_SIZE / 2,
+    RIGEL_FLOPPY_DRIVE_COUNT = 4,
+    RIGEL_CIA_COUNT          = 2
 };
 
 struct RigelChipset {
-    rigel_u64 cycles;
+    rigel_u64  cycles;
     RigelAgnus agnus;
     RigelDenise denise;
-    RigelPaula paula;
-    RigelRTC rtc;
+    RigelPaula  paula;
+    CIA_State   cia[RIGEL_CIA_COUNT]; /* cia[0]=CIA-A (PORTS/IPL2), cia[1]=CIA-B (EXTER/IPL6) */
+    rigel_u32   cia_eclock_rem;       /* fractional E-clock tick accumulator */
+    RigelRTC    rtc;
     FloppyDrive floppy[RIGEL_FLOPPY_DRIVE_COUNT];
-    rigel_u16 custom_regs[RIGEL_CUSTOM_REG_COUNT];
+    rigel_u32   floppy_index_cck;  /* CCK accumulator for /INDEX pulse generation */
+    rigel_u16   custom_regs[RIGEL_CUSTOM_REG_COUNT];
 };
 
 void rigel_chipset_reset(RigelChipset *chipset);

@@ -5,7 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef uint8_t rigel_u8;
+typedef int16_t  rigel_i16;
+typedef uint8_t  rigel_u8;
 typedef uint16_t rigel_u16;
 typedef uint32_t rigel_u32;
 typedef uint64_t rigel_u64;

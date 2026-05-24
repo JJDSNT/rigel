@@ -4,6 +4,8 @@
 
 #include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/copper/copper_regs.h"
+#include "agnus/dma/sprite_dma.h"
+#include "agnus/mmio/agnus_regs.h"
 #include "agnus/timing/slot_scheduler.h"
 #include "core/rigel_context.h"
 #include "domains/blitter/blitter_domain.h"
@@ -64,6 +66,14 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
                 bplpt_set_hi(&ctx->chipset.agnus.bplpt, plane, value);
             else
                 bplpt_set_lo(&ctx->chipset.agnus.bplpt, plane, value);
+        }
+        /* SPR0PTH-SPR7PTL */
+        if (addr >= AGNUS_SPR0PTH && addr <= AGNUS_SPR7PTL && (addr & 1u) == 0u) {
+            unsigned sp = (unsigned)((addr - AGNUS_SPR0PTH) / 4u);
+            if ((addr & 2u) == 0u)
+                sprite_dma_set_ptr_hi(&ctx->chipset.agnus.sprite_dma, sp, value);
+            else
+                sprite_dma_set_ptr_lo(&ctx->chipset.agnus.sprite_dma, sp, value);
         }
         rigel_context_write_reg(ctx, addr, value);
         break;

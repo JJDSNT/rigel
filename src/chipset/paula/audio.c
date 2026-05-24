@@ -48,8 +48,11 @@ static void audio_mix(audio_state_t *audio)
         right = -32768;
     }
 
-    audio->mixed_left = (int16_t)left;
-    audio->mixed_right = (int16_t)right;
+    if ((int16_t)left != audio->mixed_left || (int16_t)right != audio->mixed_right) {
+        audio->mixed_left  = (int16_t)left;
+        audio->mixed_right = (int16_t)right;
+        audio->sample_ready = true;
+    }
 }
 
 void audio_reset(audio_state_t *audio)

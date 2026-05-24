@@ -9,6 +9,7 @@
 #include "agnus/dma.h"
 #include "agnus/blitter/blitter.h"
 #include "agnus/timing/slot_scheduler.h"
+#include "agnus/dma/sprite_dma.h"
 #include "rigel/rigel_types.h"
 
 typedef struct RigelContext RigelContext;
@@ -21,6 +22,7 @@ typedef struct RigelAgnus {
     bitplane_pointers_t bplpt;
     bitplane_fetch_state_t fetch;
     BlitterState blitter;
+    sprite_dma_state_t sprite_dma;
     agnus_slot_scheduler_t scheduler;
 } RigelAgnus;
 

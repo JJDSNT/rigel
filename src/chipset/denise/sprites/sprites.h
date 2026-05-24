@@ -46,6 +46,12 @@ uint8_t denise_sprite_pixel(const denise_sprites_state_t *s, unsigned sp, rigel_
 /* Check if a sprite pair is attached (odd sprite index must be provided) */
 bool denise_sprite_is_attached(const denise_sprites_state_t *s, unsigned odd_sp);
 
+/* Compute the 4-bit colour index for an attached sprite pair at hpos.
+ * even_sp must be the even sprite of the pair (0, 2, 4, or 6).
+ * Returns 0 if transparent; non-zero values are final palette indices 17-31. */
+uint8_t denise_sprite_attached_pixel(const denise_sprites_state_t *s,
+                                     unsigned even_sp, rigel_u16 hpos);
+
 /* Compute horizontal start position from SPRxPOS/CTL */
 rigel_u16 denise_sprite_hstart(const denise_sprite_t *sp);
 

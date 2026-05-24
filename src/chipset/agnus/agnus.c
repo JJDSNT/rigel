@@ -6,6 +6,7 @@
 #include "agnus/blitter/blitter.h"
 #include "agnus/bitplanes/bitplane_fetch.h"
 #include "agnus/bitplanes/bitplane_pointers.h"
+#include "agnus/dma/sprite_dma.h"
 #include "core/rigel_context.h"
 #include "domains/beam/beam_domain.h"
 #include "domains/blitter/blitter_domain.h"
@@ -36,6 +37,7 @@ void rigel_agnus_reset(RigelAgnus *agnus)
     bitplanes_set_depth(&agnus->bitplanes, 0);
     bplpt_reset(&agnus->bplpt);
     bitplane_fetch_reset(&agnus->fetch);
+    sprite_dma_reset(&agnus->sprite_dma);
     agnus_slot_scheduler_init(&agnus->scheduler);
 }
 

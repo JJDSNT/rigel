@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "chipset/chipset.h"
+#include "cia/cia.h"
 #include "chipset/agnus/beam.h"
 #include "chipset/agnus/blitter/blitter.h"
 #include "chipset/agnus/timing/deadline.h"
@@ -54,25 +55,15 @@ RigelContext *rigel_create(const rigel_config_t *config)
     rigel_paula_set_disk_memory_if(&ctx->chipset.paula, ctx->config.chip_ram);
     rigel_paula_set_disk_irq_sink(&ctx->chipset.paula, rigel_paula_disk_irq_sink(ctx));
     rigel_paula_set_serial_irq_sink(&ctx->chipset.paula, rigel_paula_serial_irq_sink(ctx));
+
+    if (config->rtc_model != RIGEL_RTC_MODEL_NONE) {
+        rtc_set_model(&ctx->chipset.rtc, config->rtc_model);
+        if (config->rtc_time != 0) {
+            rtc_set_time(&ctx->chipset.rtc, config->rtc_time);
+        }
+    }
+
     return ctx;
-}
-
-RigelChipset *rigel_get_chipset(RigelContext *ctx)
-{
-    if (ctx == NULL) {
-        return NULL;
-    }
-
-    return &ctx->chipset;
-}
-
-const RigelChipset *rigel_get_chipset_const(const RigelContext *ctx)
-{
-    if (ctx == NULL) {
-        return NULL;
-    }
-
-    return &ctx->chipset;
 }
 
 void rigel_destroy(RigelContext *ctx)
@@ -232,6 +223,11 @@ rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
         result.events |= (rigel_u32)RIGEL_EVENT_VBLANK;
     }
 
+    if (ctx->chipset.paula.audio.sample_ready) {
+        result.events |= (rigel_u32)RIGEL_EVENT_AUDIO_READY;
+        ctx->chipset.paula.audio.sample_ready = false;
+    }
+
     return result;
 }
 
@@ -320,6 +316,27 @@ void rigel_input_set_pot_button_y(RigelContext *ctx, rigel_u32 port, bool presse
     }
 
     rigel_paula_set_pot_button_y(&ctx->chipset.paula, port, pressed);
+}
+
+void rigel_input_set_fire(RigelContext *ctx, rigel_u32 port, bool pressed)
+{
+    rigel_u8 pra;
+
+    if (ctx == NULL || port > 1u) {
+        return;
+    }
+
+    /*
+     * CIA-A PRA: bit 6 = /FIR0 (port 0), bit 7 = /FIR1 (port 1). Active low.
+     * Read current external PRA, update the relevant bit, write back.
+     */
+    pra = cia_port_a_value(&ctx->chipset.cia[0]);
+    if (port == 0u) {
+        pra = pressed ? (pra & ~0x40u) : (pra | 0x40u);
+    } else {
+        pra = pressed ? (pra & ~0x80u) : (pra | 0x80u);
+    }
+    cia_set_external_pra(&ctx->chipset.cia[0], pra);
 }
 
 rigel_status_t rigel_floppy_insert(

@@ -1,6 +1,9 @@
 #ifndef RIGEL_CONFIG_H
 #define RIGEL_CONFIG_H
 
+#include <time.h>
+
+#include "rigel_rtc.h"
 #include "rigel_types.h"
 
 typedef rigel_u16 (*rigel_chip_ram_read16_fn)(void *opaque, rigel_u32 addr);
@@ -13,10 +16,16 @@ typedef struct rigel_chip_ram_if {
 } rigel_chip_ram_if_t;
 
 typedef struct rigel_config {
-    rigel_u32 clock_hz;
-    rigel_u32 chip_ram_size;
-    bool enable_trace;
+    rigel_u32         clock_hz;
+    rigel_u32         chip_ram_size;
+    bool              enable_trace;
     rigel_chip_ram_if_t chip_ram;
+    /*
+     * RTC: set rtc_model to RIGEL_RTC_MODEL_NONE to disable.
+     * rtc_time: initial Amiga calendar time; 0 = use host system clock.
+     */
+    rigel_rtc_model_t rtc_model;
+    time_t            rtc_time;
 } rigel_config_t;
 
 #endif

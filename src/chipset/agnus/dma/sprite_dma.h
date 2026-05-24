@@ -2,6 +2,7 @@
 #define RIGEL_AGNUS_DMA_SPRITE_H
 
 #include "rigel/rigel_types.h"
+#include "rigel/rigel_config.h"
 
 /* Sprite DMA — Agnus fetches sprite control words and pixel data.
  * Denise receives the fetched data and handles composition and collision.
@@ -11,8 +12,12 @@
 #define SPRITE_DMA_CHANNELS 8
 
 typedef struct sprite_dma_channel {
-    rigel_u32 ptr;      /* SPRxPTH/SPRxPTL — current fetch pointer */
-    bool      armed;    /* set after control words fetched          */
+    rigel_u32 ptr;          /* SPRxPTH/SPRxPTL — current fetch pointer   */
+    bool      armed;        /* control words fetched; vstart/vstop valid  */
+    bool      fetch_ctrl;   /* A-slot decided: fetching ctrl (not data)   */
+    rigel_u16 vstart;       /* cached from last SPRxPOS fetch             */
+    rigel_u16 vstop;        /* cached from last SPRxCTL fetch             */
+    rigel_u16 w0;           /* word latched in A-slot, consumed in B-slot */
 } sprite_dma_channel_t;
 
 typedef struct sprite_dma_state {
@@ -23,10 +28,15 @@ void sprite_dma_reset(sprite_dma_state_t *s);
 void sprite_dma_set_ptr_hi(sprite_dma_state_t *s, unsigned sp, rigel_u16 val);
 void sprite_dma_set_ptr_lo(sprite_dma_state_t *s, unsigned sp, rigel_u16 val);
 
-/* Called per slot pair during hblank; fetches control or pixel words.
- * Returns the two fetched words via out_w0/out_w1 (for forwarding to Denise). */
-void sprite_dma_step(sprite_dma_state_t *s, unsigned sp,
+/* Process one DMA slot (A or B) for sprite channel `sp`.
+ * is_b: false = A-slot (latch first word), true = B-slot (latch + deliver).
+ * vpos: current scanline, used to decide control vs data fetch.
+ * On B-slot returns true and fills *out_w0, *out_w1, *out_is_ctrl.
+ * On A-slot returns false (*out_* not written). */
+bool sprite_dma_slot(sprite_dma_state_t *s, unsigned sp,
+                     rigel_u16 vpos, bool is_b,
                      rigel_chip_ram_if_t mem,
-                     rigel_u16 *out_w0, rigel_u16 *out_w1);
+                     rigel_u16 *out_w0, rigel_u16 *out_w1,
+                     bool *out_is_ctrl);
 
 #endif

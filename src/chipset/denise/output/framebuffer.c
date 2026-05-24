@@ -17,11 +17,16 @@ void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
     output->scanline_width = 0;
     output->last_rgb = 0;
     (void)memset(output->scanline_rgba, 0, sizeof(output->scanline_rgba));
+    (void)memset(output->frame_rgba, 0, sizeof(output->frame_rgba));
     (void)memset(output->plane_words, 0, sizeof(output->plane_words));
     output->plane_word_count = 0;
     output->visible_scanline = false;
     output->scanline_dirty = false;
     output->frame_dirty = true;
+    output->pending_flags   = 0;
+    output->completed_flags = 0;
+    (void)memset(output->pending_dirty,   0, sizeof(output->pending_dirty));
+    (void)memset(output->completed_dirty, 0, sizeof(output->completed_dirty));
 }
 
 void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_state_t *beam)
@@ -39,9 +44,24 @@ void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_sta
     line_changed = frame_changed || output->beam_vpos != beam->vpos;
 
     if (line_changed) {
-        /* plane_words cleared here for the new line; compositor manages scanline_rgba and dirty */
+        if (output->beam_vpos < RIGEL_DENISE_MAX_LINES) {
+            (void)memcpy(output->frame_rgba[output->beam_vpos],
+                         output->scanline_rgba,
+                         sizeof(output->scanline_rgba));
+        }
         (void)memset(output->plane_words, 0, sizeof(output->plane_words));
         output->plane_word_count = 0;
+    }
+
+    /* Snapshot pending frame metadata into completed slot at frame boundary.
+     * This runs before RIGEL_EVENT_FRAME_READY fires, so rigel_get_frame()
+     * sees the completed values from the frame that just ended. */
+    if (frame_changed) {
+        output->completed_flags = output->pending_flags;
+        (void)memcpy(output->completed_dirty, output->pending_dirty,
+                     sizeof(output->completed_dirty));
+        output->pending_flags = 0;
+        (void)memset(output->pending_dirty, 0, sizeof(output->pending_dirty));
     }
 
     output->frame_counter = beam->frame_count;

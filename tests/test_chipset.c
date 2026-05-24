@@ -1,4 +1,6 @@
 #include "rigel/rigel.h"
+#include "chipset/chipset.h"
+#include "core/rigel_context.h"
 
 int main(void)
 {
@@ -11,8 +13,8 @@ int main(void)
         return 1;
     }
 
-    chipset = rigel_get_chipset(ctx);
-    if (chipset == NULL || rigel_get_chipset_const(ctx) == NULL) {
+    chipset = &ctx->chipset;
+    if (chipset == NULL || &ctx->chipset == NULL) {
         rigel_destroy(ctx);
         return 1;
     }

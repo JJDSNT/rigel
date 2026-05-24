@@ -14,14 +14,15 @@ priority_result_t denise_priority_resolve(
         ? ((bplcon2 >> 3) & 0x7u)
         : (bplcon2 & 0x7u);
 
-    /* Find lowest-numbered non-transparent sprite */
+    /* Sprite pair p beats PFx when PF is transparent or pair + PFxP < 4.
+     * Lower sprite number = higher priority; first non-transparent that beats PF wins. */
     for (int i = 0; i < 8; i++) {
-        if (sprite_px[i]) {
-            /* TODO: compare sprite priority against pf_prio */
-            (void)pf_prio;
+        unsigned pair = (unsigned)i / 2u;
+        if (!sprite_px[i]) continue;
+        if (pf_color == 0 || pair + pf_prio < 4u) {
             r.from_sprite = true;
             r.sprite_num  = (uint8_t)i;
-            r.color_index = sprite_px[i];
+            r.color_index = (uint8_t)(16u + pair * 4u + sprite_px[i]);
             return r;
         }
     }

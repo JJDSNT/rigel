@@ -130,6 +130,10 @@ typedef struct agnus_slot_scheduler {
 
     /* Bitplane fetch cycling: which plane to fetch on the next BITPLANE slot */
     rigel_u16 fetch_plane_index;
+
+    /* Hires mode (BPLCON0 bit 15): doubles bitplane fetch rate.
+     * Must be kept in sync with BPLCON0 via agnus_slot_scheduler_set_hires(). */
+    bool hires;
 } agnus_slot_scheduler_t;
 
 /* =========================================================================
@@ -146,6 +150,9 @@ void agnus_slot_scheduler_invalidate(agnus_slot_scheduler_t *sched, rigel_u16 dm
 /* Call whenever DDFSTRT or DDFSTOP is written — marks the table for rebuild. */
 void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
                                    rigel_u16 ddfstrt, rigel_u16 ddfstop);
+
+/* Call whenever BPLCON0 bit 15 (hires) changes — marks the table for rebuild. */
+void agnus_slot_scheduler_set_hires(agnus_slot_scheduler_t *sched, bool hires);
 
 /* Rebuild the slot table from the current DMACON and beam vpos.
  * Called automatically by step functions when table_dirty is set. */

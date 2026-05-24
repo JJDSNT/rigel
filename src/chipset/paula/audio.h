@@ -39,6 +39,7 @@ typedef struct audio_state {
     rigel_audio_channel_t ch[RIGEL_PAULA_AUDIO_CHANNELS];
     int16_t mixed_left;
     int16_t mixed_right;
+    bool sample_ready;   /* set when mixed_left/right change; cleared by rigel_step */
     rigel_u16 dmacon;
     rigel_audio_irq_sink_t irq;
 } audio_state_t;

@@ -1,5 +1,6 @@
 #include "paula/serial.h"
 #include "chipset/chipset.h"
+#include "core/rigel_context.h"
 #include "rigel/rigel.h"
 
 int main(void)
@@ -13,7 +14,7 @@ int main(void)
         return 1;
     }
 
-    chipset = rigel_get_chipset(ctx);
+    chipset = &ctx->chipset;
     if (chipset == NULL) {
         rigel_destroy(ctx);
         return 1;

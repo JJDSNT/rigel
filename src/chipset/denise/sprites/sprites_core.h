@@ -1,8 +1,8 @@
 #ifndef RIGEL_DENISE_SPRITES_CORE_H
 #define RIGEL_DENISE_SPRITES_CORE_H
 
-#include "denise/denise_state.h"
+#include "denise/sprites/sprites.h"
 
-void rigel_denise_sprites_reset(rigel_denise_sprite_state_t *sprites);
+void rigel_denise_sprites_reset(denise_sprites_state_t *sprites);
 
 #endif

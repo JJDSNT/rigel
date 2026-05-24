@@ -11,6 +11,7 @@
 #include "agnus/blitter/blitter.h"
 #include "agnus/copper/copper_service.h"
 #include "agnus/dma/sprite_dma.h"
+#include "denise/sprites/sprites.h"
 #include "domains/beam/beam_domain.h"
 #include "domains/dma/dma_domain.h"
 #include "domains/copper/copper_domain.h"
@@ -62,18 +63,31 @@ static void dispatch_slot(agnus_slot_owner_t owner,
         break;
 
     case AGNUS_SLOT_SPRITE_0:
-        /* TODO(slot_scheduler): agnus_sprite_dma_step(&ctx->chipset.agnus, 0, ...) */
-        break;
     case AGNUS_SLOT_SPRITE_1:
-        /* TODO(slot_scheduler): agnus_sprite_dma_step(&ctx->chipset.agnus, 1, ...) */
-        break;
     case AGNUS_SLOT_SPRITE_2:
     case AGNUS_SLOT_SPRITE_3:
     case AGNUS_SLOT_SPRITE_4:
     case AGNUS_SLOT_SPRITE_5:
     case AGNUS_SLOT_SPRITE_6:
     case AGNUS_SLOT_SPRITE_7:
-        /* TODO(slot_scheduler): sprite dispatch for channels 2-7 */
+        if (ctx) {
+            unsigned sp = (unsigned)(owner - AGNUS_SLOT_SPRITE_0);
+            /* A-slot: (hpos & 2) == 0; B-slot: (hpos & 2) != 0 */
+            bool is_b = (hpos & 2u) != 0u;
+            rigel_u16 w0, w1;
+            bool is_ctrl;
+            bool ready = sprite_dma_slot(
+                &ctx->chipset.agnus.sprite_dma, sp,
+                ctx->chipset.agnus.beam.vpos, is_b,
+                ctx->config.chip_ram,
+                &w0, &w1, &is_ctrl);
+            if (ready) {
+                if (is_ctrl)
+                    denise_sprite_receive_ctrl(&ctx->chipset.denise.sprites, sp, w0, w1);
+                else
+                    denise_sprite_receive_data(&ctx->chipset.denise.sprites, sp, w0, w1);
+            }
+        }
         break;
 
     case AGNUS_SLOT_BITPLANE:
@@ -159,8 +173,8 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
     if (dmacon_auden(sched->dmacon, 2)) fill_slot(sched, AGNUS_HPOS_AUDIO_2, AGNUS_SLOT_AUDIO_2);
     if (dmacon_auden(sched->dmacon, 3)) fill_slot(sched, AGNUS_HPOS_AUDIO_3, AGNUS_SLOT_AUDIO_3);
 
-    /* Sprite DMA — suppressed during VBL */
-    if (!vbl && dmacon_spren(sched->dmacon)) {
+    /* Sprite DMA — active during VBL (fetches control words) and active display (fetches data) */
+    if (dmacon_spren(sched->dmacon)) {
         fill_slot(sched, AGNUS_HPOS_SPRITE_0_A, AGNUS_SLOT_SPRITE_0);
         fill_slot(sched, AGNUS_HPOS_SPRITE_0_B, AGNUS_SLOT_SPRITE_0);
         fill_slot(sched, AGNUS_HPOS_SPRITE_1_A, AGNUS_SLOT_SPRITE_1);
@@ -181,13 +195,14 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
 
     /* Bitplane DMA — suppressed during VBL.
      * Range is derived from DDFSTRT/DDFSTOP (written via MMIO).
-     * TODO(slot_scheduler): account for BPLCON0 hires bit (adds 4 extra fetch slots). */
+     * Hires mode (BPLCON0 bit 15): fills every CCK slot instead of every other. */
     if (!vbl && dmacon_bplen(sched->dmacon)) {
         rigel_u16 h;
         rigel_u16 bpl_start = sched->ddfstrt;
         rigel_u16 bpl_stop  = sched->ddfstop < (AGNUS_SLOTS_PER_LINE - 4u)
                               ? sched->ddfstop : (AGNUS_SLOTS_PER_LINE - 4u);
-        for (h = bpl_start; h < bpl_stop; h += 2u)
+        rigel_u16 step = sched->hires ? 1u : 2u;
+        for (h = bpl_start; h < bpl_stop; h += step)
             fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
     }
 
@@ -222,6 +237,7 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
     sched->blitter_nasty     = false;
     sched->blitter_active    = false;
     sched->fetch_plane_index = 0;
+    sched->hires             = false;
 
     for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++)
         sched->table[i] = AGNUS_SLOT_CPU;
@@ -231,6 +247,14 @@ void agnus_slot_scheduler_invalidate(agnus_slot_scheduler_t *sched, rigel_u16 dm
 {
     sched->dmacon       = dmacon;
     sched->table_dirty  = true;
+}
+
+void agnus_slot_scheduler_set_hires(agnus_slot_scheduler_t *sched, bool hires)
+{
+    if (sched->hires != hires) {
+        sched->hires       = hires;
+        sched->table_dirty = true;
+    }
 }
 
 void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,

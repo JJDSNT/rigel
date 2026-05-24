@@ -1,5 +1,6 @@
 #include "agnus/agnus_state.h"
 #include "chipset/chipset.h"
+#include "core/rigel_context.h"
 #include "rigel/rigel.h"
 
 static rigel_u16 test_chip_ram_read16(void *opaque, rigel_u32 addr)
@@ -36,7 +37,7 @@ int main(void)
         return 1;
     }
 
-    chipset = rigel_get_chipset(ctx);
+    chipset = &ctx->chipset;
     if (chipset == NULL) {
         rigel_destroy(ctx);
         return 1;

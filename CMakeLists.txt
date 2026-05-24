@@ -21,7 +21,10 @@ add_library(rigel
     src/chipset/chipset.c
     src/core/rigel.c
     src/core/rigel_context.c
+    src/core/rigel_audio_api.c
+    src/core/rigel_cia_api.c
     src/core/rigel_denise_api.c
+    src/core/rigel_serial_api.c
     src/core/rigel_timing.c
     src/mmio/rigel_mmio.c
     src/mmio/custom_regs.c
@@ -58,13 +61,21 @@ add_library(rigel
     src/chipset/agnus/bitplanes/bitplanes.c
     src/chipset/agnus/bitplanes/bitplane_fetch.c
     src/chipset/agnus/bitplanes/bitplane_pointers.c
+    src/chipset/agnus/dma/sprite_dma.c
     src/chipset/denise/denise.c
     src/chipset/denise/registers/denise_registers.c
     src/chipset/denise/render/compositor.c
+    src/chipset/denise/render/dualpf.c
+    src/chipset/denise/render/ehb.c
+    src/chipset/denise/render/ham.c
     src/chipset/denise/render/pixel_pipeline.c
     src/chipset/denise/render/playfield.c
+    src/chipset/denise/render/priority.c
     src/chipset/denise/output/planar.c
+    src/chipset/denise/sprites/collisions.c
+    src/chipset/denise/sprites/sprite_attach.c
     src/chipset/denise/sprites/sprites_core.c
+    src/chipset/denise/sprites/sprites.c
     src/chipset/denise/palette/palette.c
     src/chipset/denise/palette/color_regs.c
     src/chipset/denise/video/display_window.c

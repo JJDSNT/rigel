@@ -7,7 +7,10 @@
 #include "denise/render/compositor.h"
 #include "denise/sprites/sprites_core.h"
 #include "denise/video/display_window.h"
+#include "agnus/timing/slot_scheduler.h"
 #include "core/rigel_context.h"
+
+enum { RIGEL_REG_BPLCON0 = 0x100, RIGEL_BPLCON0_HIRES = 0x8000 };
 
 void rigel_denise_reset(RigelDenise *denise)
 {
@@ -17,6 +20,7 @@ void rigel_denise_reset(RigelDenise *denise)
 
     rigel_denise_palette_reset(&denise->palette);
     rigel_denise_sprites_reset(&denise->sprites);
+    collision_reset(&denise->coll);
     rigel_denise_display_window_reset(&denise->video);
     rigel_denise_framebuffer_reset(&denise->output);
     denise->regs.bplcon0 = 0;
@@ -75,4 +79,12 @@ void rigel_denise_write_reg(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
 
     rigel_denise_registers_write(&ctx->chipset.denise, addr, value);
     rigel_context_write_reg(ctx, addr, value);
+
+    /* Hires bit (BPLCON0 bit 15) changes the bitplane slot count in Agnus */
+    if (addr == RIGEL_REG_BPLCON0) {
+        agnus_slot_scheduler_set_hires(
+            &ctx->chipset.agnus.scheduler,
+            (value & RIGEL_BPLCON0_HIRES) != 0
+        );
+    }
 }

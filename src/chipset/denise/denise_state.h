@@ -4,10 +4,13 @@
 #include "rigel/rigel_denise_types.h"
 #include "rigel/rigel_types.h"
 #include "agnus/beam.h"
+#include "denise/sprites/collisions.h"
+#include "denise/sprites/sprites.h"
 
 enum {
     RIGEL_DENISE_MAX_SCANLINE_PIXELS = 1024,
-    RIGEL_DENISE_MAX_PLANE_WORDS     = 64
+    RIGEL_DENISE_MAX_PLANE_WORDS     = 64,
+    RIGEL_DENISE_MAX_LINES           = 312   /* PAL raster height */
 };
 
 typedef struct rigel_denise_register_file {
@@ -23,10 +26,7 @@ typedef struct rigel_denise_palette_state {
     rigel_u32 rgb32[32];
 } rigel_denise_palette_state_t;
 
-typedef struct rigel_denise_sprite_state {
-    rigel_u16 active_mask;
-    rigel_u16 attached_mask;
-} rigel_denise_sprite_state_t;
+/* Full per-sprite state lives in denise_sprites_state_t (from sprites/sprites.h). */
 
 typedef struct rigel_denise_video_state {
     rigel_u16 width;
@@ -46,18 +46,26 @@ typedef struct rigel_denise_output_state {
     rigel_u16 scanline_width;
     rigel_u32 last_rgb;
     rigel_u32 scanline_rgba[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
+    rigel_u32 frame_rgba[RIGEL_DENISE_MAX_LINES][RIGEL_DENISE_MAX_SCANLINE_PIXELS];
     bool visible_scanline;
     bool scanline_dirty;
     bool frame_dirty;
     /* Bitplane line buffer — words fetched per plane for the current scanline */
     rigel_u16 plane_words[6][RIGEL_DENISE_MAX_PLANE_WORDS];
     rigel_u16 plane_word_count;
+    /* Frame metadata: pending = accumulating for current frame;
+     * completed = snapshotted at frame boundary for the host to read. */
+    rigel_u32 pending_flags;
+    rigel_u64 pending_dirty[5];
+    rigel_u32 completed_flags;
+    rigel_u64 completed_dirty[5];
 } rigel_denise_output_state_t;
 
 typedef struct RigelDenise {
     rigel_denise_register_file_t regs;
     rigel_denise_palette_state_t palette;
-    rigel_denise_sprite_state_t sprites;
+    denise_sprites_state_t sprites;
+    collision_state_t coll;
     rigel_denise_video_state_t video;
     rigel_denise_output_state_t output;
     rigel_denise_debug_state_t debug;
