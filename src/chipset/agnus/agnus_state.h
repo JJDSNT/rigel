@@ -8,7 +8,9 @@
 #include "agnus/copper/copper.h"
 #include "agnus/dma.h"
 #include "agnus/blitter/blitter.h"
+#include "agnus/timing/raster.h"
 #include "agnus/timing/slot_scheduler.h"
+#include "agnus/dma/refresh_dma.h"
 #include "agnus/dma/sprite_dma.h"
 #include "rigel/rigel_types.h"
 
@@ -24,6 +26,8 @@ typedef struct RigelAgnus {
     BlitterState blitter;
     sprite_dma_state_t sprite_dma;
     agnus_slot_scheduler_t scheduler;
+    raster_config_t raster;
+    refresh_dma_state_t refresh;
 } RigelAgnus;
 
 void rigel_agnus_reset(RigelAgnus *agnus);

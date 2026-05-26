@@ -1,6 +1,8 @@
 #include "refresh_dma.h"
 
-/* TODO(dma): implement refresh slot accounting */
+/* OCS chip RAM refresh — Agnus inserts one refresh slot roughly every 10 CCKs.
+ * The slot scheduler already places these at fixed hpos positions; this module
+ * only accounts for the consumed cycles (useful for diagnostics). */
 
 void refresh_dma_reset(refresh_dma_state_t *r)
 {
@@ -9,7 +11,5 @@ void refresh_dma_reset(refresh_dma_state_t *r)
 
 void refresh_dma_step(refresh_dma_state_t *r, rigel_u32 cycles)
 {
-    (void)r;
-    (void)cycles;
-    /* TODO */
+    r->pending_cycles += cycles;
 }
