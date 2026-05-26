@@ -67,7 +67,7 @@ bool rigel_get_scanline(const RigelContext *ctx, rigel_u16 y, rigel_denise_scanl
     out->frame_counter = denise->output.frame_counter;
     out->y             = y;
     out->width         = (rigel_u16)(denise->video.visible_x_stop - x0);
-    out->pixels_rgba   = &denise->output.frame_rgba[y][x0];
+    out->pixels_rgba   = &denise->output.frame_rgba[denise->output.front_idx][y][x0];
     out->last_rgb32    = 0;
     out->visible       = (y >= denise->video.visible_y_start &&
                           y <  denise->video.visible_y_stop);
@@ -94,8 +94,8 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
     frame->pitch       = (rigel_u32)(RIGEL_DENISE_MAX_SCANLINE_PIXELS * sizeof(rigel_u32));
     frame->frame_count = denise->output.frame_counter;
     frame->pixels      = (y0 < RIGEL_DENISE_MAX_LINES)
-                             ? &denise->output.frame_rgba[y0][x0]
-                             : &denise->output.frame_rgba[0][0];
+                             ? &denise->output.frame_rgba[denise->output.front_idx][y0][x0]
+                             : &denise->output.frame_rgba[denise->output.front_idx][0][0];
     frame->flags       = (rigel_frame_flags_t)denise->output.completed_flags;
     frame->delta.full_redraw = false;
     (void)memcpy(frame->delta.dirty_lines, denise->output.completed_dirty,

@@ -18,6 +18,7 @@ void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
     output->last_rgb = 0;
     (void)memset(output->scanline_rgba, 0, sizeof(output->scanline_rgba));
     (void)memset(output->frame_rgba, 0, sizeof(output->frame_rgba));
+    output->front_idx = 0;
     (void)memset(output->plane_words, 0, sizeof(output->plane_words));
     output->plane_word_count = 0;
     output->visible_scanline = false;
@@ -45,7 +46,7 @@ void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_sta
 
     if (line_changed) {
         if (output->beam_vpos < RIGEL_DENISE_MAX_LINES) {
-            (void)memcpy(output->frame_rgba[output->beam_vpos],
+            (void)memcpy(output->frame_rgba[1u ^ output->front_idx][output->beam_vpos],
                          output->scanline_rgba,
                          sizeof(output->scanline_rgba));
         }
@@ -53,15 +54,15 @@ void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_sta
         output->plane_word_count = 0;
     }
 
-    /* Snapshot pending frame metadata into completed slot at frame boundary.
-     * This runs before RIGEL_EVENT_FRAME_READY fires, so rigel_get_frame()
-     * sees the completed values from the frame that just ended. */
+    /* At frame boundary: snapshot metadata, then make the back buffer visible.
+     * Swap runs after writing the last scanline so the front buffer is complete. */
     if (frame_changed) {
         output->completed_flags = output->pending_flags;
         (void)memcpy(output->completed_dirty, output->pending_dirty,
                      sizeof(output->completed_dirty));
         output->pending_flags = 0;
         (void)memset(output->pending_dirty, 0, sizeof(output->pending_dirty));
+        output->front_idx ^= 1u;
     }
 
     output->frame_counter = beam->frame_count;
