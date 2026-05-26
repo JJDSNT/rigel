@@ -403,3 +403,17 @@ void disk_dma_service_grant(disk_state_t *disk)
     disk->dskptr = disk->dma_ptr_base + disk->dma_bytes_total;
     disk_emit_irq(disk, 0x0002u);
 }
+
+rigel_u32 disk_cycles_to_next_event(const disk_state_t *disk)
+{
+    if (disk == NULL || !disk->dma_active) {
+        return 0xFFFFFFFFu;
+    }
+
+    /* Countdown phase: fake-DMA delay until completion IRQ. */
+    if (disk->countdown > 0u && disk->dma_bytes_total == 0u) {
+        return disk->countdown;
+    }
+
+    return 0xFFFFFFFFu;
+}

@@ -254,3 +254,23 @@ void audio_dma_step_slot(audio_state_t *audio, int channel, rigel_chip_ram_if_t 
         audio->irq.raise(audio->irq.opaque, irq_bits[channel]);
     }
 }
+
+rigel_u32 audio_cycles_to_next_event(const audio_state_t *audio)
+{
+    rigel_u32 min = 0xFFFFFFFFu;
+    int ch;
+
+    if (audio == NULL) {
+        return 0xFFFFFFFFu;
+    }
+
+    for (ch = 0; ch < RIGEL_PAULA_AUDIO_CHANNELS; ch++) {
+        const rigel_audio_channel_t *c = &audio->ch[ch];
+        if ((c->dma_enabled || c->data_pending) && c->period_counter > 0u) {
+            if (c->period_counter < min)
+                min = c->period_counter;
+        }
+    }
+
+    return min;
+}

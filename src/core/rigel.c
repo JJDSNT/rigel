@@ -13,6 +13,8 @@
 #include "domains/copper/copper_domain.h"
 #include "core/rigel_context.h"
 #include "floppy/floppy_drive.h"
+#include "paula/audio.h"
+#include "paula/disk.h"
 #include "paula/paula_interrupts.h"
 #include "paula/paula_state.h"
 
@@ -167,6 +169,9 @@ rigel_cycle_t rigel_get_next_deadline(const RigelContext *ctx)
         &ctx->chipset.agnus.copper,
         &ctx->chipset.agnus.beam
     );
+
+    d.audio = audio_cycles_to_next_event(&ctx->chipset.paula.audio);
+    d.disk  = disk_cycles_to_next_event(&ctx->chipset.paula.disk);
 
     return ctx->chipset.cycles + agnus_deadlines_min(&d);
 }

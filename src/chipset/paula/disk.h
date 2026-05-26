@@ -65,5 +65,6 @@ rigel_u16 disk_read_dskdatr(const disk_state_t *disk);
 void disk_step(disk_state_t *disk, rigel_u32 cycles);
 int disk_dma_wants_service(const disk_state_t *disk);
 void disk_dma_service_grant(disk_state_t *disk);
+rigel_u32 disk_cycles_to_next_event(const disk_state_t *disk);
 
 #endif

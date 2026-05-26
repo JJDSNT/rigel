@@ -57,5 +57,6 @@ void audio_write_vol(audio_state_t *audio, int channel, rigel_u16 value);
 void audio_write_dat(audio_state_t *audio, int channel, rigel_u16 value);
 int16_t audio_left(const audio_state_t *audio);
 int16_t audio_right(const audio_state_t *audio);
+rigel_u32 audio_cycles_to_next_event(const audio_state_t *audio);
 
 #endif

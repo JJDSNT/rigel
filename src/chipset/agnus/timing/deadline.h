@@ -36,14 +36,12 @@ typedef struct agnus_deadlines {
      * TODO: implement in domains/copper once beam model is complete. */
     rigel_u32 copper_wait;
 
-    /* Audio: cycles until the next audio DMA slot grant (period expiry).
-     * Source: audio domain per-channel period counters.
-     * TODO: implement in domains/audio. */
+    /* Audio: cycles until the next audio period expiry (sample output).
+     * Source: audio_cycles_to_next_event() — min period_counter across active channels. */
     rigel_u32 audio;
 
-    /* Disk: cycles until the next disk DMA word transfer.
-     * Source: disk domain DMA active flag + MFM bit rate.
-     * TODO: implement in domains/disk. */
+    /* Disk: cycles until fake-DMA countdown completion IRQ.
+     * Source: disk_cycles_to_next_event() — countdown field when in countdown phase. */
     rigel_u32 disk;
 } agnus_deadlines_t;
 
