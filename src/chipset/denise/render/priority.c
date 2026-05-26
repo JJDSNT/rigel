@@ -1,7 +1,14 @@
 #include "priority.h"
 
-/* TODO(render): implement full priority resolution.
- * Reference: HRM "Sprite and Playfield Priority" chapter. */
+/* Priority resolution — HRM "Sprite and Playfield Priority" chapter.
+ *
+ * sprite_px[i] must be the final palette index for sprite i (0 = transparent).
+ * Callers map the 2-bit raw sprite value to a palette slot before calling here.
+ *
+ * A sprite pair p (= sprite_num / 2) beats a playfield when either:
+ *   - the playfield pixel is transparent (pf_color == 0), or
+ *   - pair + PFxP < 4  (lower pair number = higher sprite priority).
+ * Sprites are tested 0→7 so the lowest-numbered non-transparent sprite wins. */
 
 priority_result_t denise_priority_resolve(
     uint8_t pf_color,
@@ -13,16 +20,15 @@ priority_result_t denise_priority_resolve(
     unsigned pf_prio = is_pf2
         ? ((bplcon2 >> 3) & 0x7u)
         : (bplcon2 & 0x7u);
+    int i;
 
-    /* Sprite pair p beats PFx when PF is transparent or pair + PFxP < 4.
-     * Lower sprite number = higher priority; first non-transparent that beats PF wins. */
-    for (int i = 0; i < 8; i++) {
+    for (i = 0; i < 8; i++) {
         unsigned pair = (unsigned)i / 2u;
         if (!sprite_px[i]) continue;
         if (pf_color == 0 || pair + pf_prio < 4u) {
             r.from_sprite = true;
             r.sprite_num  = (uint8_t)i;
-            r.color_index = (uint8_t)(16u + pair * 4u + sprite_px[i]);
+            r.color_index = sprite_px[i];
             return r;
         }
     }

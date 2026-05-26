@@ -51,17 +51,22 @@ add_library(rigel
     src/domains/input/input_domain.c
     src/chipset/agnus/blitter/blitter_command.c
     src/chipset/agnus/blitter/blitter_dma.c
+    src/chipset/agnus/blitter/blitter_line.c
     src/chipset/agnus/blitter/blitter_ref.c
     src/chipset/agnus/blitter/blitter_regs.c
     src/chipset/agnus/blitter/blitter_timing.c
     src/chipset/agnus/timing/vblank.c
     src/chipset/agnus/timing/deadline.c
+    src/chipset/agnus/timing/raster.c
     src/chipset/agnus/timing/slot_scheduler.c
     src/chipset/agnus/irq/agnus_irq.c
     src/chipset/agnus/bitplanes/bitplanes.c
     src/chipset/agnus/bitplanes/bitplane_fetch.c
     src/chipset/agnus/bitplanes/bitplane_pointers.c
+    src/chipset/agnus/dma/refresh_dma.c
     src/chipset/agnus/dma/sprite_dma.c
+    src/chipset/agnus/copper/copper_exec.c
+    src/chipset/agnus/copper/copper_wait.c
     src/chipset/denise/denise.c
     src/chipset/denise/registers/denise_registers.c
     src/chipset/denise/render/compositor.c
@@ -145,6 +150,25 @@ if(RIGEL_BUILD_TESTS)
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/src/chipset
+        )
+        add_test(NAME ${test_name} COMMAND ${test_name})
+    endforeach()
+
+    set(DENISE_UNIT_TESTS
+        test_priority
+        test_ham
+        test_dualpf
+        test_sprites
+    )
+
+    foreach(test_name IN LISTS DENISE_UNIT_TESTS)
+        add_executable(${test_name}
+            src/chipset/denise/tests/${test_name}.c)
+        target_link_libraries(${test_name} PRIVATE rigel)
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/chipset
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
         )
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()

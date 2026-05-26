@@ -3,25 +3,76 @@
 
 #include "denise/render/dualpf.h"
 
-/* TODO(tests): verify dual playfield plane splitting and priority
- *   - 6-plane word → correct pf1_index (bits 0,2,4)
- *   - 6-plane word → correct pf2_index (bits 1,3,5)
- *   - transparent pixels (index=0) per playfield
- *   - priority resolve: PF2 over PF1, background */
-
 int main(void)
 {
     dualpf_result_t r;
+    uint8_t win;
 
-    /* plane_bits = 0b101010 → PF1 bits = 0, PF2 bits = 7 */
+    /* --- plane splitting ---
+     * Odd planes (bits 0,2,4) → PF1; even planes (bits 1,3,5) → PF2.
+     * A non-zero PF2 index has 8 added; PF1 index is returned as-is (1-7). */
+
+    /* 0b101010: bits 0,2,4 = 0 → PF1 transparent; bits 1,3,5 = 1,1,1 → PF2 = 7+8 */
     r = dualpf_decode(0b101010u);
-    assert(r.pf1_index == 0);   /* transparent */
-    assert(r.pf2_index == 8 + 7);
+    assert(r.pf1_index == 0);
+    assert(r.pf2_index == 15);
 
-    /* plane_bits = 0b010101 → PF1 bits = 7, PF2 bits = 0 */
+    /* 0b010101: bits 0,2,4 = 1,1,1 → PF1 = 7; bits 1,3,5 = 0 → PF2 transparent */
     r = dualpf_decode(0b010101u);
     assert(r.pf1_index == 7);
-    assert(r.pf2_index == 0);   /* transparent */
+    assert(r.pf2_index == 0);
+
+    /* 0b000000: both transparent */
+    r = dualpf_decode(0u);
+    assert(r.pf1_index == 0);
+    assert(r.pf2_index == 0);
+
+    /* 0b111111: all planes set → PF1 = 7, PF2 = 15 */
+    r = dualpf_decode(0b111111u);
+    assert(r.pf1_index == 7);
+    assert(r.pf2_index == 15);
+
+    /* 0b000001: only bit0 → PF1 = 1, PF2 transparent */
+    r = dualpf_decode(0b000001u);
+    assert(r.pf1_index == 1);
+    assert(r.pf2_index == 0);
+
+    /* 0b000010: only bit1 → PF1 transparent, PF2 = 8+1 = 9 */
+    r = dualpf_decode(0b000010u);
+    assert(r.pf1_index == 0);
+    assert(r.pf2_index == 9);
+
+    /* --- priority resolution --- */
+
+    /* both transparent → background (0) */
+    r.pf1_index = 0; r.pf2_index = 0;
+    win = dualpf_priority_resolve(&r, 0x0000u);
+    assert(win == 0);
+
+    /* only PF1 → PF1 wins regardless of PFxP */
+    r.pf1_index = 3; r.pf2_index = 0;
+    win = dualpf_priority_resolve(&r, 0x0000u);
+    assert(win == 3);
+
+    /* only PF2 → PF2 wins */
+    r.pf1_index = 0; r.pf2_index = 12;
+    win = dualpf_priority_resolve(&r, 0x0000u);
+    assert(win == 12);
+
+    /* both opaque, PF1P > PF2P → PF1 wins */
+    r.pf1_index = 3; r.pf2_index = 12;
+    win = dualpf_priority_resolve(&r, 0x0018u);  /* PF1P=3<<0=3? no: PF1P bits[2:0] */
+    /* bplcon2: PF1P = bits[2:0]=4, PF2P = bits[5:3]=0 → PF1 > PF2 → PF1 wins */
+    win = dualpf_priority_resolve(&r, 0x0004u);
+    assert(win == 3);
+
+    /* both opaque, PF1P < PF2P → PF2 wins */
+    win = dualpf_priority_resolve(&r, 0x0020u);  /* PF2P=4, PF1P=0 → PF2 wins */
+    assert(win == 12);
+
+    /* both opaque, tie (PF1P == PF2P) → PF2 wins (hardware default) */
+    win = dualpf_priority_resolve(&r, 0x0000u);
+    assert(win == 12);
 
     printf("test_dualpf: PASS\n");
     return 0;

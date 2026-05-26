@@ -9,7 +9,6 @@
  * Agnus owns: SPRxPT pointers, DMA timing, fetch scheduling.
  * Denise owns: latching, interpretation, rendering. */
 
-/* TODO(sprites): implement Agnus→Denise delivery callback.
- * When the slot scheduler runs a sprite DMA slot, Agnus calls back into
- * Denise with the fetched words. Wire this up via an interface in
- * rigel_context or a direct call from agnus_step(). */
+/* Delivery is wired: slot_scheduler.c dispatch_slot() calls
+ * denise_sprite_receive_ctrl / denise_sprite_receive_data from sprites.c
+ * for each AGNUS_SLOT_SPRITE_N slot. No additional callback needed. */
