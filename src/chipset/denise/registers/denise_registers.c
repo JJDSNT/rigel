@@ -10,7 +10,6 @@
 enum {
     RIGEL_REG_CLXDAT   = 0x00e,
     RIGEL_REG_CLXCON   = 0x098,
-    RIGEL_REG_COLOR31  = 0x1be,
     RIGEL_REG_SPR0POS  = 0x140,
     RIGEL_REG_SPR7DATB = 0x17e
 };

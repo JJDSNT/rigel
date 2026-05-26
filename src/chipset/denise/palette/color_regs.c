@@ -2,8 +2,6 @@
 
 #include "rigel/rigel_custom.h"
 
-enum { RIGEL_REG_COLOR31 = 0x1be };
-
 rigel_u32 rigel_denise_color_expand_12bit(rigel_u16 value)
 {
     rigel_u32 r = (rigel_u32)((value >> 8) & 0x0f);
