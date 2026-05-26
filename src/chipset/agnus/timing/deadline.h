@@ -5,12 +5,9 @@
 
 /* Per-subsystem deadline contributions for rigel_get_next_deadline().
  *
- * The current implementation in core/rigel.c contains:
- *   "TODO: each domain should expose its next wake time; aggregate here"
- *
- * This header is the resolution of that TODO. Each Agnus subsystem computes
- * "how many cycles until my next observable event?" and deposits it here.
- * The aggregate minimum becomes the return value of rigel_get_next_deadline().
+ * Each Agnus subsystem computes "how many cycles until my next observable
+ * event?" and deposits it here. The aggregate minimum is returned by
+ * rigel_get_next_deadline().
  *
  * AGNUS_DEADLINE_UNKNOWN means the subsystem has no pending event and should
  * not constrain the deadline. The aggregate ignores UNKNOWN entries. */
@@ -27,13 +24,11 @@ typedef struct agnus_deadlines {
     rigel_u32 beam_line_end;
 
     /* VERTB: cycles until the next vertical blank IRQ trigger point (vpos=0, hpos=1).
-     * Source: agnus_cycles_to_vertb() in timing/vblank.h.
-     * TODO: wire up in core/rigel.c once vblank.h is integrated. */
+     * Source: agnus_cycles_to_vertb() in timing/vblank.h. */
     rigel_u32 vertb;
 
     /* Copper: cycles until the copper's armed WAIT target is reached.
-     * Source: copper_domain — needs a "cycles_to_wait_target(beam, copper)" helper.
-     * TODO: implement in domains/copper once beam model is complete. */
+     * Source: rigel_copper_domain_cycles_to_wait() in domains/copper. */
     rigel_u32 copper_wait;
 
     /* Audio: cycles until the next audio period expiry (sample output).

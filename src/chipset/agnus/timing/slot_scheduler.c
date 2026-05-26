@@ -25,8 +25,7 @@
  * Internal: slot dispatch
  *
  * Called once per CCK for the slot owner. Domains own state; this is
- * purely a call-routing layer. All TODOs here point at missing domain
- * slot-step functions that need to be added as Approach C is implemented.
+ * purely a call-routing layer.
  * ========================================================================= */
 
 static void dispatch_slot(agnus_slot_owner_t owner,

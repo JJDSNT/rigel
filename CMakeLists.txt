@@ -73,7 +73,6 @@ add_library(rigel
     src/chipset/denise/render/dualpf.c
     src/chipset/denise/render/ehb.c
     src/chipset/denise/render/ham.c
-    src/chipset/denise/render/pixel_pipeline.c
     src/chipset/denise/render/playfield.c
     src/chipset/denise/render/priority.c
     src/chipset/denise/output/planar.c

@@ -21,7 +21,6 @@ uint8_t denise_sprite_attached_pixel(const denise_sprites_state_t *s,
     if (even_sp >= DENISE_SPRITE_COUNT - 1 || (even_sp & 1u)) return 0;
     odd_sp = even_sp + 1;
 
-    /* TODO(sprites): shift out bits from even+odd data/datb at hpos */
     lo = denise_sprite_pixel(s, even_sp, hpos);
     hi = denise_sprite_pixel(s, odd_sp,  hpos);
 

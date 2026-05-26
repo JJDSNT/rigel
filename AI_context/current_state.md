@@ -125,6 +125,10 @@
   - `test_sprites`: hstart/vstart/vstop, pixel shifting, transparency, attached detection
 - Priority fix: `denise_priority_resolve` was double-mapping sprite pixel index; corrected to pass palette index as-is
 
+- Dead code removed: `pixel_pipeline.c/h` (compositor implementa o pipeline inline em `compose_line`), `scanline.c/h` (API nunca chamada), `agnus/dma/dma.c/h` e `agnus/timing/beam.c/h` (stubs de forwarding sem callers), `agnus/bitplanes/display_window.c/h` (substituído por raster.c)
+- `agnus_irq.c` reduzido a `agnus_irq_raise_vblank`; `raise_blitter_done` e `raise_copper` eram dead code (blitter usa `BlitterIrqSink`, copper não levanta IRQ pelo agnus_irq path)
+- Todos os comentários TODO obsoletos limpos (deadline.h, slot_scheduler.c, sprite_attach.c)
+
 - Denise keeps its internal split as the canonical direction for visual work:
   - `registers/`
   - `render/`
