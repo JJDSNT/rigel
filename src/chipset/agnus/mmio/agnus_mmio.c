@@ -1,6 +1,7 @@
 #include "agnus/mmio/agnus_mmio.h"
 
 #include "agnus/copper/copper_regs.h"
+#include "agnus/mmio/agnus_regs.h"
 #include "domains/copper/copper_domain.h"
 #include "domains/blitter/blitter_domain.h"
 #include "rigel/rigel_custom.h"
@@ -18,6 +19,10 @@ bool rigel_agnus_mmio_has_reg(rigel_u32 addr)
 
     /* BPL1PTH-BPL6PTL: 0x0E0-0x0F6 (even addresses) */
     if (addr >= RIGEL_REG_BPL1PTH && addr <= RIGEL_REG_BPL6PTL && (addr & 1u) == 0u) {
+        return true;
+    }
+
+    if (addr == AGNUS_BPLMOD1 || addr == AGNUS_BPLMOD2) {
         return true;
     }
 

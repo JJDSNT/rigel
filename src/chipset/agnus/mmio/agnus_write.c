@@ -6,6 +6,8 @@
 #include "agnus/copper/copper_regs.h"
 #include "agnus/dma/sprite_dma.h"
 #include "agnus/mmio/agnus_regs.h"
+
+#include "agnus/timing/raster.h"
 #include "agnus/timing/slot_scheduler.h"
 #include "core/rigel_context.h"
 #include "domains/blitter/blitter_domain.h"
@@ -43,6 +45,7 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
         );
         break;
     case RIGEL_REG_DDFSTRT:
+        raster_set_ddfstrt(&ctx->chipset.agnus.raster, value);
         agnus_slot_scheduler_set_ddf(
             &ctx->chipset.agnus.scheduler,
             value,
@@ -51,11 +54,20 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
         rigel_context_write_reg(ctx, addr, value);
         break;
     case RIGEL_REG_DDFSTOP:
+        raster_set_ddfstop(&ctx->chipset.agnus.raster, value);
         agnus_slot_scheduler_set_ddf(
             &ctx->chipset.agnus.scheduler,
             ctx->chipset.agnus.scheduler.ddfstrt,
             value
         );
+        rigel_context_write_reg(ctx, addr, value);
+        break;
+    case AGNUS_BPLMOD1:
+        bplpt_set_modulo(&ctx->chipset.agnus.bplpt, 0, value);
+        rigel_context_write_reg(ctx, addr, value);
+        break;
+    case AGNUS_BPLMOD2:
+        bplpt_set_modulo(&ctx->chipset.agnus.bplpt, 1, value);
         rigel_context_write_reg(ctx, addr, value);
         break;
     default:
