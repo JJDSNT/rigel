@@ -25,11 +25,10 @@
 ## Near-Term Targets (fidelidade e completude)
 
 - `paula_disk`: melhorar `DSKBYTR`, `DSKDATR`, `DSKSYNC`, `ADKCON`, drive-selection real DF0–DF3
-- `audio`: stepping mais fiel ao DMA fetch/service por canal
+- `audio`: stepping mais fiel ao DMA fetch/service por canal; `RIGEL_EVENT_AUDIO_READY` ainda não dispara
 - slot scheduler: disk `_step_slot()`, audio `_step_slot()`, sprite DMA `_step_slot()`
-- `denise`: BPLCON0 hires bit (+4 extra slots), BPLCON1 scroll offsets, sprite composition, dual-playfield / HAM
-- Sprite DMA: fetch em Agnus, interpretação/composição em Denise
-- Timing deadlines: contribuições de audio e disk
+- `denise`: BPLCON1 scroll offsets para PF2; dirty-lines bitmask; frame flags (interlace, copper-active)
+- Sprite DMA: fetch em Agnus, interpretação/composição em Denise (wired, mas sem testes de integração completos)
 
 ## Medium-Term
 

@@ -1,6 +1,6 @@
 # API Integration Status
 
-_Last updated: 2026-05-23 — CIA, teclado, serial, AUDIO\_READY, RTC config, fire button, sprite DMA, CIA-B → floppy DF1-3, INDEX pulse, BPLCON1 scroll, BPLCON0 hires, rigel\_get\_chipset privatizado, HAM6, dual-playfield, EHB, sprite/PF priority (BPLCON2), attached sprites, rigel\_get\_scanline, frame flags + delta, CLXDAT/CLXCON collision detection_
+_Last updated: 2026-05-26 — frame double-buffering, BPL1MOD/BPL2MOD, audio+disk deadline contributions, blitter LINE mode per-slot, raster config, refresh DMA, DIWSTRT/DIWSTOP cross-domain fix, BPLCON0/1/2 consolidated, Denise render unit tests (priority/HAM/dualpf/sprites), priority double-map fix_
 
 Legend: ✅ done · ⚠️ partial / known issue · ❌ missing
 
@@ -125,14 +125,12 @@ relação um ao outro.
 
 ---
 
-### Frame buffer sem double-buffering ⚠️
+### Frame buffer double-buffering ✅
 
-O frame buffer (`frame_rgba[312][1024]`) é único. Quando `FRAME_READY` dispara,
-o primeiro `rigel_step` seguinte já pode sobrescrever a linha 0. Para uso
-single-thread a janela é segura; para hosts async (render thread separado) há
-race condition.
-
-**Acção futura:** double-buffer interno + swap no FRAME_READY.
+`frame_rgba[2][MAX_LINES][MAX_PIXELS]` com `front_idx` atómico por frame.
+Denise escreve sempre para `frame_rgba[1 ^ front_idx]`; no boundary de frame
+`front_idx ^= 1`. Hosts single-thread e async lêem `frame_rgba[front_idx]`
+sem race condition dentro do mesmo `rigel_step`.
 
 ---
 
@@ -144,7 +142,7 @@ race condition.
 | `rigel_frame_t.delta` (dirty lines bitmask) | ✅ | `dirty_lines[5]` — 1 bit/linha; pending→completed no frame boundary |
 | Pixel format config (`RGBA8888` / `RGB565` / `INDEXED_8BIT`) | ❌ | default actual: RGBA8888 |
 | `rigel_get_scanline(ctx, y)` por linha arbitrária | ✅ | raster y 0-311; `pixels_rgba` → frame_rgba[y][visible_x_start] |
-| Double-buffering de frame | ❌ | depende de p3 estabilizar |
+| Double-buffering de frame | ✅ | `frame_rgba[2]` + `front_idx`; swap atómico no boundary de frame |
 | AUDIO_READY por-período com timestamp | ❌ | depende de P2 audio_ready |
 | DF1–3 INDEX pulse para CIA-B TOD | ✅ | 300 RPM sintético via CCK counter |
 | `rigel_snapshot_t` completo | ❌ | depende de estado interno estabilizar |
@@ -164,10 +162,10 @@ race condition.
 |---|---|---|---|---|---|
 | Beam / raster | ✅ | ✅ | — | ✅ | slot scheduler activo |
 | Copper | ✅ | ✅ | ✅ | via events | MOVE/WAIT/SKIP completo |
-| Blitter | ✅ | ✅ | ✅ | via events | BLTPRI + nasty |
-| Bitplane DMA | ✅ | ✅ | — | `rigel_get_frame` | planar→chunky feito |
-| Audio | ✅ | ✅ | ✅ | `rigel_get_audio_sample` | AUDIO_READY não dispara |
-| Disk / floppy | ✅ | ✅ | ✅ | insert/eject/status | DF0-3 CIA-B PRB wired ✅ |
+| Blitter | ✅ | ✅ | ✅ | via events | BLTPRI + nasty; LINE mode per-slot via `blitter_line_step` |
+| Bitplane DMA | ✅ | ✅ | — | `rigel_get_frame` | planar→chunky feito; BPL1MOD/BPL2MOD aplicados fim-de-linha |
+| Audio | ✅ | ✅ | ✅ | `rigel_get_audio_sample` | AUDIO_READY não dispara; deadline `audio_cycles_to_next_event` wired |
+| Disk / floppy | ✅ | ✅ | ✅ | insert/eject/status | DF0-3 CIA-B PRB wired ✅; deadline `disk_cycles_to_next_event` wired |
 | Serial | ✅ | ✅ | ✅ | ✅ `rigel_serial_*` | TX FIFO 16 bytes, RBF+TBE IRQ |
 | Input (joy/pot/mouse) | ✅ | ✅ | — | ✅ | joydat, fire(CIA-A), pot buttons |
 | Teclado | ✅ via CIA-B SDR | ✅ | ✅ EXTER | `rigel_keyboard_inject` | ✅ |

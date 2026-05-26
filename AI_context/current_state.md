@@ -103,6 +103,28 @@
   - at each `AGNUS_SLOT_BITPLANE` CCK, `bitplane_fetch_step()` reads chip RAM, stores the word, advances the pointer
   - fetched word is written to `denise->output.plane_words[plane][widx]`
   - `fetch_plane_index` tracks interleaved plane cycling (0→depth-1 per word); `plane_word_count` increments per word-group
+- Frame double-buffering implemented:
+  - `frame_rgba[2][MAX_LINES][MAX_PIXELS]` + `front_idx` in `denise_output_state_t`
+  - Denise writes to `frame_rgba[1^front_idx]`; at frame boundary `front_idx ^= 1`
+  - Host reads `frame_rgba[front_idx]` via `rigel_get_frame` / `rigel_get_scanline`
+- BPL1MOD/BPL2MOD (0x108/0x10A) fully wired:
+  - `bplmod[2]` (signed) in `bitplane_pointers_t`
+  - Set via MMIO; applied to each active plane pointer at end of every non-VBL display line by the slot scheduler
+- DIWSTRT/DIWSTOP cross-domain: both registers live in the Denise MMIO domain; `rigel_denise_write_reg` propagates to Agnus raster + slot scheduler (same pattern as BPLCON0 HIRES)
+- BPLCON0/1/2 register constants moved to `rigel_custom.h` (were split between public header and local enums in Denise)
+- Audio deadline wired: `audio_cycles_to_next_event()` contributes to `rigel_get_next_deadline()`
+- Disk deadline wired: `disk_cycles_to_next_event()` contributes to `rigel_get_next_deadline()`
+- Blitter LINE mode active: `blitter_step_dma` dispatches to `blitter_line_step` per DMA slot instead of reference execute
+- Raster config implemented: `raster_reset`, `raster_in_display_window`, `raster_in_fetch_window` now functional (was all TODO stubs)
+- Refresh DMA wired: `refresh_dma_step` called at each `AGNUS_SLOT_REFRESH` CCK
+- Copper MOVE/WAIT/SKIP fully implemented: `copper_exec_move` routes via `custom_regs_write16`; `copper_exec_skip_test` uses `copper_beam_cmp`; `copper_wait_arm` stores VP/HP with masks
+- Denise render unit tests added to CTest (22 tests total):
+  - `test_priority`: 8 cases covering sprite/playfield priority from BPLCON2
+  - `test_ham`: HAM6 (ctrl bits[5:4]) and HAM8 (ctrl bits[7:6]) decode
+  - `test_dualpf`: plane splitting + priority resolution
+  - `test_sprites`: hstart/vstart/vstop, pixel shifting, transparency, attached detection
+- Priority fix: `denise_priority_resolve` was double-mapping sprite pixel index; corrected to pass palette index as-is
+
 - Denise keeps its internal split as the canonical direction for visual work:
   - `registers/`
   - `render/`
