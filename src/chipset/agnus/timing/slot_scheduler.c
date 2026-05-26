@@ -8,6 +8,7 @@
 #include "agnus/bitplanes/bitplane_fetch.h"
 #include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/dma/dmacon.h"
+#include "agnus/dma/refresh_dma.h"
 #include "agnus/blitter/blitter.h"
 #include "agnus/copper/copper_service.h"
 #include "agnus/dma/sprite_dma.h"
@@ -42,7 +43,7 @@ static void dispatch_slot(agnus_slot_owner_t owner,
         break;
 
     case AGNUS_SLOT_REFRESH:
-        /* Chip RAM self-refresh — transparent to software, no domain call. */
+        if (ctx) refresh_dma_step(&ctx->chipset.agnus.refresh, 1);
         break;
 
     case AGNUS_SLOT_DISK:
@@ -193,10 +194,11 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
         fill_slot(sched, AGNUS_HPOS_SPRITE_7_B, AGNUS_SLOT_SPRITE_7);
     }
 
-    /* Bitplane DMA — suppressed during VBL.
+    /* Bitplane DMA — suppressed during VBL and outside the vertical display window.
      * Range is derived from DDFSTRT/DDFSTOP (written via MMIO).
      * Hires mode (BPLCON0 bit 15): fills every CCK slot instead of every other. */
-    if (!vbl && dmacon_bplen(sched->dmacon)) {
+    if (!vbl && dmacon_bplen(sched->dmacon) &&
+        vpos >= sched->vdiwstrt && vpos <= sched->vdiwstop) {
         rigel_u16 h;
         rigel_u16 bpl_start = sched->ddfstrt;
         rigel_u16 bpl_stop  = sched->ddfstop < (AGNUS_SLOTS_PER_LINE - 4u)
@@ -231,6 +233,8 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
     sched->dmacon            = 0;
     sched->ddfstrt           = AGNUS_HPOS_BITPLANE_START;
     sched->ddfstop           = AGNUS_SLOTS_PER_LINE;    /* no upper limit until host sets it */
+    sched->vdiwstrt          = AGNUS_VBL_LINE_END + 1u; /* PAL default: active display starts at line 26 */
+    sched->vdiwstop          = 255u;                    /* PAL default: last active line */
     sched->line_is_vbl       = false;
     sched->table_dirty       = true;
     sched->copper_active     = false;
@@ -262,6 +266,14 @@ void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
 {
     sched->ddfstrt     = (rigel_u16)(ddfstrt & 0x00FCu);
     sched->ddfstop     = (rigel_u16)(ddfstop & 0x00FCu);
+    sched->table_dirty = true;
+}
+
+void agnus_slot_scheduler_set_diw(agnus_slot_scheduler_t *sched,
+                                   rigel_u16 vdiwstrt, rigel_u16 vdiwstop)
+{
+    sched->vdiwstrt    = vdiwstrt & 0xFFu;
+    sched->vdiwstop    = vdiwstop & 0xFFu;
     sched->table_dirty = true;
 }
 
@@ -308,6 +320,11 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
         if (beam->hpos == 0) {
             sched->table_dirty = true;  /* new line: VBL status may change */
             sched->fetch_plane_index = 0;
+            /* Apply BPL1MOD/BPL2MOD at the end of each active display line */
+            if (ctx && !sched->line_is_vbl) {
+                unsigned depth = (ctx->chipset.denise.regs.bplcon0 >> 12) & 0x7u;
+                bplpt_apply_modulo(&ctx->chipset.agnus.bplpt, depth);
+            }
         }
         if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos))
             agnus_irq_raise_vblank(ctx);

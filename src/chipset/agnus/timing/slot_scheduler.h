@@ -95,8 +95,7 @@ enum {
 
     /* Bitplane DMA — begins at DDFSTRT, ends at DDFSTOP.
      * The exact start position depends on BPLCON0 (hires/lores) and DDFSTRT.
-     * Only present on active scan lines. Enabled by BPLEN.
-     * TODO(slot_scheduler): derive dynamically from DDFSTRT register. */
+     * Only present on active scan lines within the vertical DIW. Enabled by BPLEN. */
     AGNUS_HPOS_BITPLANE_START = 0x35,
 };
 
@@ -116,6 +115,8 @@ typedef struct agnus_slot_scheduler {
     rigel_u16 dmacon;     /* DMACON value at last rebuild   */
     rigel_u16 ddfstrt;    /* bitplane fetch start hpos      */
     rigel_u16 ddfstop;    /* bitplane fetch stop hpos       */
+    rigel_u16 vdiwstrt;   /* DIWSTRT vertical start (bits[15:8]) — bitplane DMA inhibited above */
+    rigel_u16 vdiwstop;   /* DIWSTOP vertical stop  (bits[15:8]) — bitplane DMA inhibited below */
     bool      line_is_vbl; /* true = VBL line, sprite/bpl suppressed */
 
     /* Set when DMACON/DDF is written; clears after next rebuild */
@@ -151,6 +152,11 @@ void agnus_slot_scheduler_invalidate(agnus_slot_scheduler_t *sched, rigel_u16 dm
 void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
                                    rigel_u16 ddfstrt, rigel_u16 ddfstop);
 
+/* Call whenever DIWSTRT or DIWSTOP is written — updates the vertical DIW range.
+ * vdiwstrt = DIWSTRT[15:8], vdiwstop = DIWSTOP[15:8]. */
+void agnus_slot_scheduler_set_diw(agnus_slot_scheduler_t *sched,
+                                   rigel_u16 vdiwstrt, rigel_u16 vdiwstop);
+
 /* Call whenever BPLCON0 bit 15 (hires) changes — marks the table for rebuild. */
 void agnus_slot_scheduler_set_hires(agnus_slot_scheduler_t *sched, bool hires);
 
@@ -163,8 +169,7 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
 void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
                                rigel_u16 line_clocks, rigel_u16 frame_lines);
 
-/* Step until `cycles` CCKs have elapsed — the inner loop of rigel_agnus_step().
- * TODO(slot_scheduler): replace rigel_agnus_step() body with this call. */
+/* Step until `cycles` CCKs have elapsed — the inner loop of rigel_agnus_step(). */
 void agnus_slot_scheduler_step_until(agnus_slot_scheduler_t *sched, RigelContext *ctx,
                                      rigel_u32 cycles,
                                      rigel_u16 line_clocks, rigel_u16 frame_lines);

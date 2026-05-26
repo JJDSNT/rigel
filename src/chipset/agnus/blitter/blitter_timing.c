@@ -65,6 +65,7 @@ void blitter_start_timing(BlitterState *b)
 
     memset(&b->result, 0, sizeof(b->result));
     b->dma_slots_consumed = 0;
+    b->line_d = 0;
     b->cycles_remaining =
         blitter_estimate_cycles(&b->cmd);
 

@@ -1,7 +1,7 @@
 #ifndef RIGEL_AGNUS_BLITTER_LINE_H
 #define RIGEL_AGNUS_BLITTER_LINE_H
 
-#include "blitter_types.h"
+#include "blitter.h"
 
 /* Blitter line-draw mode (Bresenham).
  *

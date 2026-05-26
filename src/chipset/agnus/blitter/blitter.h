@@ -54,6 +54,9 @@ typedef struct BlitterState
     uint32_t dma_slots_consumed;
 
     bool debug_trace;
+
+    /* Incremental line-mode state — valid between blitter_line_step() calls. */
+    int16_t line_d;
 } BlitterState;
 
 #ifdef __cplusplus
