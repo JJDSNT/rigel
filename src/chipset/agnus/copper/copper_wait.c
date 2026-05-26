@@ -1,22 +1,23 @@
 #include "copper_wait.h"
 
-/* TODO(copper): implement WAIT arm and satisfaction test.
- * Reference: HRM "Copper Instructions" — WAIT beam comparison with mask. */
+/* WAIT/SKIP format (HRM "Copper Instructions"):
+ *   IR1 bits[15:8] = VPOS, bits[7:1] = HPOS, bit 0 = 1
+ *   IR2 bits[15:8] = VPMASK, bits[7:1] = HPMASK, bit 0 = 0 (WAIT) or 1 (SKIP) */
 
 void copper_wait_arm(copper_state_t *copper, rigel_u16 ir1, rigel_u16 ir2)
 {
-    (void)ir2;
-    copper->wait_vpos = (ir1 >> 8) & 0xFFu;
-    copper->wait_hpos = (ir1 >> 1) & 0x7Fu;
-    copper->waiting   = true;
-    /* TODO: store mask from IR2 */
+    copper->wait_vpos   = (ir1 >> 8) & 0xFFu;
+    copper->wait_hpos   = ir1 & 0xFEu;
+    copper->wait_vpmask = (ir2 >> 8) & 0xFFu;
+    copper->wait_hpmask = ir2 & 0xFEu;
+    copper->waiting     = true;
 }
 
 bool copper_wait_satisfied(const copper_state_t *copper,
                            rigel_u16 hpos, rigel_u16 vpos)
 {
     if (!copper->waiting) return true;
-    if (vpos < copper->wait_vpos) return false;
-    if (vpos > copper->wait_vpos) return true;
-    return hpos >= copper->wait_hpos;
+    return copper_beam_cmp(vpos, hpos,
+                           copper->wait_vpos, copper->wait_hpos,
+                           copper->wait_vpmask, copper->wait_hpmask);
 }
