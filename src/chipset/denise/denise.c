@@ -1,5 +1,6 @@
 #include "denise/denise_state.h"
 
+#include "rigel/rigel_custom.h"
 #include "denise/debug/denise_trace.h"
 #include "denise/output/framebuffer.h"
 #include "denise/palette/palette.h"
@@ -7,10 +8,9 @@
 #include "denise/render/compositor.h"
 #include "denise/sprites/sprites_core.h"
 #include "denise/video/display_window.h"
+#include "agnus/timing/raster.h"
 #include "agnus/timing/slot_scheduler.h"
 #include "core/rigel_context.h"
-
-enum { RIGEL_REG_BPLCON0 = 0x100, RIGEL_BPLCON0_HIRES = 0x8000 };
 
 void rigel_denise_reset(RigelDenise *denise)
 {
@@ -84,7 +84,25 @@ void rigel_denise_write_reg(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
     if (addr == RIGEL_REG_BPLCON0) {
         agnus_slot_scheduler_set_hires(
             &ctx->chipset.agnus.scheduler,
-            (value & RIGEL_BPLCON0_HIRES) != 0
+            (value & 0x8000u) != 0
+        );
+    }
+
+    /* DIWSTRT/DIWSTOP gate both Denise's display window and Agnus's bitplane DMA window */
+    if (addr == RIGEL_REG_DIWSTRT) {
+        raster_set_diwstrt(&ctx->chipset.agnus.raster, value);
+        agnus_slot_scheduler_set_diw(
+            &ctx->chipset.agnus.scheduler,
+            (value >> 8) & 0xFFu,
+            ctx->chipset.agnus.scheduler.vdiwstop
+        );
+    }
+    if (addr == RIGEL_REG_DIWSTOP) {
+        raster_set_diwstop(&ctx->chipset.agnus.raster, value);
+        agnus_slot_scheduler_set_diw(
+            &ctx->chipset.agnus.scheduler,
+            ctx->chipset.agnus.scheduler.vdiwstrt,
+            (value >> 8) & 0xFFu
         );
     }
 }
