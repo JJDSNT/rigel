@@ -46,15 +46,20 @@ uint32_t blitter_estimate_cycles(const BlitCommand *cmd)
      *   - fill mode timing
      */
 
-    uint32_t words =
-        (uint32_t)cmd->width_words *
-        (uint32_t)cmd->height_lines;
+    uint32_t cycles;
 
-    if (words == 0) {
-        words = 1;
+    if (cmd->mode == BLITTER_MODE_LINE) {
+        /* Line mode: one pixel per ~4 DMA cycles (A bitmask, B pattern, C read, D write). */
+        cycles = (uint32_t)cmd->height_lines * 4u;
+    } else {
+        cycles = (uint32_t)cmd->width_words * (uint32_t)cmd->height_lines;
     }
 
-    return words;
+    if (cycles == 0) {
+        cycles = 1;
+    }
+
+    return cycles;
 }
 
 void blitter_start_timing(BlitterState *b)
@@ -64,8 +69,8 @@ void blitter_start_timing(BlitterState *b)
     b->exec_state = BLITTER_EXEC_PENDING;
 
     memset(&b->result, 0, sizeof(b->result));
+    memset(&b->line_state, 0, sizeof(b->line_state));
     b->dma_slots_consumed = 0;
-    b->line_d = 0;
     b->cycles_remaining =
         blitter_estimate_cycles(&b->cmd);
 

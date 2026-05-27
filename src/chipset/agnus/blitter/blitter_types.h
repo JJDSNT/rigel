@@ -53,6 +53,20 @@ typedef enum BlitterExecState {
     BLITTER_EXEC_RUNNING
 } BlitterExecState;
 
+typedef struct BlitterLineState {
+    int16_t  error;
+    uint16_t pattern;
+    uint32_t plane_addr;
+    uint32_t last_addr;
+    int      plane_delta;
+    int      offset_delta;
+    uint16_t step_index;
+    uint16_t last_cdat;
+    uint16_t last_ddat;
+    bool     zero;
+    bool     initialized;
+} BlitterLineState;
+
 typedef struct BlitterRegs {
     uint16_t bltcon0;
     uint16_t bltcon1;

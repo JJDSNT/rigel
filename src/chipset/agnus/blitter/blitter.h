@@ -55,8 +55,7 @@ typedef struct BlitterState
 
     bool debug_trace;
 
-    /* Incremental line-mode state — valid between blitter_line_step() calls. */
-    int16_t line_d;
+    BlitterLineState line_state;
 } BlitterState;
 
 #ifdef __cplusplus
