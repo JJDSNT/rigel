@@ -29,6 +29,8 @@ Agnus is the timing and DMA-facing core of the classic chipset inside Rigel.
 - **ECS minimum surface**: `rigel_config_t.chipset_model` can select ECS.
   Agnus exposes ECS IDs through `VPOSR`, accepts `BEAMCON0` PAL/NTSC selection,
   and Denise exposes `DENISEID` plus `DIWHIGH`.
+- **Chip RAM visibility**: DMA uses a chipset-visible Chip RAM interface.
+  OCS wraps at 512 KiB; ECS currently wraps at 1 MiB.
 
 ## Structural rules
 
@@ -58,5 +60,5 @@ bit 9) and the channel enable bit are set:
 
 - ECS programmable beam timing beyond `BEAMCON0` bit 5
 - ECS SuperHires/Productivity display modes
-- ECS Chip RAM address policy
+- 2 MiB ECS Agnus variants
 - `BPLCON3` display semantics

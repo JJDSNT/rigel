@@ -2,6 +2,81 @@
 
 #include "rigel/rigel_custom.h"
 
+static rigel_u32 rigel_context_chip_ram_visible_size(const RigelContext *ctx)
+{
+    rigel_u32 model_limit;
+
+    if (ctx == NULL) {
+        return 0;
+    }
+
+    model_limit = ctx->config.chipset_model == RIGEL_CHIPSET_ECS
+        ? 0x00100000u
+        : 0x00080000u;
+
+    if (ctx->config.chip_ram_size != 0u &&
+        ctx->config.chip_ram_size < model_limit) {
+        return ctx->config.chip_ram_size;
+    }
+
+    return model_limit;
+}
+
+static rigel_u32 rigel_context_chip_ram_addr(const RigelContext *ctx, rigel_u32 addr)
+{
+    rigel_u32 visible_size = rigel_context_chip_ram_visible_size(ctx);
+
+    addr &= ~1u;
+    if (visible_size == 0u) {
+        return addr;
+    }
+
+    return addr % visible_size;
+}
+
+static rigel_u16 rigel_context_chip_ram_read16(void *opaque, rigel_u32 addr)
+{
+    RigelContext *ctx = (RigelContext *)opaque;
+
+    if (ctx == NULL || ctx->config.chip_ram.read16 == NULL) {
+        return 0;
+    }
+
+    return ctx->config.chip_ram.read16(
+        ctx->config.chip_ram.opaque,
+        rigel_context_chip_ram_addr(ctx, addr)
+    );
+}
+
+static void rigel_context_chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
+{
+    RigelContext *ctx = (RigelContext *)opaque;
+
+    if (ctx == NULL || ctx->config.chip_ram.write16 == NULL) {
+        return;
+    }
+
+    ctx->config.chip_ram.write16(
+        ctx->config.chip_ram.opaque,
+        rigel_context_chip_ram_addr(ctx, addr),
+        value
+    );
+}
+
+rigel_chip_ram_if_t rigel_context_chip_ram(RigelContext *ctx)
+{
+    rigel_chip_ram_if_t mem = { 0 };
+
+    if (ctx == NULL) {
+        return mem;
+    }
+
+    mem.opaque = ctx;
+    mem.read16 = rigel_context_chip_ram_read16;
+    mem.write16 = rigel_context_chip_ram_write16;
+    return mem;
+}
+
 rigel_u16 rigel_context_read_reg(const RigelContext *ctx, rigel_u32 addr)
 {
     if (ctx == NULL) {

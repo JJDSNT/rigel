@@ -9,13 +9,18 @@
 
 static rigel_u16 rigel_agnus_copper_fetch16(RigelContext *ctx, rigel_u32 addr)
 {
-    addr &= 0x001ffffeu;
+    rigel_chip_ram_if_t mem;
 
-    if (ctx == NULL || ctx->config.chip_ram.read16 == NULL) {
+    if (ctx == NULL) {
         return 0;
     }
 
-    return ctx->config.chip_ram.read16(ctx->config.chip_ram.opaque, addr);
+    mem = rigel_context_chip_ram(ctx);
+    if (mem.read16 == NULL) {
+        return 0;
+    }
+
+    return mem.read16(mem.opaque, addr);
 }
 
 void rigel_copper_service_step_program(RigelContext *ctx)

@@ -80,7 +80,7 @@ static void dispatch_slot(agnus_slot_owner_t owner,
             bool ready = sprite_dma_slot(
                 &ctx->chipset.agnus.sprite_dma, sp,
                 ctx->chipset.agnus.beam.vpos, is_b,
-                ctx->config.chip_ram,
+                rigel_context_chip_ram(ctx),
                 &w0, &w1, &is_ctrl);
             if (ready) {
                 if (is_ctrl)
@@ -102,7 +102,7 @@ static void dispatch_slot(agnus_slot_owner_t owner,
             if (depth > 0 && depth <= 6 && plane < depth &&
                 widx < RIGEL_DENISE_MAX_PLANE_WORDS) {
                 bitplane_fetch_step(&agnus->fetch, &agnus->bplpt, plane,
-                                    ctx->config.chip_ram);
+                                    rigel_context_chip_ram(ctx));
                 dout->plane_words[plane][widx] = agnus->fetch.data[plane];
                 plane = (unsigned)(plane + 1u);
                 if (plane >= depth) {

@@ -76,7 +76,7 @@ BlitterMemory rigel_agnus_blitter_memory(RigelContext *ctx)
 {
     BlitterMemory mem;
 
-    mem = ctx->config.chip_ram;
+    mem = rigel_context_chip_ram(ctx);
     return mem;
 }
 

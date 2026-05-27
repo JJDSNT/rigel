@@ -51,7 +51,7 @@ void rigel_audio_domain_step_slot(RigelContext *ctx, int channel)
         return;
     }
 
-    audio_dma_step_slot(&ctx->chipset.paula.audio, channel, ctx->config.chip_ram);
+    audio_dma_step_slot(&ctx->chipset.paula.audio, channel, rigel_context_chip_ram(ctx));
 }
 
 void rigel_audio_domain_write_reg(audio_state_t *audio, rigel_u32 addr, rigel_u16 value)

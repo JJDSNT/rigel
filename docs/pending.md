@@ -22,9 +22,9 @@ expanded. Blocked on internal state stabilising.
 ### Full ECS support is incomplete
 
 Rigel has an ECS feature gate, Agnus/Denise IDs, minimal `BEAMCON0` PAL/NTSC
-handling, and `DIWHIGH`. Full ECS still needs programmable beam timing,
-SuperHires/Productivity modes, ECS Chip RAM address policy, and real `BPLCON3`
-semantics. See `AI_context/ecs_support.md`.
+handling, `DIWHIGH`, and a 1 MiB ECS Chip RAM window. Full ECS still needs
+programmable beam timing, SuperHires/Productivity modes, 2 MiB Agnus variants,
+and real `BPLCON3` semantics. See `AI_context/ecs_support.md`.
 
 ## Harness (`harness/`)
 

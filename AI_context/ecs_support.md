@@ -26,6 +26,11 @@ Implemented ECS pieces:
   with high horizontal and vertical bits.
 - `BPLCON3` (`$106`) is latched/readable in ECS mode, but its display effects
   are intentionally not implemented yet.
+- Chip RAM DMA accesses are routed through the chipset-visible bus interface:
+  - OCS wraps at 512 KiB
+  - ECS wraps at 1 MiB
+  - if `rigel_config_t.chip_ram_size` is smaller than the model limit, the
+    smaller configured size is used as the visible wrap point.
 
 ## Still missing for full ECS
 
@@ -34,8 +39,8 @@ Implemented ECS pieces:
 - SuperHires/ECS Denise output. Current renderer supports lores/hires-era paths,
   but not SHRES pixel cadence, display width, or sprite resolution effects.
 - Productivity/31 kHz modes.
-- ECS Chip RAM address policy: OCS 512 KiB vs ECS 1 MiB/2 MiB visibility should
-  be modelled and tested against DMA pointer masking.
+- 2 MiB ECS Agnus variants are not modelled yet; current ECS policy is the
+  1 MiB HR/Fat Agnus window.
 - `BPLCON3` semantics: sprite resolution (`SPRES`), bank/compare bits, and any
   Denise-side effects needed by ECS software.
 - Broader ECS register map behaviour for currently unimplemented registers:
@@ -46,4 +51,4 @@ Implemented ECS pieces:
 1. Keep chipset model as the feature gate for all ECS-only behaviour.
 2. Add one ECS register at a time with tests that cover OCS ignore/mask behaviour.
 3. Treat SuperHires and productivity as renderer/timing work, not as simple MMIO latches.
-4. Implement Chip RAM address limits before relying on ECS memory claims.
+4. Expand Chip RAM policy only when adding explicit 2 MiB ECS Agnus variants.

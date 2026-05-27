@@ -152,6 +152,7 @@ sem race condition dentro do mesmo `rigel_step`.
 | ECS feature gate + IDs | ✅ | `RIGEL_CHIPSET_ECS`; `VPOSR` Agnus ID; `DENISEID=$00fc` |
 | ECS `BEAMCON0` mínimo | ✅ | bit 5 PAL/NTSC; outros bits mascarados até timing programável |
 | ECS `DIWHIGH` | ✅ | expande `DIWSTRT/DIWSTOP` no modelo ECS |
+| ECS Chip RAM window | ✅ | OCS wrap 512 KiB; ECS wrap 1 MiB; 2 MiB variants pendentes |
 | ECS SuperHires/Productivity | ❌ | requer timing/render próprios |
 | HAM6 mode | ✅ | `ham6_decode_pixel` ligado no compositor; estado prev_rgb por linha |
 | EHB mode (Extra-Half-Brite) | ✅ | automático com 6 planos + !HAM + !DUAL; `ehb_resolve_color` |

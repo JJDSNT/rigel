@@ -1,9 +1,33 @@
 #include "rigel/rigel.h"
+#include "core/rigel_context.h"
+
+typedef struct chip_ram_trace {
+    rigel_u32 last_read_addr;
+    rigel_u32 last_write_addr;
+} chip_ram_trace_t;
+
+static rigel_u16 trace_chip_ram_read16(void *opaque, rigel_u32 addr)
+{
+    chip_ram_trace_t *trace = (chip_ram_trace_t *)opaque;
+
+    trace->last_read_addr = addr;
+    return 0;
+}
+
+static void trace_chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
+{
+    chip_ram_trace_t *trace = (chip_ram_trace_t *)opaque;
+
+    (void)value;
+    trace->last_write_addr = addr;
+}
 
 int main(void)
 {
     rigel_config_t cfg = { 0 };
     rigel_config_t ecs_cfg = { 0 };
+    chip_ram_trace_t ocs_trace = { 0 };
+    chip_ram_trace_t ecs_trace = { 0 };
     RigelContext *ctx = rigel_create(&cfg);
     RigelContext *ecs_ctx;
     rigel_denise_video_desc_t video;
@@ -95,5 +119,49 @@ int main(void)
 
     rigel_destroy(ecs_ctx);
     rigel_destroy(ctx);
+
+    cfg = (rigel_config_t){ 0 };
+    cfg.chip_ram_size = 0x00100000u;
+    cfg.chip_ram.opaque = &ocs_trace;
+    cfg.chip_ram.read16 = trace_chip_ram_read16;
+    cfg.chip_ram.write16 = trace_chip_ram_write16;
+    ctx = rigel_create(&cfg);
+    if (ctx == NULL) {
+        return 1;
+    }
+    {
+        rigel_chip_ram_if_t mem = rigel_context_chip_ram(ctx);
+        (void)mem.read16(mem.opaque, 0x00080000u);
+        mem.write16(mem.opaque, 0x00080002u, 0x1234u);
+    }
+    if (ocs_trace.last_read_addr != 0x00000000u ||
+        ocs_trace.last_write_addr != 0x00000002u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+    rigel_destroy(ctx);
+
+    ecs_cfg = (rigel_config_t){ 0 };
+    ecs_cfg.chipset_model = RIGEL_CHIPSET_ECS;
+    ecs_cfg.chip_ram_size = 0x00100000u;
+    ecs_cfg.chip_ram.opaque = &ecs_trace;
+    ecs_cfg.chip_ram.read16 = trace_chip_ram_read16;
+    ecs_cfg.chip_ram.write16 = trace_chip_ram_write16;
+    ecs_ctx = rigel_create(&ecs_cfg);
+    if (ecs_ctx == NULL) {
+        return 1;
+    }
+    {
+        rigel_chip_ram_if_t mem = rigel_context_chip_ram(ecs_ctx);
+        (void)mem.read16(mem.opaque, 0x00080000u);
+        mem.write16(mem.opaque, 0x00100002u, 0x1234u);
+    }
+    if (ecs_trace.last_read_addr != 0x00080000u ||
+        ecs_trace.last_write_addr != 0x00000002u) {
+        rigel_destroy(ecs_ctx);
+        return 1;
+    }
+    rigel_destroy(ecs_ctx);
+
     return 0;
 }
