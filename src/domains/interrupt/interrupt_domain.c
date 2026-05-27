@@ -2,7 +2,8 @@
 
 bool rigel_interrupt_domain_owns_reg(rigel_u32 addr)
 {
-    return addr == RIGEL_REG_INTENA || addr == RIGEL_REG_INTREQ;
+    return addr == RIGEL_REG_INTENA  || addr == RIGEL_REG_INTREQ ||
+           addr == RIGEL_REG_INTENAR || addr == RIGEL_REG_INTREQR;
 }
 
 static rigel_u8 rigel_interrupt_domain_compute_ipl(const RigelInterruptDomain *irq)
@@ -167,8 +168,10 @@ rigel_u16 rigel_interrupt_domain_read_reg(const RigelInterruptDomain *irq, rigel
 {
     switch (addr) {
     case RIGEL_REG_INTENA:
+    case RIGEL_REG_INTENAR:
         return rigel_interrupt_domain_read_intena(irq);
     case RIGEL_REG_INTREQ:
+    case RIGEL_REG_INTREQR:
         return rigel_interrupt_domain_read_intreq(irq);
     default:
         return 0;

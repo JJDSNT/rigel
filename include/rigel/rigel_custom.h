@@ -17,6 +17,8 @@ enum {
     RIGEL_REG_POT0DAT = 0x012,
     RIGEL_REG_POT1DAT = 0x014,
     RIGEL_REG_POTGOR = 0x016,
+    RIGEL_REG_INTENAR = 0x01c,  /* R  interrupt enable read-back  */
+    RIGEL_REG_INTREQR = 0x01e,  /* R  interrupt request read-back */
     RIGEL_REG_DSKBYTR = 0x01a,
     RIGEL_REG_DSKPTH = 0x020,
     RIGEL_REG_DSKPTL = 0x022,
