@@ -140,9 +140,3 @@ See `docs/` for detailed documentation:
 - `video_output.md` — video pipeline, frame struct, pixel formats, dirty tracking
 - `irq_model.md` — interrupt sources, INTREQ/INTENA, host delivery
 - `memory_map.md` — custom register offsets
-
-## Status
-
-Under active construction. Core structure and domain split are in place.
-Near-term focus: beam model completion (line/frame wrapping), slot scheduler,
-and video output pipeline via Denise.
