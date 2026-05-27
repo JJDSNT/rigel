@@ -148,7 +148,9 @@ static void fill_slot(agnus_slot_scheduler_t *sched,
         sched->table[hpos] = owner;
 }
 
-void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
+void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
+                                  rigel_u16 vpos,
+                                  const refresh_dma_state_t *refresh)
 {
     int i;
     bool vbl = agnus_in_vbl_zone(vpos);
@@ -158,9 +160,11 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
         sched->table[i] = AGNUS_SLOT_CPU;
 
     /* Refresh — always, regardless of DMACON or line type */
-    fill_slot(sched, AGNUS_HPOS_REFRESH_0, AGNUS_SLOT_REFRESH);
-    fill_slot(sched, AGNUS_HPOS_REFRESH_1, AGNUS_SLOT_REFRESH);
-    fill_slot(sched, AGNUS_HPOS_REFRESH_2, AGNUS_SLOT_REFRESH);
+    for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++) {
+        if (refresh_dma_owns_slot(refresh, (rigel_u16)i)) {
+            fill_slot(sched, (rigel_u16)i, AGNUS_SLOT_REFRESH);
+        }
+    }
 
     /* Disk DMA */
     if (dmacon_dsken(sched->dmacon)) {
@@ -290,7 +294,11 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
 
     /* Rebuild slot table if DMACON changed or a new line started */
     if (sched->table_dirty)
-        agnus_slot_scheduler_rebuild(sched, beam ? beam->vpos : 0);
+        agnus_slot_scheduler_rebuild(
+            sched,
+            beam ? beam->vpos : 0,
+            ctx ? &ctx->chipset.agnus.refresh : NULL
+        );
 
     hpos  = sched->hpos;
     owner = sched->table[hpos < AGNUS_SLOTS_PER_LINE ? hpos : 0];

@@ -1,6 +1,8 @@
 #include "rigel/rigel.h"
 #include "core/rigel_context.h"
 
+#include <string.h>
+
 enum {
     TEST_FRAME_CYCLES = 227u * 262u,
     TEST_VISIBLE_Y_START = 26u,
@@ -81,6 +83,7 @@ static void setup_lores_two_bitplanes(RigelContext *ctx, rigel_u16 ddfstrt, rige
 static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
 {
     rigel_frame_t frame;
+    const rigel_u32 *pixels;
 
     rigel_reset(ctx);
     fill_bitplane_words(chip_ram, 0x5555u);
@@ -105,14 +108,19 @@ static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
     if (frame.pixels == NULL) {
         return 1;
     }
+    if (frame.format != RIGEL_PIXEL_RGBA8888 ||
+        frame.pitch != RIGEL_DENISE_MAX_SCANLINE_PIXELS * sizeof(rigel_u32)) {
+        return 1;
+    }
+    pixels = (const rigel_u32 *)frame.pixels;
     /* This is intentionally strict: dirty_lines is currently documented as
      * per-raster-line output, not per-quantum/per-frame coarse invalidation. */
     if ((frame.delta.dirty_lines[TEST_VISIBLE_Y_START / 64u] &
          ((rigel_u64)1u << (TEST_VISIBLE_Y_START % 64u))) == 0u) {
         return 1;
     }
-    if (frame.pixels[0] != 0x000000ffu || frame.pixels[1] != 0x00ffffffu ||
-        frame.pixels[2] != 0x000000ffu || frame.pixels[3] != 0x00ffffffu) {
+    if (pixels[0] != 0x000000ffu || pixels[1] != 0x00ffffffu ||
+        pixels[2] != 0x000000ffu || pixels[3] != 0x00ffffffu) {
         return 1;
     }
 
@@ -122,6 +130,7 @@ static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
 static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
 {
     rigel_frame_t frame;
+    const rigel_u32 *pixels;
 
     rigel_reset(ctx);
     fill_bitplane_words(chip_ram, 0xffffu);
@@ -140,13 +149,14 @@ static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
         return 1;
     if (!rigel_get_frame(ctx, &frame))
         return 1;
-    if (frame.pixels[0] != 0x000000ffu)
+    pixels = (const rigel_u32 *)frame.pixels;
+    if (pixels[0] != 0x000000ffu)
         return 1;
-    if (frame.pixels[7] != 0x000000ffu)
+    if (pixels[7] != 0x000000ffu)
         return 1;
-    if (frame.pixels[8] != 0x00ffffffu)
+    if (pixels[8] != 0x00ffffffu)
         return 1;
-    if (frame.pixels[23] != 0x00ffffffu)
+    if (pixels[23] != 0x00ffffffu)
         return 1;
 
     return 0;
@@ -155,6 +165,7 @@ static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
 static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *chip_ram)
 {
     rigel_frame_t frame;
+    const rigel_u32 *pixels;
 
     rigel_reset(ctx);
     fill_bitplane_words(chip_ram, 0xffffu);
@@ -171,7 +182,8 @@ static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *c
         return 1;
     if (!rigel_get_frame(ctx, &frame))
         return 1;
-    if (frame.pixels[0] != 0x00ffffffu)
+    pixels = (const rigel_u32 *)frame.pixels;
+    if (pixels[0] != 0x00ffffffu)
         return 1;
 
     rigel_custom_write16(ctx, RIGEL_REG_DMACON, RIGEL_DMACON_BPLEN);
@@ -181,7 +193,8 @@ static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *c
         return 1;
     if (!rigel_get_frame(ctx, &frame))
         return 1;
-    if (frame.pixels[0] != 0x000000ffu || frame.pixels[1] != 0x000000ffu)
+    pixels = (const rigel_u32 *)frame.pixels;
+    if (pixels[0] != 0x000000ffu || pixels[1] != 0x000000ffu)
         return 1;
 
     return 0;
@@ -190,6 +203,7 @@ static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *c
 static int test_two_bitplane_fetch_window(RigelContext *ctx, rigel_u16 *chip_ram)
 {
     rigel_frame_t frame;
+    const rigel_u32 *pixels;
 
     rigel_reset(ctx);
     fill_two_bitplane_words(chip_ram, 0x5555u, 0x3333u);
@@ -208,24 +222,81 @@ static int test_two_bitplane_fetch_window(RigelContext *ctx, rigel_u16 *chip_ram
         return 1;
     if (!rigel_get_frame(ctx, &frame))
         return 1;
+    pixels = (const rigel_u32 *)frame.pixels;
 
     /* plane0=0101..., plane1=0011... -> color indices 0,1,2,3 repeating */
-    if (frame.pixels[0] != 0x00000000u ||
-        frame.pixels[1] != 0x000000ffu ||
-        frame.pixels[2] != 0x0000ff00u ||
-        frame.pixels[3] != 0x00ff0000u ||
-        frame.pixels[4] != 0x00000000u ||
-        frame.pixels[5] != 0x000000ffu ||
-        frame.pixels[6] != 0x0000ff00u ||
-        frame.pixels[7] != 0x00ff0000u) {
+    if (pixels[0] != 0x00000000u ||
+        pixels[1] != 0x000000ffu ||
+        pixels[2] != 0x0000ff00u ||
+        pixels[3] != 0x00ff0000u ||
+        pixels[4] != 0x00000000u ||
+        pixels[5] != 0x000000ffu ||
+        pixels[6] != 0x0000ff00u ||
+        pixels[7] != 0x00ff0000u) {
         return 1;
     }
 
-    if (frame.pixels[319] != 0x00ff0000u) {
+    if (pixels[319] != 0x00ff0000u) {
         return 1;
     }
 
     return 0;
+}
+
+static int test_rgb565_frame_format(rigel_u16 *chip_ram)
+{
+    rigel_config_t cfg = { 0 };
+    static rigel_u16 host_framebuffer[256u * TEST_VISIBLE_WIDTH];
+    RigelContext *ctx;
+    rigel_frame_t frame;
+    const rigel_u16 *pixels;
+    int result = 0;
+
+    memset(host_framebuffer, 0, sizeof(host_framebuffer));
+    cfg.chip_ram.opaque = chip_ram;
+    cfg.chip_ram.read16 = test_chip_ram_read16;
+    cfg.chip_ram.write16 = test_chip_ram_write16;
+    cfg.pixel_format = RIGEL_PIXEL_RGB565;
+    cfg.framebuffer.pixels = host_framebuffer;
+    cfg.framebuffer.width = TEST_VISIBLE_WIDTH;
+    cfg.framebuffer.height = 256u;
+    cfg.framebuffer.pitch = TEST_VISIBLE_WIDTH * sizeof(rigel_u16);
+    cfg.framebuffer.format = RIGEL_PIXEL_RGB565;
+    cfg.framebuffer.little_endian = true;
+
+    ctx = rigel_create(&cfg);
+    if (ctx == NULL) {
+        return 1;
+    }
+
+    fill_bitplane_words(chip_ram, 0x5555u);
+    setup_lores_single_bitplane(ctx, 0x0038u, 0x0060u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x000fu);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x0fffu);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0 ||
+        !rigel_get_frame(ctx, &frame)) {
+        result = 1;
+    } else {
+        pixels = (const rigel_u16 *)frame.pixels;
+        if (frame.format != RIGEL_PIXEL_RGB565 ||
+            frame.pitch != RIGEL_DENISE_MAX_SCANLINE_PIXELS * sizeof(rigel_u16) ||
+            pixels == NULL ||
+            pixels[0] != 0x001fu ||
+            pixels[1] != 0xffffu ||
+            host_framebuffer[0] != 0x001fu ||
+            host_framebuffer[1] != 0xffffu) {
+            result = 1;
+        }
+    }
+
+    rigel_destroy(ctx);
+    return result;
 }
 
 int main(void)
@@ -338,6 +409,14 @@ int main(void)
 
     {
         int rc = test_two_bitplane_fetch_window(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_rgb565_frame_format(chip_ram);
         if (rc != 0) {
             rigel_destroy(ctx);
             return 1;

@@ -5,6 +5,7 @@
 #include "rigel/rigel_types.h"
 #include "agnus/agnus_config.h"
 #include "agnus/dma/dmacon.h"
+#include "agnus/dma/refresh_dma.h"
 
 /* Agnus DMA slot scheduler — foundation of Approach C (dma_slot_timing.md).
  *
@@ -159,7 +160,9 @@ void agnus_slot_scheduler_set_hires(agnus_slot_scheduler_t *sched, bool hires);
 
 /* Rebuild the slot table from the current DMACON and beam vpos.
  * Called automatically by step functions when table_dirty is set. */
-void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos);
+void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
+                                  rigel_u16 vpos,
+                                  const refresh_dma_state_t *refresh);
 
 /* Step one CCK slot — dispatch to the owning domain, advance hpos.
  * Handles line wrap internally (hpos resets to 0 at line_clocks). */

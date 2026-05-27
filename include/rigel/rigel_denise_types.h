@@ -1,6 +1,7 @@
 #ifndef RIGEL_DENISE_TYPES_H
 #define RIGEL_DENISE_TYPES_H
 
+#include "rigel_config.h"
 #include "rigel_types.h"
 
 typedef enum rigel_denise_mode_flags {
@@ -51,7 +52,8 @@ typedef struct rigel_frame {
     rigel_u32             height;      /* visible rows */
     rigel_u32             pitch;       /* bytes between row starts */
     rigel_u64             frame_count;
-    const rigel_u32      *pixels;      /* RGBA8888; valid until next rigel_step */
+    rigel_pixel_format_t  format;
+    const void           *pixels;      /* valid until next rigel_step */
     rigel_frame_flags_t   flags;       /* what was active during this frame */
     rigel_frame_delta_t   delta;       /* which raster lines were composed */
 } rigel_frame_t;

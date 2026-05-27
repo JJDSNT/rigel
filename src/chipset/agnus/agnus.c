@@ -41,8 +41,21 @@ void rigel_agnus_reset(RigelAgnus *agnus)
     bitplane_fetch_reset(&agnus->fetch);
     sprite_dma_reset(&agnus->sprite_dma);
     agnus_slot_scheduler_init(&agnus->scheduler);
-    raster_reset(&agnus->raster, AGNUS_VIDEO_PAL);
+    raster_reset(&agnus->raster, AGNUS_VIDEO_NTSC);
+    agnus->beam.line_clocks = agnus->raster.line_clocks;
+    agnus->beam.frame_lines = agnus->raster.frame_lines;
     refresh_dma_reset(&agnus->refresh);
+}
+
+void rigel_agnus_set_video_std(RigelAgnus *agnus, agnus_video_std_t std)
+{
+    if (agnus == NULL) {
+        return;
+    }
+
+    raster_reset(&agnus->raster, std);
+    agnus->beam.line_clocks = agnus->raster.line_clocks;
+    agnus->beam.frame_lines = agnus->raster.frame_lines;
 }
 
 BlitterMemory rigel_agnus_blitter_memory(RigelContext *ctx)
@@ -90,5 +103,5 @@ void rigel_agnus_step(RigelContext *ctx, rigel_u32 cycles)
 
     /* Slot loop drives beam CCK-by-CCK, dispatches copper and blitter (Approach C) */
     agnus_slot_scheduler_step_until(&agnus->scheduler, ctx, cycles,
-                                     agnus->beam.line_clocks, agnus->beam.frame_lines);
+                                     agnus->raster.line_clocks, agnus->raster.frame_lines);
 }

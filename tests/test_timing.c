@@ -1,3 +1,4 @@
+#include "agnus/agnus_state.h"
 #include "rigel/rigel.h"
 
 int main(void)

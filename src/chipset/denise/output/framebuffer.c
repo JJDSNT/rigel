@@ -3,6 +3,86 @@
 #include <string.h>
 #include <stdint.h>
 
+static rigel_u16 rgba8888_to_rgb565(rigel_u32 rgba)
+{
+    rigel_u32 r = (rgba >> 16) & 0xffu;
+    rigel_u32 g = (rgba >> 8) & 0xffu;
+    rigel_u32 b = rgba & 0xffu;
+
+    return (rigel_u16)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+}
+
+static void convert_scanline_rgb565(rigel_u16 *dst, const rigel_u32 *src)
+{
+    rigel_u32 x;
+
+    for (x = 0; x < RIGEL_DENISE_MAX_SCANLINE_PIXELS; ++x) {
+        dst[x] = rgba8888_to_rgb565(src[x]);
+    }
+}
+
+static void store_rgb565_le(rigel_u8 *dst, rigel_u16 value)
+{
+    dst[0] = (rigel_u8)(value & 0xffu);
+    dst[1] = (rigel_u8)(value >> 8);
+}
+
+static void copy_visible_line_to_target(const RigelDenise *denise)
+{
+    const rigel_denise_output_state_t *output;
+    const rigel_framebuffer_target_t *target;
+    rigel_u16 raster_y;
+    rigel_u32 row;
+    rigel_u32 width;
+    rigel_u32 x;
+    rigel_u16 x0;
+    rigel_u8 *dst;
+
+    if (denise == NULL) {
+        return;
+    }
+
+    output = &denise->output;
+    if (!output->has_write_target) {
+        return;
+    }
+
+    target = &output->write_target;
+    raster_y = output->beam_vpos;
+    if (raster_y < denise->video.visible_y_start ||
+        raster_y >= denise->video.visible_y_stop) {
+        return;
+    }
+
+    row = (rigel_u32)(raster_y - denise->video.visible_y_start);
+    if (row >= target->height) {
+        return;
+    }
+
+    width = denise->video.width;
+    if (width > target->width) {
+        width = target->width;
+    }
+
+    x0 = denise->video.visible_x_start;
+    dst = (rigel_u8 *)target->pixels + row * target->pitch;
+
+    if (target->format == RIGEL_PIXEL_RGB565) {
+        for (x = 0; x < width; ++x) {
+            rigel_u16 value = rgba8888_to_rgb565(output->scanline_rgba[x0 + x]);
+            if (target->little_endian) {
+                store_rgb565_le(dst + x * sizeof(rigel_u16), value);
+            } else {
+                ((rigel_u16 *)dst)[x] = value;
+            }
+        }
+    } else {
+        (void)memcpy(dst,
+                     &output->scanline_rgba[x0],
+                     width * sizeof(rigel_u32));
+    }
+}
+
 void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
 {
     if (output == NULL) {
@@ -18,6 +98,7 @@ void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
     output->last_rgb = 0;
     (void)memset(output->scanline_rgba, 0, sizeof(output->scanline_rgba));
     (void)memset(output->frame_rgba, 0, sizeof(output->frame_rgba));
+    (void)memset(output->frame_rgb565, 0, sizeof(output->frame_rgb565));
     output->front_idx = 0;
     (void)memset(output->plane_words, 0, sizeof(output->plane_words));
     output->plane_word_count = 0;
@@ -29,6 +110,42 @@ void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
     output->completed_flags = 0;
     (void)memset(output->pending_dirty,   0, sizeof(output->pending_dirty));
     (void)memset(output->completed_dirty, 0, sizeof(output->completed_dirty));
+    output->has_write_target = false;
+    (void)memset(&output->write_target, 0, sizeof(output->write_target));
+}
+
+void rigel_denise_framebuffer_set_target(rigel_denise_output_state_t *output,
+                                         const rigel_framebuffer_target_t *target)
+{
+    if (output == NULL) {
+        return;
+    }
+
+    output->has_write_target = false;
+    (void)memset(&output->write_target, 0, sizeof(output->write_target));
+
+    if (target == NULL || target->pixels == NULL ||
+        target->width == 0u || target->height == 0u || target->pitch == 0u) {
+        return;
+    }
+
+    if (target->format != RIGEL_PIXEL_RGB565 &&
+        target->format != RIGEL_PIXEL_RGBA8888) {
+        return;
+    }
+
+    if (target->format == RIGEL_PIXEL_RGB565 &&
+        target->pitch < target->width * sizeof(rigel_u16)) {
+        return;
+    }
+
+    if (target->format == RIGEL_PIXEL_RGBA8888 &&
+        target->pitch < target->width * sizeof(rigel_u32)) {
+        return;
+    }
+
+    output->write_target = *target;
+    output->has_write_target = true;
 }
 
 void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_state_t *beam)
@@ -47,9 +164,13 @@ void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_sta
 
     if (line_changed) {
         if (output->beam_vpos < RIGEL_DENISE_MAX_LINES) {
+            rigel_u8 back_idx = (rigel_u8)(1u ^ output->front_idx);
             (void)memcpy(output->frame_rgba[1u ^ output->front_idx][output->beam_vpos],
                          output->scanline_rgba,
                          sizeof(output->scanline_rgba));
+            convert_scanline_rgb565(output->frame_rgb565[back_idx][output->beam_vpos],
+                                    output->scanline_rgba);
+            copy_visible_line_to_target(denise);
         }
         (void)memset(output->plane_words, 0, sizeof(output->plane_words));
         output->plane_word_count = 0;

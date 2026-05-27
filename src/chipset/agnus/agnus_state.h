@@ -31,6 +31,7 @@ typedef struct RigelAgnus {
 } RigelAgnus;
 
 void rigel_agnus_reset(RigelAgnus *agnus);
+void rigel_agnus_set_video_std(RigelAgnus *agnus, agnus_video_std_t std);
 BlitterMemory rigel_agnus_blitter_memory(RigelContext *ctx);
 BlitterIrqSink rigel_agnus_blitter_irq_sink(RigelContext *ctx);
 void rigel_agnus_blitter_step_dma(RigelContext *ctx, rigel_u32 dma_slots);

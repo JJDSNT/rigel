@@ -50,6 +50,7 @@ typedef struct rigel_denise_output_state {
      * Denise writes to frame_rgba[1^front_idx]; host reads frame_rgba[front_idx].
      * Swap at frame boundary: front_idx ^= 1. */
     rigel_u32 frame_rgba[2][RIGEL_DENISE_MAX_LINES][RIGEL_DENISE_MAX_SCANLINE_PIXELS];
+    rigel_u16 frame_rgb565[2][RIGEL_DENISE_MAX_LINES][RIGEL_DENISE_MAX_SCANLINE_PIXELS];
     rigel_u8  front_idx;
     bool visible_scanline;
     bool scanline_dirty;
@@ -66,6 +67,8 @@ typedef struct rigel_denise_output_state {
     rigel_u64 pending_dirty[5];
     rigel_u32 completed_flags;
     rigel_u64 completed_dirty[5];
+    bool has_write_target;
+    rigel_framebuffer_target_t write_target;
 } rigel_denise_output_state_t;
 
 typedef struct RigelDenise {
@@ -80,5 +83,6 @@ typedef struct RigelDenise {
 
 void rigel_denise_reset(RigelDenise *denise);
 void rigel_denise_step(RigelDenise *denise, const beam_state_t *beam, rigel_u32 cycles);
+void rigel_denise_set_framebuffer_target(RigelDenise *denise, const rigel_framebuffer_target_t *target);
 
 #endif

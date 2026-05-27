@@ -67,8 +67,10 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
         break;
     case AGNUS_BEAMCON0:
         /* Bit 5 (VARVSYEN/PAL): 1 = PAL 312 lines, 0 = NTSC 262 lines */
-        ctx->chipset.agnus.beam.frame_lines =
-            (value & 0x0020u) ? AGNUS_PAL_FRAME_LINES : AGNUS_NTSC_FRAME_LINES;
+        rigel_agnus_set_video_std(
+            &ctx->chipset.agnus,
+            (value & 0x0020u) ? AGNUS_VIDEO_PAL : AGNUS_VIDEO_NTSC
+        );
         rigel_context_write_reg(ctx, addr, value);
         break;
     default:

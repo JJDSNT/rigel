@@ -61,10 +61,6 @@ RigelContext *rigel_create(const rigel_config_t *config)
     ctx->config = *config;
     rigel_reset(ctx);
 
-    if (config->video_std == RIGEL_VIDEO_PAL) {
-        ctx->chipset.agnus.beam.frame_lines = AGNUS_PAL_FRAME_LINES;
-    }
-
     rigel_paula_set_disk_memory_if(&ctx->chipset.paula, ctx->config.chip_ram);
     rigel_paula_set_disk_irq_sink(&ctx->chipset.paula, rigel_paula_disk_irq_sink(ctx));
     rigel_paula_set_serial_irq_sink(&ctx->chipset.paula, rigel_paula_serial_irq_sink(ctx));
@@ -91,6 +87,11 @@ void rigel_reset(RigelContext *ctx)
     }
 
     rigel_chipset_reset(&ctx->chipset);
+    rigel_agnus_set_video_std(
+        &ctx->chipset.agnus,
+        ctx->config.video_std == RIGEL_VIDEO_PAL ? AGNUS_VIDEO_PAL : AGNUS_VIDEO_NTSC
+    );
+    rigel_denise_set_framebuffer_target(&ctx->chipset.denise, &ctx->config.framebuffer);
 }
 
 rigel_u32 rigel_get_clock_hz(const RigelContext *ctx)

@@ -7,34 +7,17 @@ full per-subsystem breakdown.
 
 ## Chipset / library
 
-### `RIGEL_EVENT_AUDIO_READY` does not fire
+### `RIGEL_PIXEL_INDEXED_8BIT` is not implemented
 
-The deadline contribution from the audio domain is wired into
-`rigel_get_next_deadline()`, but the event itself is never raised.
-`rigel_get_audio_sample()` polling still works.
-
-### Pixel format is not configurable
-
-The frame buffer is always RGBA8888. `RGB565` and `INDEXED_8BIT` are planned
-in `rigel_config_t` but not implemented.
+`rigel_config_t.pixel_format` supports `RGBA8888` and `RGB565`. Indexed output
+is still missing because it requires Denise to retain post-priority,
+pre-palette chunky indices, not just convert the completed RGBA frame.
 
 ### `rigel_snapshot_t` captures only 3 fields
 
 `cycles`, `intreq`, `intena` — the rest of the chipset state (copper, blitter,
 audio, disk, beam) is not captured. Do not use for save state until this is
 expanded. Blocked on internal state stabilising.
-
-### `blitter_line_step` not wired into the active path
-
-`blitter_line_step` (per-slot Bresenham) is implemented but
-`blitter_dma.c` still dispatches through `blitter_execute_reference`.
-The incremental path needs to replace the reference backend.
-
-### `raster_config_t` / `refresh_dma_state_t` not wired into `agnus_state.h`
-
-`raster.c` and `refresh_dma.c` are built and functional in isolation but
-their state structs are not embedded in `RigelAgnus`. The slot scheduler
-owns refresh slot placement independently.
 
 ### FRAME_READY vs VBLANK semantics undocumented
 

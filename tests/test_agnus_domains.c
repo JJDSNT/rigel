@@ -18,8 +18,10 @@ static void test_chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
 int main(void)
 {
     rigel_config_t cfg = { 0 };
+    rigel_config_t pal_cfg = { 0 };
     rigel_u16 chip_ram[256] = { 0 };
     RigelContext *ctx;
+    RigelContext *pal_ctx;
     RigelChipset *chipset;
     rigel_step_result_t result;
     rigel_denise_scanline_t scanline;
@@ -43,13 +45,40 @@ int main(void)
         return 1;
     }
 
-    rigel_agnus_step(ctx, 4);
-    if (chipset->agnus.beam.hpos != 4) {
+    if (chipset->agnus.raster.std != AGNUS_VIDEO_NTSC ||
+        chipset->agnus.raster.frame_lines != chipset->agnus.beam.frame_lines ||
+        chipset->agnus.raster.line_clocks != chipset->agnus.beam.line_clocks) {
         rigel_destroy(ctx);
         return 1;
     }
 
-    rigel_agnus_step(ctx, (rigel_u32)(RIGEL_BEAM_DEFAULT_LINE_CLOCKS - 4));
+    pal_cfg.video_std = RIGEL_VIDEO_PAL;
+    pal_ctx = rigel_create(&pal_cfg);
+    if (pal_ctx == NULL ||
+        pal_ctx->chipset.agnus.raster.std != AGNUS_VIDEO_PAL ||
+        pal_ctx->chipset.agnus.raster.frame_lines != AGNUS_PAL_FRAME_LINES ||
+        pal_ctx->chipset.agnus.beam.frame_lines != AGNUS_PAL_FRAME_LINES) {
+        if (pal_ctx != NULL) rigel_destroy(pal_ctx);
+        rigel_destroy(ctx);
+        return 1;
+    }
+    rigel_reset(pal_ctx);
+    if (pal_ctx->chipset.agnus.raster.std != AGNUS_VIDEO_PAL ||
+        pal_ctx->chipset.agnus.beam.frame_lines != AGNUS_PAL_FRAME_LINES) {
+        rigel_destroy(pal_ctx);
+        rigel_destroy(ctx);
+        return 1;
+    }
+    rigel_destroy(pal_ctx);
+
+    rigel_agnus_step(ctx, 6);
+    if (chipset->agnus.beam.hpos != 6 ||
+        chipset->agnus.refresh.pending_cycles != 3u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_agnus_step(ctx, (rigel_u32)(RIGEL_BEAM_DEFAULT_LINE_CLOCKS - 6));
     if (chipset->agnus.beam.hpos != 0 || chipset->agnus.beam.vpos != 1) {
         rigel_destroy(ctx);
         return 1;
@@ -173,8 +202,18 @@ int main(void)
     rigel_custom_write16(ctx, RIGEL_REG_DDFSTRT, 0x0050u);
     rigel_custom_write16(ctx, RIGEL_REG_DDFSTOP, 0x00c0u);
 
-    if (chipset->agnus.scheduler.ddfstrt != 0x0050u ||
+    if (chipset->agnus.raster.ddfstrt != 0x0050u ||
+        chipset->agnus.raster.ddfstop != 0x00c0u ||
+        chipset->agnus.scheduler.ddfstrt != 0x0050u ||
         chipset->agnus.scheduler.ddfstop != 0x00c0u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, RIGEL_REG_DIWSTRT, 0x2c81u);
+    rigel_custom_write16(ctx, RIGEL_REG_DIWSTOP, 0x2cc1u);
+    if (chipset->agnus.raster.diwstrt != 0x2c81u ||
+        chipset->agnus.raster.diwstop != 0x2cc1u) {
         rigel_destroy(ctx);
         return 1;
     }

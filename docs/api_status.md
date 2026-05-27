@@ -62,9 +62,9 @@ RTC auto-avança com clock real do host. `rigel_rtc_set_model/time` continuam di
 
 ### `RIGEL_EVENT_AUDIO_READY` ✅
 
-Dispara quando `audio_mix()` produz um sample novo (pelo menos um período de canal
-disparou e o valor mixado mudou). O host pode acumular amostras event-driven ou
-continuar a usar `rigel_get_audio_sample()` em polling.
+Dispara quando pelo menos um período de canal de áudio vence. O evento não depende
+de mudança no valor mixado, então samples consecutivos idênticos ainda acordam o
+host. O deadline de áudio considera canais recém-armados antes do primeiro step.
 
 ---
 
@@ -140,10 +140,10 @@ sem race condition dentro do mesmo `rigel_step`.
 |---|---|---|
 | `rigel_frame_t.flags` (interlace, HAM, etc.) | ✅ | HAM/DUAL_PF/SPRITES_ACTIVE; INTERLACE/COPPER reservados |
 | `rigel_frame_t.delta` (dirty lines bitmask) | ✅ | `dirty_lines[5]` — 1 bit/linha; pending→completed no frame boundary |
-| Pixel format config (`RGBA8888` / `RGB565` / `INDEXED_8BIT`) | ❌ | default actual: RGBA8888 |
+| Pixel format config (`RGBA8888` / `RGB565` / `INDEXED_8BIT`) | ⚠️ | RGBA8888 default and RGB565 implemented, including external write target; INDEXED_8BIT pending |
 | `rigel_get_scanline(ctx, y)` por linha arbitrária | ✅ | raster y 0-311; `pixels_rgba` → frame_rgba[y][visible_x_start] |
 | Double-buffering de frame | ✅ | `frame_rgba[2]` + `front_idx`; swap atómico no boundary de frame |
-| AUDIO_READY por-período com timestamp | ❌ | depende de P2 audio_ready |
+| AUDIO_READY por-período com timestamp | ⚠️ | evento por período implementado; timestamp específico do sample ainda não |
 | DF1–3 INDEX pulse para CIA-B TOD | ✅ | 300 RPM sintético via CCK counter |
 | `rigel_snapshot_t` completo | ❌ | depende de estado interno estabilizar |
 | Attached sprites (4bpp de pares) | ✅ | CTL bit7 → `denise_sprite_attached_pixel`; paleta 17–31 |
@@ -164,7 +164,7 @@ sem race condition dentro do mesmo `rigel_step`.
 | Copper | ✅ | ✅ | ✅ | via events | MOVE/WAIT/SKIP completo |
 | Blitter | ✅ | ✅ | ✅ | via events | BLTPRI + nasty; LINE mode per-slot via `blitter_line_step` |
 | Bitplane DMA | ✅ | ✅ | — | `rigel_get_frame` | planar→chunky feito; BPL1MOD/BPL2MOD aplicados fim-de-linha |
-| Audio | ✅ | ✅ | ✅ | `rigel_get_audio_sample` | AUDIO_READY não dispara; deadline `audio_cycles_to_next_event` wired |
+| Audio | ✅ | ✅ | ✅ | `rigel_get_audio_sample` | AUDIO_READY por período; deadline `audio_cycles_to_next_event` wired |
 | Disk / floppy | ✅ | ✅ | ✅ | insert/eject/status | DF0-3 CIA-B PRB wired ✅; deadline `disk_cycles_to_next_event` wired |
 | Serial | ✅ | ✅ | ✅ | ✅ `rigel_serial_*` | TX FIFO 16 bytes, RBF+TBE IRQ |
 | Input (joy/pot/mouse) | ✅ | ✅ | — | ✅ | joydat, fire(CIA-A), pot buttons |
@@ -172,6 +172,6 @@ sem race condition dentro do mesmo `rigel_step`.
 | CIA-A / CIA-B | ✅ | ✅ step+MMIO | ✅ PORTS/EXTER | `rigel_cia_read/write` | CIA-B TOD sem /INDEX |
 | RTC | ✅ | ✅ | — | ✅ | config + pós-init |
 | Sprites | ✅ DMA | ✅ SPRxPOS/CTL/DATA/DATB | — | via Denise | overlay+BPLCON2 priority ✅; attached 4bpp ✅; CLXDAT/CLXCON ✅ |
-| Denise video | ✅ | ✅ | — | `rigel_get_frame` / `rigel_get_scanline` | HAM6/EHB/dual-pf/priority/attached ✅; dirty/flags ❌ |
+| Denise video | ✅ | ✅ | — | `rigel_get_frame` / `rigel_get_scanline` / framebuffer target | HAM6/EHB/dual-pf/priority/attached ✅; dirty/flags ✅; RGBA8888/RGB565 |
 | IRQ / IPL | ✅ | ✅ | ✅ | `rigel_get_ipl` | ✅ |
 | Bus observation | ✅ | — | — | `rigel_get_bus_state` | slot-accurate |

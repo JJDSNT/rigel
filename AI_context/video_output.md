@@ -26,7 +26,6 @@ durante o DMA slot sequence. Tirar isso do chipset seria tirar Denise do Rigel.
 
 ```c
 typedef enum rigel_pixel_format {
-    RIGEL_PIXEL_INDEXED_8BIT,    /* índice 0-31 (OCS) / 0-255 (AGA) — pré-palette */
     RIGEL_PIXEL_RGBA8888,        /* MVP: pronto para host copiar */
     RIGEL_PIXEL_RGB565
 } rigel_pixel_format_t;
@@ -143,14 +142,38 @@ Custo adicional: zero se Denise marcar linhas on-the-fly.
 
 ```
 MVP:
-  - rigel_config_t aceita rigel_pixel_format_t (default RGBA8888)
-  - Rigel entrega frame completo em RGBA8888 após RIGEL_EVENT_FRAME_READY
+  - rigel_config_t aceita rigel_pixel_format_t (default RGBA8888) ✅
+  - Rigel entrega frame completo em RGBA8888 após RIGEL_EVENT_FRAME_READY ✅
+  - Rigel entrega frame completo em RGB565 após RIGEL_EVENT_FRAME_READY ✅
   - rigel_get_frame() retorna ponteiro para buffer interno
 
 Depois:
   - rigel_get_scanline() para hosts copper-aware e interlace
   - RIGEL_PIXEL_INDEXED_8BIT para hosts com pipeline de cor próprio
-  - Write target via config (zero-copy para Pi/PiStorm streaming)
+  - Write target via config (zero-copy para Pi/PiStorm streaming) ✅ para RGBA8888/RGB565
+
+## Write target RGB565
+
+Hosts com framebuffer próprio podem preencher `rigel_config_t.framebuffer`:
+
+```c
+cfg.pixel_format = RIGEL_PIXEL_RGB565;
+cfg.framebuffer.pixels = framebuffer;      /* uint16_t* ou memória equivalente */
+cfg.framebuffer.width = width;
+cfg.framebuffer.height = height;
+cfg.framebuffer.pitch = width * sizeof(uint16_t);
+cfg.framebuffer.format = RIGEL_PIXEL_RGB565;
+cfg.framebuffer.little_endian = true;
+```
+
+Denise escreve scanlines visíveis diretamente no target quando uma linha fecha.
+RGB565 usa `((r8 >> 3) << 11) | ((g8 >> 2) << 5) | (b8 >> 3)`; com
+`little_endian = true`, os bytes são armazenados em ordem LE para framebuffer
+SDL/bare-metal.
+
+Nota: `external/libamivideo` é uma referência útil de conversão planar/palette,
+mas não foi usado no framebuffer do Rigel. O chipset já executa a composição de
+Denise; a conversão final RGBA8888→RGB565 é pequena e fica local ao framebuffer.
 ```
 
 ---

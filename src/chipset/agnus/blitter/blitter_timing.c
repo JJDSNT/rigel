@@ -49,8 +49,8 @@ uint32_t blitter_estimate_cycles(const BlitCommand *cmd)
     uint32_t cycles;
 
     if (cmd->mode == BLITTER_MODE_LINE) {
-        /* Line mode: one pixel per ~4 DMA cycles (A bitmask, B pattern, C read, D write). */
-        cycles = (uint32_t)cmd->height_lines * 4u;
+        /* Line mode advances one pixel per granted blitter DMA slot. */
+        cycles = (uint32_t)cmd->height_lines;
     } else {
         cycles = (uint32_t)cmd->width_words * (uint32_t)cmd->height_lines;
     }

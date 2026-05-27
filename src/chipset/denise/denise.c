@@ -57,6 +57,15 @@ void rigel_denise_step(RigelDenise *denise, const beam_state_t *beam, rigel_u32 
     denise->debug.visible_scanline = denise->output.visible_scanline;
 }
 
+void rigel_denise_set_framebuffer_target(RigelDenise *denise, const rigel_framebuffer_target_t *target)
+{
+    if (denise == NULL) {
+        return;
+    }
+
+    rigel_denise_framebuffer_set_target(&denise->output, target);
+}
+
 bool rigel_denise_owns_reg(rigel_u32 addr)
 {
     return rigel_denise_registers_owns_reg(addr);

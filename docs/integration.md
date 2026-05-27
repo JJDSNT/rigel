@@ -33,6 +33,10 @@ while (running) {
 }
 ```
 
+For a host-owned RGB565 framebuffer, configure `rigel_config_t.framebuffer`.
+Denise will write completed visible scanlines directly into that buffer using
+the host pitch; `rigel_get_frame()` remains available for the internal buffer.
+
 Simple hosts can ignore `bus_change`, `cpu_would_stall`, and the per-scanline API —
 the interface is designed so that fine integration is optional, not mandatory.
 
@@ -131,8 +135,9 @@ for (int i = 0; i < num_samples; i++) {
 Call `rigel_get_audio_sample` once per `RIGEL_EVENT_HBLANK` (~15.6 kHz for PAL)
 and resample in the host audio backend.
 
-`RIGEL_EVENT_AUDIO_READY` is reserved for a future DMA-block-complete model and
-is not fired today.
+**Event-driven:**
+`RIGEL_EVENT_AUDIO_READY` fires when at least one Paula audio channel period
+elapses. Read the current mixed sample with `rigel_get_audio_sample(ctx)`.
 
 ## Frame pacing
 

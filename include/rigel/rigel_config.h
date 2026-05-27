@@ -16,6 +16,20 @@ typedef enum rigel_video_std {
     RIGEL_VIDEO_PAL  = 1,
 } rigel_video_std_t;
 
+typedef enum rigel_pixel_format {
+    RIGEL_PIXEL_RGBA8888 = 0,
+    RIGEL_PIXEL_RGB565   = 1
+} rigel_pixel_format_t;
+
+typedef struct rigel_framebuffer_target {
+    void *pixels;
+    rigel_u32 width;
+    rigel_u32 height;
+    rigel_u32 pitch;              /* bytes between row starts */
+    rigel_pixel_format_t format;
+    bool little_endian;           /* applies to RGB565 stores */
+} rigel_framebuffer_target_t;
+
 typedef rigel_u16 (*rigel_chip_ram_read16_fn)(void *opaque, rigel_u32 addr);
 typedef void (*rigel_chip_ram_write16_fn)(void *opaque, rigel_u32 addr, rigel_u16 value);
 
@@ -44,6 +58,8 @@ typedef struct rigel_config {
     rigel_log_fn_t    log_fn;
     void             *log_opaque;
     rigel_video_std_t video_std;
+    rigel_pixel_format_t pixel_format;
+    rigel_framebuffer_target_t framebuffer;
 } rigel_config_t;
 
 #endif

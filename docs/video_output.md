@@ -29,7 +29,8 @@ typedef struct rigel_frame {
     rigel_u32       height;      /* visible rows */
     rigel_u32       pitch;       /* bytes between row starts (use for pointer arithmetic) */
     rigel_u64       frame_count; /* monotone counter — detect dropped frames */
-    const rigel_u32 *pixels;     /* RGBA8888, first visible pixel */
+    rigel_pixel_format_t format; /* RGBA8888 or RGB565 */
+    const void      *pixels;     /* first visible pixel in `format` */
 } rigel_frame_t;
 
 bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame);
@@ -40,8 +41,9 @@ frame buffer (312 lines × 1024 pixels) and is valid until the next `rigel_step`
 that advances past the start of the next frame.
 
 `width` and `height` are the visible region as derived from `DIWSTRT`/`DIWSTOP`.
-`pitch` is always `1024 * sizeof(uint32_t)` (the full buffer stride), which is
-wider than `width * 4` — use `pitch` to advance rows, not `width * 4`.
+`pitch` is the full internal buffer stride, not `width * bytes_per_pixel`.
+For RGBA8888 it is `1024 * sizeof(uint32_t)`; for RGB565 it is
+`1024 * sizeof(uint16_t)`. Use `pitch` to advance rows.
 
 Use `rigel_denise_get_video_desc()` to obtain the visible region offsets if
 needed for precise placement.
@@ -92,9 +94,44 @@ typedef enum rigel_frame_flags {
 } rigel_frame_flags_t;
 ```
 
-**Pixel formats** — `RIGEL_PIXEL_INDEXED_8BIT` (pre-palette chunky index) and
-`RIGEL_PIXEL_RGB565`, configured at `rigel_create` time. The current output is
-always RGBA8888.
+**Pixel formats** — `RIGEL_PIXEL_RGBA8888` is the default and
+`RIGEL_PIXEL_RGB565` is available via `rigel_config_t.pixel_format`.
+`RIGEL_PIXEL_INDEXED_8BIT` remains future work because it needs Denise to retain
+post-priority, pre-palette chunky indices during composition.
+
+### Zero-copy write target
+
+Hosts that own a framebuffer can provide it at `rigel_create` time:
+
+```c
+static uint16_t framebuffer[HEIGHT][WIDTH];
+
+rigel_config_t cfg = {0};
+cfg.pixel_format = RIGEL_PIXEL_RGB565;
+cfg.framebuffer.pixels = framebuffer;
+cfg.framebuffer.width = WIDTH;
+cfg.framebuffer.height = HEIGHT;
+cfg.framebuffer.pitch = WIDTH * sizeof(uint16_t);
+cfg.framebuffer.format = RIGEL_PIXEL_RGB565;
+cfg.framebuffer.little_endian = true;
+```
+
+When configured, Denise writes each completed visible scanline directly into
+that target using the target pitch. RGB565 uses:
+
+```c
+rgb565 = ((r8 >> 3) << 11) | ((g8 >> 2) << 5) | (b8 >> 3);
+```
+
+With `little_endian = true`, the two bytes are stored in little-endian order.
+This matches SDL's `SDL_PIXELFORMAT_RGB565` on little-endian hosts and simple
+bare-metal `uint16_t *` framebuffers. The internal double-buffered frame remains
+available through `rigel_get_frame()`.
+
+`external/libamivideo` was evaluated for this layer. It is useful as a
+standalone planar/palette conversion reference, but Rigel already performs
+Denise composition internally; framebuffer format conversion is kept local to
+avoid coupling the chipset core to a viewport conversion adapter.
 
 **Write target** — zero-copy path for PiStorm/Pi streaming where the host
 supplies a framebuffer pointer at config time.
