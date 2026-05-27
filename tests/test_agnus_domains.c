@@ -24,10 +24,10 @@ int main(void)
     rigel_step_result_t result;
     rigel_denise_scanline_t scanline;
 
-    chip_ram[0x40u >> 1] = 0x0f00u;
-    chip_ram[0x42u >> 1] = RIGEL_REG_COLOR00;
-    chip_ram[0x44u >> 1] = 0x0010u;
-    chip_ram[0x46u >> 1] = 0x0001u;
+    chip_ram[0x40u >> 1] = RIGEL_REG_COLOR00;
+    chip_ram[0x42u >> 1] = 0x0f00u;
+    chip_ram[0x44u >> 1] = 0x0011u;  /* WAIT: vpos=0, hpos=0, bit0=1 */
+    chip_ram[0x46u >> 1] = 0x0000u;  /* mask (bit0=0 = WAIT not SKIP) */
     cfg.chip_ram.opaque = chip_ram;
     cfg.chip_ram.read16 = test_chip_ram_read16;
     cfg.chip_ram.write16 = test_chip_ram_write16;
@@ -100,14 +100,23 @@ int main(void)
         RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_COPEN
     );
     rigel_custom_write16(ctx, RIGEL_REG_COPJMP1, 0);
-    result = rigel_step(ctx, 1);
+    {
+        unsigned i;
+        result.events = RIGEL_EVENT_NONE;
+        for (i = 0; i < RIGEL_BEAM_DEFAULT_LINE_CLOCKS; i++) {
+            result = rigel_step(ctx, 1);
+            if (result.events & RIGEL_EVENT_COPPER) break;
+        }
+    }
 
     if ((result.events & RIGEL_EVENT_COPPER) == 0) {
         rigel_destroy(ctx);
         return 1;
     }
 
-    if (chipset->agnus.copper.program_counter != 0x40u) {
+    /* After VBL reload at (0,1) the copper re-executes from COP1LC=0x40;
+     * pc is 0x44 after that second MOVE completes. */
+    if (chipset->agnus.copper.program_counter != 0x44u) {
         rigel_destroy(ctx);
         return 1;
     }
@@ -118,10 +127,10 @@ int main(void)
     }
 
     rigel_reset(ctx);
-    chip_ram[0x40u >> 1] = 0x1a04u;
-    chip_ram[0x42u >> 1] = 0x0001u;
-    chip_ram[0x44u >> 1] = 0x00f0u;
-    chip_ram[0x46u >> 1] = RIGEL_REG_COLOR00;
+    chip_ram[0x40u >> 1] = 0x1a05u;  /* WAIT: vpos=26, hpos=4, bit0=1 */
+    chip_ram[0x42u >> 1] = 0x0000u;  /* mask: bit0=0 = WAIT not SKIP */
+    chip_ram[0x44u >> 1] = RIGEL_REG_COLOR00;
+    chip_ram[0x46u >> 1] = 0x00f0u;
     rigel_custom_write16(ctx, RIGEL_REG_COP1LCH, 0x0000);
     rigel_custom_write16(ctx, RIGEL_REG_COP1LCL, 0x0040);
     rigel_custom_write16(

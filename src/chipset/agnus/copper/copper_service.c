@@ -1,6 +1,8 @@
 #include "agnus/copper/copper_service.h"
 
 #include "agnus/agnus_state.h"
+#include "agnus/copper/copper_exec.h"
+#include "agnus/copper/copper_wait.h"
 #include "core/rigel_context.h"
 #include "domains/copper/copper_domain.h"
 #include "mmio/custom_regs.h"
@@ -22,7 +24,6 @@ void rigel_copper_service_step_program(RigelContext *ctx)
     copper_state_t *copper;
     rigel_u16 ir1;
     rigel_u16 ir2;
-    rigel_u32 reg;
 
     if (ctx == NULL) {
         return;
@@ -38,35 +39,26 @@ void rigel_copper_service_step_program(RigelContext *ctx)
     ir2 = rigel_agnus_copper_fetch16(ctx, copper->program_counter + 2u);
     copper->fetch_pending = false;
 
-    if ((ir2 & 0x0001u) != 0) {
-        rigel_u16 wait_vpos = (rigel_u16)(ir1 >> 8);
-        rigel_u16 wait_hpos = (rigel_u16)(ir1 & 0xFEu);
-        rigel_u16 vpmask    = (rigel_u16)((ir2 >> 8) & 0xFFu);
-        rigel_u16 hpmask    = (rigel_u16)(ir2 & 0xFEu);
-
-        if (ir1 & 0x0001u) {
-            /* SKIP: evaluate beam condition now; skip next instruction if satisfied */
-            bool skip = copper_beam_cmp(agnus->beam.vpos, agnus->beam.hpos,
-                                        wait_vpos, wait_hpos, vpmask, hpmask);
+    if ((ir1 & 0x0001u) != 0) {
+        /* WAIT or SKIP — IR1 bit 0 = 1 distinguishes from MOVE */
+        if (ir2 & 0x0001u) {
+            /* SKIP: advance past the next instruction if beam condition is met */
+            bool skip = copper_exec_skip_test(ir1, ir2,
+                                              agnus->beam.hpos, agnus->beam.vpos);
             copper->program_counter += skip ? 8u : 4u;
             copper->fetch_pending = true;
         } else {
-            /* WAIT: arm beam-bound wait with masks */
-            rigel_copper_domain_set_wait(copper, wait_vpos, wait_hpos, vpmask, hpmask);
+            /* WAIT: stall until beam reaches the target position */
+            copper_wait_arm(copper, ir1, ir2);
+            /* fetch_pending stays false — copper_domain_step releases the wait */
         }
         return;
     }
 
-    reg = (rigel_u32)(ir2 & 0x01feu);
-    if (rigel_custom_is_valid_reg(reg)) {
-        /* COPCON CDANG (bit 1): when clear, block writes to registers < 0x40 */
-        bool cdang = (copper->copcon & 0x0002u) != 0;
-        if (reg >= 0x40u || cdang) {
-            custom_regs_write16(ctx, reg, ir1);
-        }
-    }
-
+    /* MOVE: IR1 = register address (even, bit 0 = 0), IR2 = data */
+    copper_exec_move(ctx, ir1, ir2);
     copper->program_counter += 4u;
-    copper->triggered = true;
+    copper->triggered     = true;
+    copper->event_latched = true;
     copper->fetch_pending = true;
 }
