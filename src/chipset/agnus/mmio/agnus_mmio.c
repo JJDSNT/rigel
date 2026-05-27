@@ -11,9 +11,11 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
 
 bool rigel_agnus_mmio_has_reg(rigel_u32 addr)
 {
-    if (addr == RIGEL_REG_DMACON ||
-        addr == RIGEL_REG_DDFSTRT ||
-        addr == RIGEL_REG_DDFSTOP) {
+    if (addr == RIGEL_REG_DMACON   ||
+        addr == RIGEL_REG_DDFSTRT  ||
+        addr == RIGEL_REG_DDFSTOP  ||
+        addr == AGNUS_VPOSR        ||
+        addr == AGNUS_VHPOSR) {
         return true;
     }
 

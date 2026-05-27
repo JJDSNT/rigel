@@ -54,7 +54,7 @@ int main(void)
         return 1;
     }
 
-    if (rigel_custom_domain_for_reg(0x004) != RIGEL_DOMAIN_UNKNOWN) {
+    if (rigel_custom_domain_for_reg(0x004) != RIGEL_DOMAIN_AGNUS) {
         return 1;
     }
 
