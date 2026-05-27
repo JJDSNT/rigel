@@ -1,6 +1,7 @@
 #include "chipset/chipset.h"
 #include "core/rigel_context.h"
 #include "rigel/rigel.h"
+#include "rigel/rigel_events.h"
 
 int main(void)
 {
@@ -23,7 +24,15 @@ int main(void)
     rigel_custom_write16(ctx, RIGEL_REG_AUD0DAT, 0x7f00);
     rigel_custom_write16(ctx, RIGEL_REG_DMACON, RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_AUD0EN);
 
-    rigel_step(ctx, 3);
+    if ((rigel_step(ctx, 3).events & RIGEL_EVENT_AUDIO_READY) == 0) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    if ((rigel_step(ctx, 2).events & RIGEL_EVENT_AUDIO_READY) == 0) {
+        rigel_destroy(ctx);
+        return 1;
+    }
 
     if (chipset->paula.audio.dmacon != (RIGEL_DMACON_DMAEN | RIGEL_DMACON_AUD0EN)) {
         rigel_destroy(ctx);

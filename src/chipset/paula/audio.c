@@ -48,11 +48,8 @@ static void audio_mix(audio_state_t *audio)
         right = -32768;
     }
 
-    if ((int16_t)left != audio->mixed_left || (int16_t)right != audio->mixed_right) {
-        audio->mixed_left  = (int16_t)left;
-        audio->mixed_right = (int16_t)right;
-        audio->sample_ready = true;
-    }
+    audio->mixed_left  = (int16_t)left;
+    audio->mixed_right = (int16_t)right;
 }
 
 void audio_reset(audio_state_t *audio)
@@ -89,6 +86,7 @@ void audio_set_dmacon(audio_state_t *audio, rigel_u16 dmacon)
 void audio_step(audio_state_t *audio, rigel_u32 cycles)
 {
     int channel;
+    bool sample_elapsed = false;
 
     if (audio == NULL) {
         return;
@@ -115,6 +113,7 @@ void audio_step(audio_state_t *audio, rigel_u32 cycles)
         while (remaining >= state->period_counter) {
             remaining -= state->period_counter;
             state->period_counter = state->audper;
+            sample_elapsed = true;
 
             if (state->data_pending) {
                 state->current_sample = (int16_t)((int8_t)(state->auddat >> 8)) << 8;
@@ -134,6 +133,9 @@ void audio_step(audio_state_t *audio, rigel_u32 cycles)
     }
 
     audio_mix(audio);
+    if (sample_elapsed) {
+        audio->sample_ready = true;
+    }
 }
 
 void audio_write_lch(audio_state_t *audio, int channel, rigel_u16 value)
@@ -266,9 +268,17 @@ rigel_u32 audio_cycles_to_next_event(const audio_state_t *audio)
 
     for (ch = 0; ch < RIGEL_PAULA_AUDIO_CHANNELS; ch++) {
         const rigel_audio_channel_t *c = &audio->ch[ch];
-        if ((c->dma_enabled || c->data_pending) && c->period_counter > 0u) {
-            if (c->period_counter < min)
-                min = c->period_counter;
+        if (audio_channel_dma_enabled(audio, ch) ||
+            c->data_pending ||
+            c->has_pending_lo ||
+            c->dma_word_ready) {
+            rigel_u32 next = c->period_counter;
+            if (next == 0u) {
+                next = c->audper != 0u ? c->audper : 1u;
+            }
+            if (next < min) {
+                min = next;
+            }
         }
     }
 
