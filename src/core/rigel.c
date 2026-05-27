@@ -87,6 +87,14 @@ void rigel_reset(RigelContext *ctx)
     }
 
     rigel_chipset_reset(&ctx->chipset);
+    rigel_agnus_set_chip_rev(
+        &ctx->chipset.agnus,
+        ctx->config.chipset_model == RIGEL_CHIPSET_ECS ? AGNUS_REV_ECS : AGNUS_REV_OCS
+    );
+    rigel_denise_set_chip_rev(
+        &ctx->chipset.denise,
+        ctx->config.chipset_model == RIGEL_CHIPSET_ECS ? AGNUS_REV_ECS : AGNUS_REV_OCS
+    );
     rigel_agnus_set_video_std(
         &ctx->chipset.agnus,
         ctx->config.video_std == RIGEL_VIDEO_PAL ? AGNUS_VIDEO_PAL : AGNUS_VIDEO_NTSC

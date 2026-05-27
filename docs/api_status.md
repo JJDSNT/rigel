@@ -149,6 +149,10 @@ sem race condition dentro do mesmo `rigel_step`.
 | Attached sprites (4bpp de pares) | ✅ | CTL bit7 → `denise_sprite_attached_pixel`; paleta 17–31 |
 | BPLCON1 scroll offsets | ✅ | PF1H aplicado no compositor (shift de -s pixels) |
 | BPLCON0 hires mode (extra 4 slots) | ✅ | scheduler usa passo 1 em hires (bit 15) |
+| ECS feature gate + IDs | ✅ | `RIGEL_CHIPSET_ECS`; `VPOSR` Agnus ID; `DENISEID=$00fc` |
+| ECS `BEAMCON0` mínimo | ✅ | bit 5 PAL/NTSC; outros bits mascarados até timing programável |
+| ECS `DIWHIGH` | ✅ | expande `DIWSTRT/DIWSTOP` no modelo ECS |
+| ECS SuperHires/Productivity | ❌ | requer timing/render próprios |
 | HAM6 mode | ✅ | `ham6_decode_pixel` ligado no compositor; estado prev_rgb por linha |
 | EHB mode (Extra-Half-Brite) | ✅ | automático com 6 planos + !HAM + !DUAL; `ehb_resolve_color` |
 | Dual-playfield mode | ✅ | `dualpf_decode` + BPLCON2 PF1P/PF2P resolve PF1 vs PF2 |

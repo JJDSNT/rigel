@@ -28,11 +28,16 @@ static void rigel_agnus_raise_blitter_irq(void *opaque, uint16_t mask)
 
 void rigel_agnus_reset(RigelAgnus *agnus)
 {
+    agnus_chip_rev_t chip_rev;
+
     if (agnus == NULL) {
         return;
     }
 
+    chip_rev = agnus->chip_rev;
     rigel_beam_domain_reset(&agnus->beam);
+    agnus->chip_rev = chip_rev;
+    agnus->beamcon0 = 0;
     rigel_dma_domain_reset(&agnus->dma);
     rigel_copper_domain_reset(&agnus->copper);
     rigel_blitter_domain_reset(&agnus->blitter);
@@ -45,6 +50,15 @@ void rigel_agnus_reset(RigelAgnus *agnus)
     agnus->beam.line_clocks = agnus->raster.line_clocks;
     agnus->beam.frame_lines = agnus->raster.frame_lines;
     refresh_dma_reset(&agnus->refresh);
+}
+
+void rigel_agnus_set_chip_rev(RigelAgnus *agnus, agnus_chip_rev_t rev)
+{
+    if (agnus == NULL) {
+        return;
+    }
+
+    agnus->chip_rev = rev;
 }
 
 void rigel_agnus_set_video_std(RigelAgnus *agnus, agnus_video_std_t std)

@@ -16,6 +16,11 @@ typedef enum rigel_video_std {
     RIGEL_VIDEO_PAL  = 1,
 } rigel_video_std_t;
 
+typedef enum rigel_chipset_model {
+    RIGEL_CHIPSET_OCS = 0,
+    RIGEL_CHIPSET_ECS = 1
+} rigel_chipset_model_t;
+
 typedef enum rigel_pixel_format {
     RIGEL_PIXEL_RGBA8888 = 0,
     RIGEL_PIXEL_RGB565   = 1
@@ -58,6 +63,7 @@ typedef struct rigel_config {
     rigel_log_fn_t    log_fn;
     void             *log_opaque;
     rigel_video_std_t video_std;
+    rigel_chipset_model_t chipset_model;
     rigel_pixel_format_t pixel_format;
     rigel_framebuffer_target_t framebuffer;
 } rigel_config_t;

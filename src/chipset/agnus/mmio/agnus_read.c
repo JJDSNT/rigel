@@ -10,6 +10,22 @@
 #include "domains/dma/dma_domain.h"
 #include "rigel/rigel_custom.h"
 
+static rigel_u16 agnus_vposr_chip_id(const RigelAgnus *agnus)
+{
+    bool pal;
+
+    if (agnus == NULL) {
+        return 0;
+    }
+
+    pal = agnus->raster.std == AGNUS_VIDEO_PAL;
+    if (agnus->chip_rev == AGNUS_REV_ECS) {
+        return pal ? 0x20u : 0x30u;
+    }
+
+    return pal ? 0x00u : 0x10u;
+}
+
 rigel_u16 rigel_agnus_mmio_read_impl(RigelContext *ctx, rigel_u32 addr)
 {
     if (ctx == NULL) {
@@ -37,15 +53,20 @@ rigel_u16 rigel_agnus_mmio_read_impl(RigelContext *ctx, rigel_u32 addr)
     case RIGEL_REG_DMACON:
         return rigel_dma_domain_read_dmacon(&ctx->chipset.agnus.dma);
     case AGNUS_VPOSR:
-        /* [15]=LOF [14:8]=chip_id (0x00 = OCS Agnus 8361/8370) [0]=vpos[8] */
+        /* [15]=LOF [14:8]=chip_id [2:0]=vpos[10:8]. */
         return (rigel_u16)(
             ((rigel_u16)ctx->chipset.agnus.beam.lof << 15) |
-            ((ctx->chipset.agnus.beam.vpos >> 8) & 1u)
+            (agnus_vposr_chip_id(&ctx->chipset.agnus) << 8) |
+            ((ctx->chipset.agnus.beam.vpos >> 8) & 0x7u)
         );
     case AGNUS_VHPOSR:
         /* [15:8]=vpos[7:0]  [7:0]=hpos in lores pixels (CCK / 2) */
         return (rigel_u16)(((ctx->chipset.agnus.beam.vpos & 0xFFu) << 8) |
                             ((ctx->chipset.agnus.beam.hpos >> 1) & 0xFFu));
+    case RIGEL_REG_BEAMCON0:
+        return ctx->chipset.agnus.chip_rev == AGNUS_REV_ECS
+            ? ctx->chipset.agnus.beamcon0
+            : 0u;
     default:
         return rigel_context_read_reg(ctx, addr);
     }

@@ -25,13 +25,16 @@ bool rigel_denise_registers_owns_reg(rigel_u32 addr)
     }
 
     switch (addr) {
+    case RIGEL_REG_DENISEID:
     case RIGEL_REG_CLXDAT:
     case RIGEL_REG_CLXCON:
     case RIGEL_REG_BPLCON0:
     case RIGEL_REG_BPLCON1:
     case RIGEL_REG_BPLCON2:
+    case RIGEL_REG_BPLCON3:
     case RIGEL_REG_DIWSTRT:
     case RIGEL_REG_DIWSTOP:
+    case RIGEL_REG_DIWHIGH:
         return true;
     default:
         return false;
@@ -49,6 +52,8 @@ rigel_u16 rigel_denise_registers_read(RigelDenise *denise, rigel_u32 addr)
     }
 
     switch (addr) {
+    case RIGEL_REG_DENISEID:
+        return denise->chip_rev == AGNUS_REV_ECS ? 0x00fcu : 0x0000u;
     case RIGEL_REG_CLXDAT:
         /* CLXDAT clears on read */
         return collision_read_clxdat(&denise->coll);
@@ -58,10 +63,14 @@ rigel_u16 rigel_denise_registers_read(RigelDenise *denise, rigel_u32 addr)
         return denise->regs.bplcon1;
     case RIGEL_REG_BPLCON2:
         return denise->regs.bplcon2;
+    case RIGEL_REG_BPLCON3:
+        return denise->chip_rev == AGNUS_REV_ECS ? denise->regs.bplcon3 : 0u;
     case RIGEL_REG_DIWSTRT:
         return denise->regs.diwstrt;
     case RIGEL_REG_DIWSTOP:
         return denise->regs.diwstop;
+    case RIGEL_REG_DIWHIGH:
+        return denise->chip_rev == AGNUS_REV_ECS ? denise->regs.diwhigh : 0u;
     default:
         return 0;
     }
@@ -124,6 +133,10 @@ void rigel_denise_registers_write(RigelDenise *denise, rigel_u32 addr, rigel_u16
     case RIGEL_REG_BPLCON2:
         denise->regs.bplcon2 = value;
         break;
+    case RIGEL_REG_BPLCON3:
+        if (denise->chip_rev == AGNUS_REV_ECS)
+            denise->regs.bplcon3 = value;
+        break;
     case RIGEL_REG_DIWSTRT:
         denise->regs.diwstrt = value;
         rigel_denise_display_window_update(denise);
@@ -131,6 +144,12 @@ void rigel_denise_registers_write(RigelDenise *denise, rigel_u32 addr, rigel_u16
     case RIGEL_REG_DIWSTOP:
         denise->regs.diwstop = value;
         rigel_denise_display_window_update(denise);
+        break;
+    case RIGEL_REG_DIWHIGH:
+        if (denise->chip_rev == AGNUS_REV_ECS) {
+            denise->regs.diwhigh = value;
+            rigel_denise_display_window_update(denise);
+        }
         break;
     default:
         break;

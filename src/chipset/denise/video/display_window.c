@@ -22,12 +22,26 @@ void rigel_denise_display_window_update(RigelDenise *denise)
         return;
     }
 
-    hstrt = (rigel_u16)(denise->regs.diwstrt & 0x00FFu);
-    vstrt = (rigel_u16)((denise->regs.diwstrt >> 8) & 0x00FFu);
-    /* DIWSTOP hpos is always in the second half of the scanline [256..511].
-     * Only bits[7:0] are stored; bit 8 is implied 1, so add 256. */
-    hstop = (rigel_u16)((denise->regs.diwstop & 0x00FFu) + 256u);
-    vstop = (rigel_u16)((denise->regs.diwstop >> 8) & 0x00FFu);
+    if (denise->chip_rev == AGNUS_REV_ECS && denise->regs.diwhigh != 0u) {
+        rigel_u16 start_hi = (rigel_u16)(denise->regs.diwhigh & 0x00FFu);
+        rigel_u16 stop_hi  = (rigel_u16)((denise->regs.diwhigh >> 8) & 0x00FFu);
+
+        hstrt = (rigel_u16)((denise->regs.diwstrt & 0x00FFu) |
+                            (((start_hi >> 3) & 0x7u) << 8));
+        vstrt = (rigel_u16)(((denise->regs.diwstrt >> 8) & 0x00FFu) |
+                            ((start_hi & 0x7u) << 8));
+        hstop = (rigel_u16)((denise->regs.diwstop & 0x00FFu) |
+                            (((stop_hi >> 3) & 0x7u) << 8));
+        vstop = (rigel_u16)(((denise->regs.diwstop >> 8) & 0x00FFu) |
+                            ((stop_hi & 0x7u) << 8));
+    } else {
+        hstrt = (rigel_u16)(denise->regs.diwstrt & 0x00FFu);
+        vstrt = (rigel_u16)((denise->regs.diwstrt >> 8) & 0x00FFu);
+        /* OCS DIWSTOP hpos is in the second half of the scanline [256..511].
+         * Only bits[7:0] are stored; bit 8 is implied 1, so add 256. */
+        hstop = (rigel_u16)((denise->regs.diwstop & 0x00FFu) + 256u);
+        vstop = (rigel_u16)((denise->regs.diwstop >> 8) & 0x00FFu);
+    }
 
     if (vstop <= vstrt) {
         vstop = (rigel_u16)(vstop + 256u);

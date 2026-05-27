@@ -19,6 +19,13 @@ pre-palette chunky indices, not just convert the completed RGBA frame.
 audio, disk, beam) is not captured. Do not use for save state until this is
 expanded. Blocked on internal state stabilising.
 
+### Full ECS support is incomplete
+
+Rigel has an ECS feature gate, Agnus/Denise IDs, minimal `BEAMCON0` PAL/NTSC
+handling, and `DIWHIGH`. Full ECS still needs programmable beam timing,
+SuperHires/Productivity modes, ECS Chip RAM address policy, and real `BPLCON3`
+semantics. See `AI_context/ecs_support.md`.
+
 ## Harness (`harness/`)
 
 The Musashi integration harness was written for internal timing tests, not for

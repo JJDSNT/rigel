@@ -14,11 +14,15 @@
 
 void rigel_denise_reset(RigelDenise *denise)
 {
+    agnus_chip_rev_t chip_rev;
+
     if (denise == NULL) {
         return;
     }
 
+    chip_rev = denise->chip_rev;
     rigel_denise_palette_reset(&denise->palette);
+    denise->chip_rev = chip_rev;
     rigel_denise_sprites_reset(&denise->sprites);
     collision_reset(&denise->coll);
     rigel_denise_display_window_reset(&denise->video);
@@ -26,8 +30,10 @@ void rigel_denise_reset(RigelDenise *denise)
     denise->regs.bplcon0 = 0;
     denise->regs.bplcon1 = 0;
     denise->regs.bplcon2 = 0;
+    denise->regs.bplcon3 = 0;
     denise->regs.diwstrt = 0;
     denise->regs.diwstop = 0;
+    denise->regs.diwhigh = 0;
     denise->debug.frame_counter = 0;
     denise->debug.scanline_counter = 0;
     denise->debug.active_mode_flags = 0;
@@ -38,6 +44,16 @@ void rigel_denise_reset(RigelDenise *denise)
     denise->debug.current_pixel = 0;
     denise->debug.last_rgb32 = 0;
     denise->debug.visible_scanline = false;
+}
+
+void rigel_denise_set_chip_rev(RigelDenise *denise, agnus_chip_rev_t rev)
+{
+    if (denise == NULL) {
+        return;
+    }
+
+    denise->chip_rev = rev;
+    rigel_denise_display_window_update(denise);
 }
 
 void rigel_denise_step(RigelDenise *denise, const beam_state_t *beam, rigel_u32 cycles)

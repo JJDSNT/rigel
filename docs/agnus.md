@@ -26,6 +26,9 @@ Agnus is the timing and DMA-facing core of the classic chipset inside Rigel.
   below `0x040` unless `COPCON` bit 1 is set).
 - **Bitplane fetch**: plane words fetched per slot and staged for Denise composition.
 - **Blitter**: full minterm/shift pipeline with DMA.
+- **ECS minimum surface**: `rigel_config_t.chipset_model` can select ECS.
+  Agnus exposes ECS IDs through `VPOSR`, accepts `BEAMCON0` PAL/NTSC selection,
+  and Denise exposes `DENISEID` plus `DIWHIGH`.
 
 ## Structural rules
 
@@ -53,7 +56,7 @@ bit 9) and the channel enable bit are set:
 
 ## Next steps
 
-- Sprite DMA dispatch (slot table already reserves sprite slots)
-- BPLCON0 hires bit (adds 4 extra fetch slots per line)
-- BPLCON1 scroll offsets
-- Disk and audio deadline contributions to `rigel_get_next_deadline`
+- ECS programmable beam timing beyond `BEAMCON0` bit 5
+- ECS SuperHires/Productivity display modes
+- ECS Chip RAM address policy
+- `BPLCON3` display semantics

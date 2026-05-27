@@ -3,6 +3,7 @@
 
 #include "rigel/rigel_denise_types.h"
 #include "rigel/rigel_types.h"
+#include "agnus/agnus_config.h"
 #include "agnus/beam.h"
 #include "denise/sprites/collisions.h"
 #include "denise/sprites/sprites.h"
@@ -18,8 +19,10 @@ typedef struct rigel_denise_register_file {
     rigel_u16 bplcon0;
     rigel_u16 bplcon1;
     rigel_u16 bplcon2;
+    rigel_u16 bplcon3;
     rigel_u16 diwstrt;
     rigel_u16 diwstop;
+    rigel_u16 diwhigh;
 } rigel_denise_register_file_t;
 
 typedef struct rigel_denise_palette_state {
@@ -74,6 +77,7 @@ typedef struct rigel_denise_output_state {
 } rigel_denise_output_state_t;
 
 typedef struct RigelDenise {
+    agnus_chip_rev_t chip_rev;
     rigel_denise_register_file_t regs;
     rigel_denise_palette_state_t palette;
     denise_sprites_state_t sprites;
@@ -84,6 +88,7 @@ typedef struct RigelDenise {
 } RigelDenise;
 
 void rigel_denise_reset(RigelDenise *denise);
+void rigel_denise_set_chip_rev(RigelDenise *denise, agnus_chip_rev_t rev);
 void rigel_denise_step(RigelDenise *denise, const beam_state_t *beam, rigel_u32 cycles);
 void rigel_denise_set_framebuffer_target(RigelDenise *denise, const rigel_framebuffer_target_t *target);
 

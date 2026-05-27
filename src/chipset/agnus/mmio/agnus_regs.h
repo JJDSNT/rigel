@@ -1,6 +1,8 @@
 #ifndef RIGEL_AGNUS_REGS_H
 #define RIGEL_AGNUS_REGS_H
 
+#include "rigel/rigel_custom.h"
+
 /* Custom chip register offsets owned by Agnus (byte addresses in custom space).
  * Read-only registers have an R suffix; write-only have a W suffix.
  * Registers with no suffix are readable and writable via the same address. */
@@ -80,7 +82,7 @@
 #define AGNUS_BPLMOD2   0x10A
 
 /* --- ECS: beam control --------------------------------------------------- */
-#define AGNUS_BEAMCON0  0x1DC   /* W  beam timing control (ECS)  */
+#define AGNUS_BEAMCON0  RIGEL_REG_BEAMCON0   /* W  beam timing control (ECS) */
 
 /* --- Copper -------------------------------------------------------------- */
 #define AGNUS_COP1LCH   0x080

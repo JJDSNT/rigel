@@ -17,6 +17,8 @@
 typedef struct RigelContext RigelContext;
 
 typedef struct RigelAgnus {
+    agnus_chip_rev_t chip_rev;
+    rigel_u16 beamcon0;
     beam_state_t beam;
     dma_state_t dma;
     copper_state_t copper;
@@ -31,6 +33,7 @@ typedef struct RigelAgnus {
 } RigelAgnus;
 
 void rigel_agnus_reset(RigelAgnus *agnus);
+void rigel_agnus_set_chip_rev(RigelAgnus *agnus, agnus_chip_rev_t rev);
 void rigel_agnus_set_video_std(RigelAgnus *agnus, agnus_video_std_t std);
 BlitterMemory rigel_agnus_blitter_memory(RigelContext *ctx);
 BlitterIrqSink rigel_agnus_blitter_irq_sink(RigelContext *ctx);

@@ -65,13 +65,17 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
         );
         rigel_context_write_reg(ctx, addr, value);
         break;
-    case AGNUS_BEAMCON0:
-        /* Bit 5 (VARVSYEN/PAL): 1 = PAL 312 lines, 0 = NTSC 262 lines */
-        rigel_agnus_set_video_std(
-            &ctx->chipset.agnus,
-            (value & 0x0020u) ? AGNUS_VIDEO_PAL : AGNUS_VIDEO_NTSC
-        );
-        rigel_context_write_reg(ctx, addr, value);
+    case RIGEL_REG_BEAMCON0:
+        if (ctx->chipset.agnus.chip_rev == AGNUS_REV_ECS) {
+            /* Minimal ECS policy: bit 5 selects PAL timing; other programmable
+             * beam bits are retained as zero until their timing is modelled. */
+            ctx->chipset.agnus.beamcon0 = (rigel_u16)(value & 0x0020u);
+            rigel_agnus_set_video_std(
+                &ctx->chipset.agnus,
+                (value & 0x0020u) ? AGNUS_VIDEO_PAL : AGNUS_VIDEO_NTSC
+            );
+            rigel_context_write_reg(ctx, addr, ctx->chipset.agnus.beamcon0);
+        }
         break;
     default:
         /* BPL1PTH-BPL6PTL */
