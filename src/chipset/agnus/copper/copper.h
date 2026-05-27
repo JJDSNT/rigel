@@ -16,6 +16,7 @@ typedef struct copper_state {
     bool waiting;
     bool enabled;
     bool triggered;
+    bool event_latched;   /* set on every MOVE/WAIT-release; cleared by rigel_step */
     bool fetch_pending;
 } copper_state_t;
 
@@ -34,5 +35,7 @@ static inline bool copper_beam_cmp(
 void copper_reset(copper_state_t *copper);
 void copper_set_pointer_hi(rigel_u32 *ptr, rigel_u16 value);
 void copper_set_pointer_lo(rigel_u32 *ptr, rigel_u16 value);
+/* Restart copper from COP1LC at VBL; no-ops when cop1lc is 0. */
+void copper_vbl_reload(copper_state_t *copper);
 
 #endif

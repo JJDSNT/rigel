@@ -16,10 +16,33 @@ void copper_reset(copper_state_t *copper)
     copper->wait_vpmask = 0xFFu;
     copper->wait_hpmask = 0xFEu;
     copper->copcon      = 0;
-    copper->waiting     = false;
-    copper->enabled = false;
-    copper->triggered = false;
+    copper->waiting       = false;
+    copper->enabled       = false;
+    copper->triggered     = false;
+    copper->event_latched = false;
     copper->fetch_pending = false;
+}
+
+void copper_vbl_reload(copper_state_t *copper)
+{
+    if (copper == NULL) {
+        return;
+    }
+
+    if ((copper->cop1lc & 0x001ffffeu) == 0u) {
+        copper->program_counter = 0u;
+        copper->waiting         = false;
+        copper->fetch_pending   = false;
+        copper->triggered       = false;
+        copper->event_latched   = false;
+        return;
+    }
+
+    copper->program_counter = copper->cop1lc & 0x001ffffeu;
+    copper->waiting         = false;
+    copper->fetch_pending   = true;
+    copper->triggered       = false;
+    copper->event_latched   = false;
 }
 
 void copper_set_pointer_hi(rigel_u32 *ptr, rigel_u16 value)

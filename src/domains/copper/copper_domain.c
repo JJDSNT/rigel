@@ -37,9 +37,10 @@ void rigel_copper_domain_jump1(copper_state_t *copper)
     }
 
     copper->program_counter = copper->cop1lc;
-    copper->triggered = false;
+    copper->triggered     = false;
+    copper->event_latched = false;
     copper->fetch_pending = true;
-    copper->waiting = false;
+    copper->waiting       = false;
 }
 
 void rigel_copper_domain_jump2(copper_state_t *copper)
@@ -49,9 +50,15 @@ void rigel_copper_domain_jump2(copper_state_t *copper)
     }
 
     copper->program_counter = copper->cop2lc;
-    copper->triggered = false;
+    copper->triggered     = false;
+    copper->event_latched = false;
     copper->fetch_pending = true;
-    copper->waiting = false;
+    copper->waiting       = false;
+}
+
+void rigel_copper_domain_vbl_reload(copper_state_t *copper)
+{
+    copper_vbl_reload(copper);
 }
 
 rigel_u32 rigel_copper_domain_cycles_to_wait(const copper_state_t *copper,
@@ -102,9 +109,10 @@ void rigel_copper_domain_step(copper_state_t *copper, const beam_state_t *beam, 
     if (copper_beam_cmp(beam->vpos, beam->hpos,
                         copper->wait_vpos, copper->wait_hpos,
                         copper->wait_vpmask, copper->wait_hpmask)) {
-        copper->waiting       = false;
+        copper->waiting         = false;
         copper->program_counter += 4u;
-        copper->triggered     = true;
-        copper->fetch_pending = true;
+        copper->triggered       = true;
+        copper->event_latched   = true;
+        copper->fetch_pending   = true;
     }
 }
