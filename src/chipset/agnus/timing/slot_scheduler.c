@@ -325,8 +325,15 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
                 bplpt_apply_modulo(&ctx->chipset.agnus.bplpt, depth);
             }
         }
-        if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos))
+        if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos)) {
+            bool copper_was_triggered = ctx->chipset.agnus.copper.triggered;
             agnus_irq_raise_vblank(ctx);
+            rigel_copper_domain_jump1(&ctx->chipset.agnus.copper);
+            /* VBL reload restarts copper from COP1LC but must not discard a
+             * triggered event that fired in the same CCK — rigel.c detects
+             * RIGEL_EVENT_COPPER as a false→true transition per step. */
+            ctx->chipset.agnus.copper.triggered = copper_was_triggered;
+        }
     } else {
         (void)frame_lines;
         hpos = (rigel_u16)(hpos + 1u);

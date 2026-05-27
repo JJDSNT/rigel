@@ -107,7 +107,7 @@ int main(void)
         return 1;
     }
 
-    if (chipset->agnus.copper.program_counter != 0x44u) {
+    if (chipset->agnus.copper.program_counter != 0x40u) {
         rigel_destroy(ctx);
         return 1;
     }
