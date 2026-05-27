@@ -1,13 +1,247 @@
 #include "rigel/rigel.h"
+#include "core/rigel_context.h"
+
+enum {
+    TEST_FRAME_CYCLES = 227u * 262u,
+    TEST_VISIBLE_Y_START = 26u,
+    TEST_VISIBLE_WIDTH = 320u,
+    TEST_BPL_WORDS = TEST_VISIBLE_WIDTH / 16u,
+    TEST_BPL1_ADDR = 0x0000u,
+    TEST_BPL2_ADDR = 0x0040u,
+    TEST_REG_BPLCON0 = 0x100u,
+    TEST_REG_BPLCON1 = 0x102u,
+    TEST_REG_BPLCON2 = 0x104u,
+    TEST_REG_COLOR01 = 0x182u,
+    TEST_REG_COLOR02 = 0x184u,
+    TEST_REG_COLOR03 = 0x186u,
+    TEST_BPL1_PTR_HI = (TEST_BPL1_ADDR >> 16) & 0xffffu,
+    TEST_BPL1_PTR_LO = TEST_BPL1_ADDR & 0xffffu,
+    TEST_BPL2_PTR_HI = (TEST_BPL2_ADDR >> 16) & 0xffffu,
+    TEST_BPL2_PTR_LO = TEST_BPL2_ADDR & 0xffffu
+};
+
+static rigel_u16 test_chip_ram_read16(void *opaque, rigel_u32 addr)
+{
+    rigel_u16 *ram = (rigel_u16 *)opaque;
+    return ram[(addr & 0x1ffu) >> 1];
+}
+
+static void test_chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
+{
+    rigel_u16 *ram = (rigel_u16 *)opaque;
+    ram[(addr & 0x1ffu) >> 1] = value;
+}
+
+static void fill_bitplane_words(rigel_u16 *chip_ram, rigel_u16 value)
+{
+    unsigned i;
+
+    for (i = 0; i < TEST_BPL_WORDS; ++i)
+        chip_ram[(TEST_BPL1_ADDR >> 1) + i] = value;
+}
+
+static void fill_two_bitplane_words(rigel_u16 *chip_ram, rigel_u16 plane1, rigel_u16 plane2)
+{
+    unsigned i;
+
+    for (i = 0; i < TEST_BPL_WORDS; ++i) {
+        chip_ram[(TEST_BPL1_ADDR >> 1) + i] = plane1;
+        chip_ram[(TEST_BPL2_ADDR >> 1) + i] = plane2;
+    }
+}
+
+static void setup_lores_single_bitplane(RigelContext *ctx, rigel_u16 ddfstrt, rigel_u16 ddfstop)
+{
+    rigel_custom_write16(ctx, 0x08e, 0x1a38u);
+    rigel_custom_write16(ctx, 0x090, 0x1a78u);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTRT, ddfstrt);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTOP, ddfstop);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL1PTH, TEST_BPL1_PTR_HI);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL1PTL, TEST_BPL1_PTR_LO);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0x1000u);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON1, 0x0000u);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON2, 0x0000u);
+}
+
+static void setup_lores_two_bitplanes(RigelContext *ctx, rigel_u16 ddfstrt, rigel_u16 ddfstop)
+{
+    rigel_custom_write16(ctx, 0x08e, 0x1a38u);
+    rigel_custom_write16(ctx, 0x090, 0x1a78u);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTRT, ddfstrt);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTOP, ddfstop);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL1PTH, TEST_BPL1_PTR_HI);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL1PTL, TEST_BPL1_PTR_LO);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL2PTH, TEST_BPL2_PTR_HI);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL2PTL, TEST_BPL2_PTR_LO);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0x2302u);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON1, 0x0000u);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON2, 0x0000u);
+}
+
+static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    rigel_frame_t frame;
+
+    rigel_reset(ctx);
+    fill_bitplane_words(chip_ram, 0x5555u);
+    setup_lores_single_bitplane(ctx, 0x0038u, 0x0060u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x000fu);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x0fffu);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0) {
+        return 1;
+    }
+    if (!rigel_get_frame(ctx, &frame)) {
+        return 1;
+    }
+    if (frame.width != TEST_VISIBLE_WIDTH || frame.height != 256u) {
+        return 1;
+    }
+    if (frame.pixels == NULL) {
+        return 1;
+    }
+    /* This is intentionally strict: dirty_lines is currently documented as
+     * per-raster-line output, not per-quantum/per-frame coarse invalidation. */
+    if ((frame.delta.dirty_lines[TEST_VISIBLE_Y_START / 64u] &
+         ((rigel_u64)1u << (TEST_VISIBLE_Y_START % 64u))) == 0u) {
+        return 1;
+    }
+    if (frame.pixels[0] != 0x000000ffu || frame.pixels[1] != 0x00ffffffu ||
+        frame.pixels[2] != 0x000000ffu || frame.pixels[3] != 0x00ffffffu) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    rigel_frame_t frame;
+
+    rigel_reset(ctx);
+    fill_bitplane_words(chip_ram, 0xffffu);
+    setup_lores_single_bitplane(ctx, 0x0040u, 0x0068u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x000fu);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x0fffu);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if (ctx->chipset.denise.output.ddfstrt_lores != 0x0040u)
+        return 1;
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+    if (frame.pixels[0] != 0x000000ffu)
+        return 1;
+    if (frame.pixels[7] != 0x000000ffu)
+        return 1;
+    if (frame.pixels[8] != 0x00ffffffu)
+        return 1;
+    if (frame.pixels[23] != 0x00ffffffu)
+        return 1;
+
+    return 0;
+}
+
+static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    rigel_frame_t frame;
+
+    rigel_reset(ctx);
+    fill_bitplane_words(chip_ram, 0xffffu);
+    setup_lores_single_bitplane(ctx, 0x0038u, 0x0060u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x000fu);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x0fffu);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+    if (frame.pixels[0] != 0x00ffffffu)
+        return 1;
+
+    rigel_custom_write16(ctx, RIGEL_REG_DMACON, RIGEL_DMACON_BPLEN);
+    fill_bitplane_words(chip_ram, 0x0000u);
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+    if (frame.pixels[0] != 0x000000ffu || frame.pixels[1] != 0x000000ffu)
+        return 1;
+
+    return 0;
+}
+
+static int test_two_bitplane_fetch_window(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    rigel_frame_t frame;
+
+    rigel_reset(ctx);
+    fill_two_bitplane_words(chip_ram, 0x5555u, 0x3333u);
+    setup_lores_two_bitplanes(ctx, 0x0038u, 0x00d0u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x0000u);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x000fu);
+    rigel_custom_write16(ctx, TEST_REG_COLOR02, 0x00f0u);
+    rigel_custom_write16(ctx, TEST_REG_COLOR03, 0x0f00u);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+
+    /* plane0=0101..., plane1=0011... -> color indices 0,1,2,3 repeating */
+    if (frame.pixels[0] != 0x00000000u ||
+        frame.pixels[1] != 0x000000ffu ||
+        frame.pixels[2] != 0x0000ff00u ||
+        frame.pixels[3] != 0x00ff0000u ||
+        frame.pixels[4] != 0x00000000u ||
+        frame.pixels[5] != 0x000000ffu ||
+        frame.pixels[6] != 0x0000ff00u ||
+        frame.pixels[7] != 0x00ff0000u) {
+        return 1;
+    }
+
+    if (frame.pixels[319] != 0x00ff0000u) {
+        return 1;
+    }
+
+    return 0;
+}
 
 int main(void)
 {
     rigel_config_t cfg = { 0 };
-    RigelContext *ctx = rigel_create(&cfg);
+    rigel_u16 chip_ram[256] = { 0 };
+    RigelContext *ctx;
     rigel_denise_video_desc_t video;
     rigel_denise_debug_state_t debug;
     rigel_denise_scanline_t scanline;
     rigel_u32 frame_cycles = 227u * 262u;
+
+    cfg.chip_ram.opaque = chip_ram;
+    cfg.chip_ram.read16 = test_chip_ram_read16;
+    cfg.chip_ram.write16 = test_chip_ram_write16;
+    ctx = rigel_create(&cfg);
 
     if (ctx == NULL) {
         return 1;
@@ -27,12 +261,14 @@ int main(void)
         return 1;
     }
 
-    if (video.display_width != 65 || video.display_height != 257) {
+    /* DIWSTRT=0x2c81 (hstrt=129, vstrt=44), DIWSTOP=0x2cc1 (hstop=193+256=449, vstop=44).
+     * vstop==vstrt so height falls back to 256; width = 449-129 = 320. */
+    if (video.display_width != 320 || video.display_height != 256) {
         rigel_destroy(ctx);
         return 1;
     }
 
-    if (video.visible_x_start != 0x81 || video.visible_x_stop != 0xc1) {
+    if (video.visible_x_start != 0x81 || video.visible_x_stop != 449) {
         rigel_destroy(ctx);
         return 1;
     }
@@ -74,6 +310,38 @@ int main(void)
     if (debug.frame_counter != 1 || debug.beam_vpos != 0 || debug.beam_hpos != 4) {
         rigel_destroy(ctx);
         return 1;
+    }
+
+    {
+        int rc = test_visual_bitplane_frame(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_ddfstrt_alignment(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_bitplane_dma_disable_stops_reuse(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_two_bitplane_fetch_window(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
     }
 
     rigel_destroy(ctx);

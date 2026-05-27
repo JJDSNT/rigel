@@ -312,6 +312,8 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
     if (beam) {
         rigel_beam_domain_step(beam, 1);
         sched->hpos = beam->hpos;
+        if (ctx)
+            rigel_denise_step(&ctx->chipset.denise, beam, 1u);
         if (beam->hpos == 0) {
             sched->table_dirty = true;  /* new line: VBL status may change */
             sched->fetch_plane_index = 0;

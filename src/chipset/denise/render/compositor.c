@@ -20,20 +20,25 @@ static void compose_line(RigelDenise *denise)
     bool is_ham  = (denise->regs.bplcon0 & 0x0800u) != 0u;
     bool is_dual = (denise->regs.bplcon0 & 0x0400u) != 0u;
     bool is_ehb  = !is_ham && !is_dual && depth == 6u && !(bplcon2 & 0x0040u);
-    unsigned scroll = denise->regs.bplcon1 & 0x0Fu;
-    unsigned pf1p   = bplcon2 & 0x7u;
-    unsigned pf2p   = (bplcon2 >> 3) & 0x7u;
+    unsigned scroll  = denise->regs.bplcon1 & 0x0Fu;
+    unsigned pf1p    = bplcon2 & 0x7u;
+    unsigned pf2p    = (bplcon2 >> 3) & 0x7u;
+    /* Absolute lores position of the first DDF word; set by Agnus on DDFSTRT. */
+    unsigned ddf0    = (unsigned)output->ddfstrt_lores;
+    rigel_u16 x_start = denise->video.visible_x_start;
+    rigel_u16 x_stop  = denise->video.visible_x_stop;   /* exclusive */
     rigel_u16 w, px;
 
-    /* Per-pixel state for rendering, priority, and collision detection. */
-    uint8_t pf_color[1024];    /* 0 = transparent */
-    uint8_t pf_prio[1024];     /* PFxP for sprite-vs-PF priority */
-    uint8_t pf_active[1024];   /* bit 0 = PF1 active, bit 1 = PF2 active */
-    uint8_t spr_active[1024];  /* bit N = sprite N has non-transparent pixel */
+    /* Per-pixel arrays indexed by absolute lores position [0..1023]. */
+    uint8_t pf_color[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
+    uint8_t pf_prio[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
+    uint8_t pf_active[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
+    uint8_t spr_active[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
 
     if (!output->visible_scanline || output->scanline_width == 0) return;
 
-    for (px = 0; px < output->scanline_width; px++) {
+    /* Initialise the visible window in scanline_rgba and the per-pixel arrays. */
+    for (px = x_start; px < x_stop && px < RIGEL_DENISE_MAX_SCANLINE_PIXELS; px++) {
         output->scanline_rgba[px] = palette[0];
         pf_color[px]   = 0;
         pf_prio[px]    = (uint8_t)pf1p;
@@ -54,14 +59,13 @@ static void compose_line(RigelDenise *denise)
                     block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
                 planar_to_chunky(block_words, depth, pixels_chunky);
                 for (px = 0; px < 16; px++) {
-                    int screen_x = (int)(w * 16u + px) - (int)scroll;
+                    int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
                     prev_rgb = ham6_decode_pixel(pixels_chunky[px], prev_rgb, palette);
-                    if (screen_x < 0 || (unsigned)screen_x >= output->scanline_width)
+                    if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
                         continue;
                     output->scanline_rgba[(unsigned)screen_x] = prev_rgb;
                     pf_color[(unsigned)screen_x]  = 0xFFu; /* opaque sentinel */
-                    pf_active[(unsigned)screen_x] = 1u;    /* PF1 active */
-                    /* pf_prio already set to pf1p in init loop */
+                    pf_active[(unsigned)screen_x] = 1u;
                 }
             }
         } else if (is_dual) {
@@ -75,14 +79,13 @@ static void compose_line(RigelDenise *denise)
                     block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
                 planar_to_chunky(block_words, depth, pixels_chunky);
                 for (px = 0; px < 16; px++) {
-                    int screen_x = (int)(w * 16u + px) - (int)scroll;
+                    int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
                     dualpf_result_t dpf;
                     bool use_pf2;
                     uint8_t ci;
-                    if (screen_x < 0 || (unsigned)screen_x >= output->scanline_width)
+                    if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
                         continue;
                     dpf = dualpf_decode(pixels_chunky[px]);
-                    /* PF2 wins when both opaque and pf2p >= pf1p (tie → PF2). */
                     use_pf2 = dpf.pf2_index && (!dpf.pf1_index || pf1p <= pf2p);
                     ci = use_pf2 ? dpf.pf2_index : dpf.pf1_index;
                     pf_color[(unsigned)screen_x]  = ci;
@@ -103,9 +106,9 @@ static void compose_line(RigelDenise *denise)
                     block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
                 planar_to_chunky(block_words, depth, pixels_chunky);
                 for (px = 0; px < 16; px++) {
-                    int screen_x = (int)(w * 16u + px) - (int)scroll;
+                    int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
                     uint8_t ci;
-                    if (screen_x < 0 || (unsigned)screen_x >= output->scanline_width)
+                    if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
                         continue;
                     ci = is_ehb
                         ? (pixels_chunky[px] & 0x3Fu)
@@ -121,12 +124,10 @@ static void compose_line(RigelDenise *denise)
 
     /* Sprite overlay — iterate 7→0 so lower-numbered (higher-priority) sprites
      * overwrite higher-numbered ones when they share a pixel.
-     * Attached pairs (odd sprite CTL bit 7): even sprite renders the combined
-     * 4bpp pixel; the odd sprite is skipped (its data is consumed by the even).
+     * Sprites use absolute lores positions matching the bitplane coordinate system.
      * A sprite pair p beats PFx when the PF pixel is transparent or pair+PFxP < 4. */
     {
         unsigned spr;
-        rigel_u16 x_start = denise->video.visible_x_start;
         for (spr = DENISE_SPRITE_COUNT; spr-- > 0; ) {
             const denise_sprite_t *sp = &denise->sprites.sp[spr];
             unsigned pair = spr / 2u;
@@ -136,31 +137,25 @@ static void compose_line(RigelDenise *denise)
             rigel_u16 hstart;
             unsigned px_idx;
 
-            /* Odd sprite of an attached pair: rendered via the even partner */
             if (attached_odd) continue;
             if (!sp->armed) continue;
 
             hstart = denise_sprite_hstart(sp);
             for (px_idx = 0; px_idx < 16u; px_idx++) {
                 rigel_u16 amiga_x = (rigel_u16)(hstart + px_idx);
-                rigel_u16 scan_px;
+                rigel_u16 scan_px = amiga_x;   /* absolute lores position */
                 uint8_t pix;
                 rigel_u32 color;
-                if (amiga_x < x_start) continue;
-                scan_px = (rigel_u16)(amiga_x - x_start);
-                if (scan_px >= output->scanline_width) break;
+                if (scan_px >= RIGEL_DENISE_MAX_SCANLINE_PIXELS) break;
                 if (attached_even) {
-                    /* 4bpp attached pair — pix is already the final palette index */
                     pix = denise_sprite_attached_pixel(&denise->sprites, spr, amiga_x);
                     if (pix == 0) continue;
                     color = palette[pix];
                 } else {
-                    /* Normal 2bpp sprite — map to sub-palette at 16 + pair*4 */
                     pix = denise_sprite_pixel(&denise->sprites, spr, amiga_x);
                     if (pix == 0) continue;
                     color = palette[(16u + pair * 4u + pix) & 31u];
                 }
-                /* Accumulate for collision detection (before priority discard) */
                 spr_active[scan_px] |= (uint8_t)(1u << spr);
 
                 if (pf_color[scan_px] == 0 || pair + pf_prio[scan_px] < 4u)
@@ -169,10 +164,10 @@ static void compose_line(RigelDenise *denise)
         }
     }
 
-    /* Collision detection — per-pixel, driven by CLXCON enable bits. */
+    /* Collision detection — per-pixel over the visible window. */
     if (denise->coll.clxcon != 0) {
         unsigned cx;
-        for (cx = 0; cx < (unsigned)output->scanline_width; cx++) {
+        for (cx = x_start; cx < x_stop && cx < RIGEL_DENISE_MAX_SCANLINE_PIXELS; cx++) {
             if (spr_active[cx] == 0 && pf_active[cx] < 2u) continue;
             collision_check_pixel(&denise->coll, spr_active[cx],
                                   (pf_active[cx] & 1u) != 0,

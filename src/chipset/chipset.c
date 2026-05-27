@@ -70,7 +70,6 @@ void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles)
 
     rigel_paula_set_dmacon(&chipset->paula, chipset->agnus.dma.dmacon);
     rigel_agnus_step(ctx, cycles);
-    rigel_denise_step(&chipset->denise, &chipset->agnus.beam, cycles);
     rigel_paula_step(&chipset->paula, cycles);
 
     /* CIA-A TOD increments once per VBL (used by Exec as frame counter) */
