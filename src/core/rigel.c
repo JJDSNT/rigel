@@ -5,6 +5,7 @@
 
 #include "chipset/chipset.h"
 #include "cia/cia.h"
+#include "debug/log.h"
 #include "chipset/agnus/beam.h"
 #include "chipset/agnus/blitter/blitter.h"
 #include "chipset/agnus/timing/deadline.h"
@@ -50,6 +51,10 @@ RigelContext *rigel_create(const rigel_config_t *config)
     ctx = (RigelContext *)calloc(1, sizeof(*ctx));
     if (ctx == NULL) {
         return NULL;
+    }
+
+    if (config->log_fn != NULL) {
+        rigel_log_set_fn(config->log_fn, config->log_opaque);
     }
 
     ctx->config = *config;
