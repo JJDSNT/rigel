@@ -1,6 +1,3 @@
 [submodule "external/musashi"]
 	path = external/musashi
 	url = https://github.com/kstenerud/Musashi
-[submodule "external/libamivideo"]
-	path = external/libamivideo
-	url = https://github.com/svanderburg/libamivideo

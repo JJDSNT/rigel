@@ -52,8 +52,9 @@ permite que o chipset otimize o pipeline interno para um único target.
 
 Rigel possui o buffer de frame. A regra: `pixels` é válido entre `RIGEL_EVENT_FRAME_READY`
 e o próximo `rigel_step` que avança além do início do próximo frame. Host que precisa de
-zero-copy deve copiar dentro desse janela, ou usar double buffering (futuro: write target
-via config callback).
+zero-copy deve configurar `rigel_config_t.framebuffer`; Denise escreve cada scanline
+visível concluída diretamente nesse target e `FRAME_READY` só é reportado depois do
+frame completo ter sido escrito.
 
 ---
 
@@ -167,13 +168,16 @@ cfg.framebuffer.little_endian = true;
 ```
 
 Denise escreve scanlines visíveis diretamente no target quando uma linha fecha.
-RGB565 usa `((r8 >> 3) << 11) | ((g8 >> 2) << 5) | (b8 >> 3)`; com
+RGB565 usa cache de palette/scanline (`palette.rgb565` + `scanline_rgb565`) para
+evitar reconverter o frame RGBA completo. A fórmula permanece
+`((r8 >> 3) << 11) | ((g8 >> 2) << 5) | (b8 >> 3)`; com
 `little_endian = true`, os bytes são armazenados em ordem LE para framebuffer
 SDL/bare-metal.
 
-Nota: `external/libamivideo` é uma referência útil de conversão planar/palette,
-mas não foi usado no framebuffer do Rigel. O chipset já executa a composição de
-Denise; a conversão final RGBA8888→RGB565 é pequena e fica local ao framebuffer.
+Nota: `libamivideo` foi avaliado como referência de conversão planar/palette,
+mas não foi usado nem mantido como submódulo no Rigel. O chipset já executa a
+composição de Denise; manter o cache RGB565 dentro de Denise evita acoplar o
+core a um adapter de viewport externo.
 ```
 
 ---

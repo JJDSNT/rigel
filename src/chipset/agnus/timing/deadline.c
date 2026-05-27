@@ -8,6 +8,7 @@ void agnus_deadlines_reset(agnus_deadlines_t *d)
     d->copper_wait  = AGNUS_DEADLINE_UNKNOWN;
     d->audio        = AGNUS_DEADLINE_UNKNOWN;
     d->disk         = AGNUS_DEADLINE_UNKNOWN;
+    d->slot         = AGNUS_DEADLINE_UNKNOWN;
 }
 
 rigel_u32 agnus_deadlines_min(const agnus_deadlines_t *d)
@@ -20,6 +21,7 @@ rigel_u32 agnus_deadlines_min(const agnus_deadlines_t *d)
     if (d->copper_wait  < min) min = d->copper_wait;
     if (d->audio        < min) min = d->audio;
     if (d->disk         < min) min = d->disk;
+    if (d->slot         < min) min = d->slot;
 
     return min;
 }

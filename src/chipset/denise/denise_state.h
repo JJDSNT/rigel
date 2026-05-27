@@ -24,6 +24,7 @@ typedef struct rigel_denise_register_file {
 
 typedef struct rigel_denise_palette_state {
     rigel_u32 rgb32[32];
+    rigel_u16 rgb565[32];
 } rigel_denise_palette_state_t;
 
 /* Full per-sprite state lives in denise_sprites_state_t (from sprites/sprites.h). */
@@ -46,6 +47,7 @@ typedef struct rigel_denise_output_state {
     rigel_u16 scanline_width;
     rigel_u32 last_rgb;
     rigel_u32 scanline_rgba[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
+    rigel_u16 scanline_rgb565[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
     /* [0] and [1] are back/front buffers; front_idx is the completed frame.
      * Denise writes to frame_rgba[1^front_idx]; host reads frame_rgba[front_idx].
      * Swap at frame boundary: front_idx ^= 1. */

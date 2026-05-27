@@ -11,10 +11,20 @@
 #include "denise/sprites/sprites.h"
 #include "rigel/rigel_denise_types.h"
 
+static rigel_u16 rgb32_to_rgb565(rigel_u32 rgb)
+{
+    rigel_u32 r = (rgb >> 16) & 0xffu;
+    rigel_u32 g = (rgb >> 8) & 0xffu;
+    rigel_u32 b = rgb & 0xffu;
+
+    return (rigel_u16)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+}
+
 static void compose_line(RigelDenise *denise)
 {
     rigel_denise_output_state_t *output = &denise->output;
     const rigel_u32 *palette = denise->palette.rgb32;
+    const rigel_u16 *palette565 = denise->palette.rgb565;
     unsigned depth    = (denise->regs.bplcon0 >> 12) & 0x7u;
     rigel_u16 bplcon2 = denise->regs.bplcon2;
     bool is_ham  = (denise->regs.bplcon0 & 0x0800u) != 0u;
@@ -40,6 +50,7 @@ static void compose_line(RigelDenise *denise)
     /* Initialise the visible window in scanline_rgba and the per-pixel arrays. */
     for (px = x_start; px < x_stop && px < RIGEL_DENISE_MAX_SCANLINE_PIXELS; px++) {
         output->scanline_rgba[px] = palette[0];
+        output->scanline_rgb565[px] = palette565[0];
         pf_color[px]   = 0;
         pf_prio[px]    = (uint8_t)pf1p;
         pf_active[px]  = 0;
@@ -64,6 +75,7 @@ static void compose_line(RigelDenise *denise)
                     if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
                         continue;
                     output->scanline_rgba[(unsigned)screen_x] = prev_rgb;
+                    output->scanline_rgb565[(unsigned)screen_x] = rgb32_to_rgb565(prev_rgb);
                     pf_color[(unsigned)screen_x]  = 0xFFu; /* opaque sentinel */
                     pf_active[(unsigned)screen_x] = 1u;
                 }
@@ -92,8 +104,10 @@ static void compose_line(RigelDenise *denise)
                     pf_prio[(unsigned)screen_x]   = (uint8_t)(use_pf2 ? pf2p : pf1p);
                     pf_active[(unsigned)screen_x] =
                         (uint8_t)((dpf.pf1_index ? 1u : 0u) | (dpf.pf2_index ? 2u : 0u));
-                    if (ci)
+                    if (ci) {
                         output->scanline_rgba[(unsigned)screen_x] = palette[ci];
+                        output->scanline_rgb565[(unsigned)screen_x] = palette565[ci];
+                    }
                 }
             }
         } else {
@@ -115,8 +129,14 @@ static void compose_line(RigelDenise *denise)
                         : (pixels_chunky[px] & 0x1Fu);
                     pf_color[(unsigned)screen_x]  = ci;
                     pf_active[(unsigned)screen_x] = (ci != 0) ? 1u : 0u;
-                    output->scanline_rgba[(unsigned)screen_x] =
-                        is_ehb ? ehb_resolve_color(ci, palette) : palette[ci];
+                    if (is_ehb) {
+                        rigel_u32 color = ehb_resolve_color(ci, palette);
+                        output->scanline_rgba[(unsigned)screen_x] = color;
+                        output->scanline_rgb565[(unsigned)screen_x] = rgb32_to_rgb565(color);
+                    } else {
+                        output->scanline_rgba[(unsigned)screen_x] = palette[ci];
+                        output->scanline_rgb565[(unsigned)screen_x] = palette565[ci];
+                    }
                 }
             }
         }
@@ -158,8 +178,10 @@ static void compose_line(RigelDenise *denise)
                 }
                 spr_active[scan_px] |= (uint8_t)(1u << spr);
 
-                if (pf_color[scan_px] == 0 || pair + pf_prio[scan_px] < 4u)
+                if (pf_color[scan_px] == 0 || pair + pf_prio[scan_px] < 4u) {
                     output->scanline_rgba[scan_px] = color;
+                    output->scanline_rgb565[scan_px] = rgb32_to_rgb565(color);
+                }
             }
         }
     }

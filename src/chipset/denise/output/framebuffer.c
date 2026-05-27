@@ -3,24 +3,6 @@
 #include <string.h>
 #include <stdint.h>
 
-static rigel_u16 rgba8888_to_rgb565(rigel_u32 rgba)
-{
-    rigel_u32 r = (rgba >> 16) & 0xffu;
-    rigel_u32 g = (rgba >> 8) & 0xffu;
-    rigel_u32 b = rgba & 0xffu;
-
-    return (rigel_u16)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
-}
-
-static void convert_scanline_rgb565(rigel_u16 *dst, const rigel_u32 *src)
-{
-    rigel_u32 x;
-
-    for (x = 0; x < RIGEL_DENISE_MAX_SCANLINE_PIXELS; ++x) {
-        dst[x] = rgba8888_to_rgb565(src[x]);
-    }
-}
-
 static void store_rgb565_le(rigel_u8 *dst, rigel_u16 value)
 {
     dst[0] = (rigel_u8)(value & 0xffu);
@@ -69,7 +51,7 @@ static void copy_visible_line_to_target(const RigelDenise *denise)
 
     if (target->format == RIGEL_PIXEL_RGB565) {
         for (x = 0; x < width; ++x) {
-            rigel_u16 value = rgba8888_to_rgb565(output->scanline_rgba[x0 + x]);
+            rigel_u16 value = output->scanline_rgb565[x0 + x];
             if (target->little_endian) {
                 store_rgb565_le(dst + x * sizeof(rigel_u16), value);
             } else {
@@ -97,6 +79,7 @@ void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
     output->scanline_width = 0;
     output->last_rgb = 0;
     (void)memset(output->scanline_rgba, 0, sizeof(output->scanline_rgba));
+    (void)memset(output->scanline_rgb565, 0, sizeof(output->scanline_rgb565));
     (void)memset(output->frame_rgba, 0, sizeof(output->frame_rgba));
     (void)memset(output->frame_rgb565, 0, sizeof(output->frame_rgb565));
     output->front_idx = 0;
@@ -168,8 +151,9 @@ void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_sta
             (void)memcpy(output->frame_rgba[1u ^ output->front_idx][output->beam_vpos],
                          output->scanline_rgba,
                          sizeof(output->scanline_rgba));
-            convert_scanline_rgb565(output->frame_rgb565[back_idx][output->beam_vpos],
-                                    output->scanline_rgba);
+            (void)memcpy(output->frame_rgb565[back_idx][output->beam_vpos],
+                         output->scanline_rgb565,
+                         sizeof(output->scanline_rgb565));
             copy_visible_line_to_target(denise);
         }
         (void)memset(output->plane_words, 0, sizeof(output->plane_words));

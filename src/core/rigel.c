@@ -184,6 +184,10 @@ rigel_cycle_t rigel_get_next_deadline(const RigelContext *ctx)
 
     d.audio = audio_cycles_to_next_event(&ctx->chipset.paula.audio);
     d.disk  = disk_cycles_to_next_event(&ctx->chipset.paula.disk);
+    d.slot  = agnus_slot_scheduler_next_event(
+        &ctx->chipset.agnus.scheduler,
+        ctx->chipset.agnus.beam.line_clocks
+    );
 
     return ctx->chipset.cycles + agnus_deadlines_min(&d);
 }

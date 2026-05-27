@@ -19,14 +19,6 @@ pre-palette chunky indices, not just convert the completed RGBA frame.
 audio, disk, beam) is not captured. Do not use for save state until this is
 expanded. Blocked on internal state stabilising.
 
-### FRAME_READY vs VBLANK semantics undocumented
-
-Both events can fire in the same `rigel_step`. The relationship between them
-(VBLANK = hardware signal lines 0–25; FRAME_READY = frame buffer swap) is not
-documented in the public headers or integration guide.
-
----
-
 ## Harness (`harness/`)
 
 The Musashi integration harness was written for internal timing tests, not for

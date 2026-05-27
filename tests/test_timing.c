@@ -9,6 +9,7 @@ int main(void)
     rigel_u32 line_cycles;
     rigel_u32 frame_cycles;
     rigel_u64 frame_us;
+    rigel_cycle_t deadline;
 
     if (ctx == NULL) {
         return 1;
@@ -42,6 +43,18 @@ int main(void)
     /* VERTB fires at vpos=0, hpos=1 (one CCK from reset) */
     rigel_agnus_step(ctx, 1);
     if ((rigel_get_intreq(ctx) & 0x0020u) == 0) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_agnus_step(ctx, 1);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_DSKEN
+    );
+    deadline = rigel_get_next_deadline(ctx);
+    if (deadline != rigel_get_time(ctx) + 1u) {
         rigel_destroy(ctx);
         return 1;
     }

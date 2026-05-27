@@ -117,7 +117,9 @@ cfg.framebuffer.little_endian = true;
 ```
 
 When configured, Denise writes each completed visible scanline directly into
-that target using the target pitch. RGB565 uses:
+that target using the target pitch. RGB565 is carried through the Denise output
+pipeline with a cached RGB565 scanline/palette path, so a RGB565 write target
+does not need to reconvert the completed RGBA frame. RGB565 uses:
 
 ```c
 rgb565 = ((r8 >> 3) << 11) | ((g8 >> 2) << 5) | (b8 >> 3);
@@ -128,10 +130,11 @@ This matches SDL's `SDL_PIXELFORMAT_RGB565` on little-endian hosts and simple
 bare-metal `uint16_t *` framebuffers. The internal double-buffered frame remains
 available through `rigel_get_frame()`.
 
-`external/libamivideo` was evaluated for this layer. It is useful as a
-standalone planar/palette conversion reference, but Rigel already performs
-Denise composition internally; framebuffer format conversion is kept local to
-avoid coupling the chipset core to a viewport conversion adapter.
+`libamivideo` was evaluated for this layer. It is useful as a standalone
+planar/palette conversion reference, but Rigel already performs Denise
+composition internally; framebuffer format conversion is kept local to avoid
+coupling the chipset core to a viewport conversion adapter. It is therefore not
+vendored by this repository.
 
 **Write target** — zero-copy path for PiStorm/Pi streaming where the host
 supplies a framebuffer pointer at config time.

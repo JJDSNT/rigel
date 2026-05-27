@@ -115,13 +115,13 @@ para quando o estado interno estabilizar).
 
 ---
 
-### FRAME_READY vs VBLANK semântica não documentada ⚠️
+### FRAME_READY vs VBLANK semântica documentada ✅
 
 `RIGEL_EVENT_FRAME_READY` dispara quando `frame_count` muda (beam wraps).
 `RIGEL_EVENT_VBLANK` dispara quando `beam_in_vblank()` faz transição false→true.
 Podem disparar no mesmo `rigel_step`. VBLANK é o sinal hardware (linhas 0–25);
-FRAME_READY é o evento de "frame completo disponível". Não estão documentados em
-relação um ao outro.
+FRAME_READY é o evento de "frame completo disponível". A relação está descrita
+em `include/rigel/rigel_events.h` e no guia de integração.
 
 ---
 

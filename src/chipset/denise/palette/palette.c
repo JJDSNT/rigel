@@ -10,5 +10,6 @@ void rigel_denise_palette_reset(rigel_denise_palette_state_t *palette)
 
     for (i = 0; i < 32; ++i) {
         palette->rgb32[i] = 0;
+        palette->rgb565[i] = 0;
     }
 }

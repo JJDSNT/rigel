@@ -38,6 +38,9 @@ typedef struct agnus_deadlines {
     /* Disk: cycles until fake-DMA countdown completion IRQ.
      * Source: disk_cycles_to_next_event() — countdown field when in countdown phase. */
     rigel_u32 disk;
+
+    /* Slot scheduler: cycles until the next non-CPU/non-FREE DMA slot. */
+    rigel_u32 slot;
 } agnus_deadlines_t;
 
 /* Initialize all entries to UNKNOWN. */

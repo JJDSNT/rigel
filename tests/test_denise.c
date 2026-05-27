@@ -299,6 +299,79 @@ static int test_rgb565_frame_format(rigel_u16 *chip_ram)
     return result;
 }
 
+static int check_rgb565_edge_target_bytes(const rigel_u8 *target)
+{
+    if (target[0] != 0x1fu || target[1] != 0x00u ||
+        target[2] != 0xffu || target[3] != 0xffu) {
+        return 1;
+    }
+
+    if (target[4] != 0xaau || target[5] != 0xaau ||
+        target[6] != 0xaau || target[7] != 0xaau) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static void setup_rgb565_edge_scene(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    memset(chip_ram, 0, 256u * sizeof(chip_ram[0]));
+    fill_bitplane_words(chip_ram, 0x5555u);
+    setup_lores_single_bitplane(ctx, 0x0038u, 0x0060u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x000fu);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x0fffu);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+}
+
+static int test_rgb565_write_target_edges(rigel_u16 *chip_ram)
+{
+    rigel_config_t cfg = { 0 };
+    static rigel_u8 host_framebuffer[8];
+    RigelContext *ctx;
+    int result = 0;
+
+    memset(host_framebuffer, 0xaa, sizeof(host_framebuffer));
+    cfg.chip_ram.opaque = chip_ram;
+    cfg.chip_ram.read16 = test_chip_ram_read16;
+    cfg.chip_ram.write16 = test_chip_ram_write16;
+    cfg.pixel_format = RIGEL_PIXEL_RGB565;
+    cfg.framebuffer.pixels = host_framebuffer;
+    cfg.framebuffer.width = 2u;
+    cfg.framebuffer.height = 1u;
+    cfg.framebuffer.pitch = sizeof(host_framebuffer);
+    cfg.framebuffer.format = RIGEL_PIXEL_RGB565;
+    cfg.framebuffer.little_endian = true;
+
+    ctx = rigel_create(&cfg);
+    if (ctx == NULL) {
+        return 1;
+    }
+
+    setup_rgb565_edge_scene(ctx, chip_ram);
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0 ||
+        check_rgb565_edge_target_bytes(host_framebuffer) != 0) {
+        result = 1;
+    }
+
+    if (result == 0) {
+        memset(host_framebuffer, 0xaa, sizeof(host_framebuffer));
+        rigel_reset(ctx);
+        setup_rgb565_edge_scene(ctx, chip_ram);
+        if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0 ||
+            check_rgb565_edge_target_bytes(host_framebuffer) != 0) {
+            result = 1;
+        }
+    }
+
+    rigel_destroy(ctx);
+    return result;
+}
+
 int main(void)
 {
     rigel_config_t cfg = { 0 };
@@ -417,6 +490,14 @@ int main(void)
 
     {
         int rc = test_rgb565_frame_format(chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_rgb565_write_target_edges(chip_ram);
         if (rc != 0) {
             rigel_destroy(ctx);
             return 1;

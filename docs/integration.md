@@ -33,6 +33,16 @@ while (running) {
 }
 ```
 
+`RIGEL_EVENT_FRAME_READY` means the beam wrapped to the next frame and Denise
+has swapped the completed internal front buffer. If a host framebuffer target is
+configured, all visible scanlines for that completed frame have also been
+written when this event is reported.
+
+`RIGEL_EVENT_VBLANK` means the hardware vertical blank signal transitioned from
+false to true. With the current PAL/NTSC beam model this happens in the vertical
+blank zone at the start of the frame, so `FRAME_READY` and `VBLANK` can be
+reported by the same `rigel_step`.
+
 For a host-owned RGB565 framebuffer, configure `rigel_config_t.framebuffer`.
 Denise will write completed visible scanlines directly into that buffer using
 the host pitch; `rigel_get_frame()` remains available for the internal buffer.

@@ -364,6 +364,10 @@ rigel_u32 agnus_slot_scheduler_next_event(const agnus_slot_scheduler_t *sched,
 {
     rigel_u16 h;
 
+    if (sched->table_dirty) {
+        return 1u;
+    }
+
     for (h = sched->hpos + 1u; h < line_clocks; h++) {
         agnus_slot_owner_t o = sched->table[h];
         if (o != AGNUS_SLOT_CPU && o != AGNUS_SLOT_FREE)
