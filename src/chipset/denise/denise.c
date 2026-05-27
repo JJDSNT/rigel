@@ -80,31 +80,21 @@ void rigel_denise_write_reg(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
     rigel_denise_registers_write(&ctx->chipset.denise, addr, value);
     rigel_context_write_reg(ctx, addr, value);
 
-    /* Hires bit (BPLCON0 bit 15) changes the bitplane slot count in Agnus */
     if (addr == RIGEL_REG_BPLCON0) {
         agnus_slot_scheduler_set_hires(
             &ctx->chipset.agnus.scheduler,
             (value & 0x8000u) != 0
         );
+        agnus_slot_scheduler_set_depth(
+            &ctx->chipset.agnus.scheduler,
+            (value >> 12) & 0x7u
+        );
     }
 
-    /* DIWSTRT/DIWSTOP gate both Denise's display window and Agnus's bitplane DMA window */
     if (addr == RIGEL_REG_DIWSTRT) {
         raster_set_diwstrt(&ctx->chipset.agnus.raster, value);
-        agnus_slot_scheduler_set_diw(
-            &ctx->chipset.agnus.scheduler,
-            (value >> 8) & 0xFFu,
-            ctx->chipset.agnus.scheduler.vdiwstop
-        );
     }
     if (addr == RIGEL_REG_DIWSTOP) {
-        rigel_u16 vstop_raw = (rigel_u16)((value >> 8) & 0xFFu);
-        rigel_u16 vstop = (vstop_raw & 0x80u) ? vstop_raw : (rigel_u16)(vstop_raw | 0x100u);
         raster_set_diwstop(&ctx->chipset.agnus.raster, value);
-        agnus_slot_scheduler_set_diw(
-            &ctx->chipset.agnus.scheduler,
-            ctx->chipset.agnus.scheduler.vdiwstrt,
-            vstop
-        );
     }
 }

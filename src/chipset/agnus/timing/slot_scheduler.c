@@ -94,7 +94,7 @@ static void dispatch_slot(agnus_slot_owner_t owner,
         if (ctx) {
             RigelAgnus *agnus = &ctx->chipset.agnus;
             rigel_denise_output_state_t *dout = &ctx->chipset.denise.output;
-            unsigned depth = (ctx->chipset.denise.regs.bplcon0 >> 12) & 0x7u;
+            unsigned depth = (unsigned)agnus->scheduler.depth;
             unsigned plane = agnus->scheduler.fetch_plane_index;
             rigel_u16 widx  = dout->plane_word_count;
 
@@ -193,11 +193,10 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched, rigel_u16 vpos)
         fill_slot(sched, AGNUS_HPOS_SPRITE_7_B, AGNUS_SLOT_SPRITE_7);
     }
 
-    /* Bitplane DMA — suppressed during VBL and outside the vertical display window.
-     * Range is derived from DDFSTRT/DDFSTOP (written via MMIO).
+    /* Bitplane DMA — suppressed during VBL only. DIWSTRT/DIWSTOP gate Denise's
+     * display output, not Agnus DMA. Range from DDFSTRT/DDFSTOP.
      * Hires mode (BPLCON0 bit 15): fills every CCK slot instead of every other. */
-    if (!vbl && dmacon_bplen(sched->dmacon) &&
-        vpos >= sched->vdiwstrt && vpos <= sched->vdiwstop) {
+    if (!vbl && dmacon_bplen(sched->dmacon)) {
         rigel_u16 h;
         rigel_u16 bpl_start = sched->ddfstrt;
         rigel_u16 bpl_stop  = sched->ddfstop < (AGNUS_SLOTS_PER_LINE - 4u)
@@ -232,8 +231,7 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
     sched->dmacon            = 0;
     sched->ddfstrt           = AGNUS_HPOS_BITPLANE_START;
     sched->ddfstop           = AGNUS_SLOTS_PER_LINE;    /* no upper limit until host sets it */
-    sched->vdiwstrt          = AGNUS_VBL_LINE_END + 1u; /* PAL default: active display starts at line 26 */
-    sched->vdiwstop          = 255u;                    /* PAL default: last active line */
+    sched->depth             = 0;
     sched->line_is_vbl       = false;
     sched->table_dirty       = true;
     sched->copper_active     = false;
@@ -268,12 +266,9 @@ void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
     sched->table_dirty = true;
 }
 
-void agnus_slot_scheduler_set_diw(agnus_slot_scheduler_t *sched,
-                                   rigel_u16 vdiwstrt, rigel_u16 vdiwstop)
+void agnus_slot_scheduler_set_depth(agnus_slot_scheduler_t *sched, rigel_u16 depth)
 {
-    sched->vdiwstrt    = vdiwstrt & 0xFFu;   /* vstrt always fits in 8 bits */
-    sched->vdiwstop    = vdiwstop;            /* vstop is OCS-decoded (may be 256+) */
-    sched->table_dirty = true;
+    sched->depth = depth & 0x7u;
 }
 
 void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
@@ -321,18 +316,14 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
             sched->fetch_plane_index = 0;
             /* Apply BPL1MOD/BPL2MOD at the end of each active display line */
             if (ctx && !sched->line_is_vbl) {
-                unsigned depth = (ctx->chipset.denise.regs.bplcon0 >> 12) & 0x7u;
-                bplpt_apply_modulo(&ctx->chipset.agnus.bplpt, depth);
+                bplpt_apply_modulo(&ctx->chipset.agnus.bplpt, (unsigned)sched->depth);
             }
         }
         if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos)) {
-            bool copper_was_triggered = ctx->chipset.agnus.copper.triggered;
             agnus_irq_raise_vblank(ctx);
-            rigel_copper_domain_jump1(&ctx->chipset.agnus.copper);
-            /* VBL reload restarts copper from COP1LC but must not discard a
-             * triggered event that fired in the same CCK — rigel.c detects
-             * RIGEL_EVENT_COPPER as a false→true transition per step. */
-            ctx->chipset.agnus.copper.triggered = copper_was_triggered;
+            if (dmacon_copen(sched->dmacon)) {
+                rigel_copper_domain_vbl_reload(&ctx->chipset.agnus.copper);
+            }
         }
     } else {
         (void)frame_lines;
