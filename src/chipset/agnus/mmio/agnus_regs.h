@@ -79,6 +79,9 @@
 #define AGNUS_BPLMOD1   0x108
 #define AGNUS_BPLMOD2   0x10A
 
+/* --- ECS: beam control --------------------------------------------------- */
+#define AGNUS_BEAMCON0  0x1DC   /* W  beam timing control (ECS)  */
+
 /* --- Copper -------------------------------------------------------------- */
 #define AGNUS_COP1LCH   0x080
 #define AGNUS_COP1LCL   0x082

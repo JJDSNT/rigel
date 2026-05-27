@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "agnus/agnus_config.h"
 #include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/copper/copper_regs.h"
 #include "agnus/dma/sprite_dma.h"
@@ -68,6 +69,12 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
         break;
     case AGNUS_BPLMOD2:
         bplpt_set_modulo(&ctx->chipset.agnus.bplpt, 1, value);
+        rigel_context_write_reg(ctx, addr, value);
+        break;
+    case AGNUS_BEAMCON0:
+        /* Bit 5 (VARVSYEN/PAL): 1 = PAL 312 lines, 0 = NTSC 262 lines */
+        ctx->chipset.agnus.beam.frame_lines =
+            (value & 0x0020u) ? AGNUS_PAL_FRAME_LINES : AGNUS_NTSC_FRAME_LINES;
         rigel_context_write_reg(ctx, addr, value);
         break;
     default:

@@ -25,4 +25,11 @@ bool rigel_serial_tx_available(const RigelContext *ctx);
  */
 bool rigel_serial_pop_tx_byte(RigelContext *ctx, rigel_u8 *byte_out);
 
+/*
+ * Enable or disable instant TX mode. When enabled, bytes written to SERDAT
+ * are queued immediately without waiting for baud-rate timing. Useful for
+ * simulation hosts that do not emulate real-time serial baud rates.
+ */
+void rigel_serial_set_tx_instant(RigelContext *ctx, bool enabled);
+
 #endif

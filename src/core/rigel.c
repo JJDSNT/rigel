@@ -6,6 +6,7 @@
 #include "chipset/chipset.h"
 #include "cia/cia.h"
 #include "debug/log.h"
+#include "chipset/agnus/agnus_config.h"
 #include "chipset/agnus/beam.h"
 #include "chipset/agnus/blitter/blitter.h"
 #include "chipset/agnus/timing/deadline.h"
@@ -59,6 +60,11 @@ RigelContext *rigel_create(const rigel_config_t *config)
 
     ctx->config = *config;
     rigel_reset(ctx);
+
+    if (config->video_std == RIGEL_VIDEO_PAL) {
+        ctx->chipset.agnus.beam.frame_lines = AGNUS_PAL_FRAME_LINES;
+    }
+
     rigel_paula_set_disk_memory_if(&ctx->chipset.paula, ctx->config.chip_ram);
     rigel_paula_set_disk_irq_sink(&ctx->chipset.paula, rigel_paula_disk_irq_sink(ctx));
     rigel_paula_set_serial_irq_sink(&ctx->chipset.paula, rigel_paula_serial_irq_sink(ctx));
@@ -186,7 +192,6 @@ rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
     rigel_step_result_t result;
     rigel_u8 ipl_before;
     bool blit_busy_before;
-    bool copper_triggered_before;
     rigel_u16 vpos_before;
     rigel_u64 frame_before;
     bool vblank_before;
@@ -200,8 +205,8 @@ rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
 
     ipl_before = rigel_paula_interrupts_current_ipl(&ctx->chipset.paula.interrupts);
     blit_busy_before = blitter_is_busy(&ctx->chipset.agnus.blitter) != 0;
-    copper_triggered_before = ctx->chipset.agnus.copper.triggered;
     vpos_before = ctx->chipset.agnus.beam.vpos;
+    ctx->chipset.agnus.copper.event_latched = false;
     frame_before = ctx->chipset.agnus.beam.frame_count;
     vblank_before = beam_in_vblank(&ctx->chipset.agnus.beam);
 
@@ -217,7 +222,7 @@ rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)
         result.events |= (rigel_u32)RIGEL_EVENT_BLIT_DONE;
     }
 
-    if (!copper_triggered_before && ctx->chipset.agnus.copper.triggered) {
+    if (ctx->chipset.agnus.copper.event_latched) {
         result.events |= (rigel_u32)RIGEL_EVENT_COPPER;
     }
 

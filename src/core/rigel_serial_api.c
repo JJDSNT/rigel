@@ -29,3 +29,12 @@ bool rigel_serial_pop_tx_byte(RigelContext *ctx, rigel_u8 *byte_out)
 
     return serial_pop_tx_byte(&ctx->chipset.paula.serial, byte_out);
 }
+
+void rigel_serial_set_tx_instant(RigelContext *ctx, bool enabled)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    serial_set_tx_instant(&ctx->chipset.paula.serial, enabled);
+}

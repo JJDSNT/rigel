@@ -12,6 +12,7 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
 bool rigel_agnus_mmio_has_reg(rigel_u32 addr)
 {
     if (addr == RIGEL_REG_DMACON   ||
+        addr == AGNUS_DMACONR      ||
         addr == RIGEL_REG_DDFSTRT  ||
         addr == RIGEL_REG_DDFSTOP  ||
         addr == AGNUS_VPOSR        ||
@@ -24,7 +25,7 @@ bool rigel_agnus_mmio_has_reg(rigel_u32 addr)
         return true;
     }
 
-    if (addr == AGNUS_BPLMOD1 || addr == AGNUS_BPLMOD2) {
+    if (addr == AGNUS_BPLMOD1 || addr == AGNUS_BPLMOD2 || addr == AGNUS_BEAMCON0) {
         return true;
     }
 

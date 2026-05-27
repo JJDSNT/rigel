@@ -11,6 +11,11 @@
  * the host should add any prefix or newline it needs. */
 typedef void (*rigel_log_fn_t)(const char *message, void *opaque);
 
+typedef enum rigel_video_std {
+    RIGEL_VIDEO_NTSC = 0,
+    RIGEL_VIDEO_PAL  = 1,
+} rigel_video_std_t;
+
 typedef rigel_u16 (*rigel_chip_ram_read16_fn)(void *opaque, rigel_u32 addr);
 typedef void (*rigel_chip_ram_write16_fn)(void *opaque, rigel_u32 addr, rigel_u16 value);
 
@@ -38,6 +43,7 @@ typedef struct rigel_config {
      */
     rigel_log_fn_t    log_fn;
     void             *log_opaque;
+    rigel_video_std_t video_std;
 } rigel_config_t;
 
 #endif
