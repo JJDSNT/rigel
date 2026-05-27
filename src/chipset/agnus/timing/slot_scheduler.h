@@ -115,8 +115,8 @@ typedef struct agnus_slot_scheduler {
     rigel_u16 dmacon;     /* DMACON value at last rebuild   */
     rigel_u16 ddfstrt;    /* bitplane fetch start hpos      */
     rigel_u16 ddfstop;    /* bitplane fetch stop hpos       */
-    rigel_u16 vdiwstrt;   /* DIWSTRT vertical start (bits[15:8]) — bitplane DMA inhibited above */
-    rigel_u16 vdiwstop;   /* DIWSTOP vertical stop  (bits[15:8]) — bitplane DMA inhibited below */
+    rigel_u16 vdiwstrt;   /* DIWSTRT vertical start: raw DIWSTRT[15:8], 0–255 */
+    rigel_u16 vdiwstop;   /* DIWSTOP vertical stop: OCS-decoded (bit 7 clear → 256+), may exceed 255 */
     bool      line_is_vbl; /* true = VBL line, sprite/bpl suppressed */
 
     /* Set when DMACON/DDF is written; clears after next rebuild */
@@ -153,7 +153,9 @@ void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
                                    rigel_u16 ddfstrt, rigel_u16 ddfstop);
 
 /* Call whenever DIWSTRT or DIWSTOP is written — updates the vertical DIW range.
- * vdiwstrt = DIWSTRT[15:8], vdiwstop = DIWSTOP[15:8]. */
+ * vdiwstrt = DIWSTRT[15:8] (raw, 0–255).
+ * vdiwstop = OCS-decoded stop line: caller applies the implicit bit-8 extension rule
+ *            (bit 7 of DIWSTOP[15:8] clear → vdiwstop | 0x100), so the value may exceed 255. */
 void agnus_slot_scheduler_set_diw(agnus_slot_scheduler_t *sched,
                                    rigel_u16 vdiwstrt, rigel_u16 vdiwstop);
 

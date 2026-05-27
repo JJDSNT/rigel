@@ -98,11 +98,13 @@ void rigel_denise_write_reg(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
         );
     }
     if (addr == RIGEL_REG_DIWSTOP) {
+        rigel_u16 vstop_raw = (rigel_u16)((value >> 8) & 0xFFu);
+        rigel_u16 vstop = (vstop_raw & 0x80u) ? vstop_raw : (rigel_u16)(vstop_raw | 0x100u);
         raster_set_diwstop(&ctx->chipset.agnus.raster, value);
         agnus_slot_scheduler_set_diw(
             &ctx->chipset.agnus.scheduler,
             ctx->chipset.agnus.scheduler.vdiwstrt,
-            (value >> 8) & 0xFFu
+            vstop
         );
     }
 }

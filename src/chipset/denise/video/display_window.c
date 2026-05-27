@@ -23,10 +23,18 @@ void rigel_denise_display_window_update(RigelDenise *denise)
         return;
     }
 
+    rigel_u16 vstop_raw;
+    rigel_u16 vstop;
+
     denise->video.visible_x_start = (rigel_u16)(denise->regs.diwstrt & 0x00ffu);
     denise->video.visible_y_start = (rigel_u16)((denise->regs.diwstrt >> 8) & 0x00ffu);
-    denise->video.visible_x_stop = (rigel_u16)(denise->regs.diwstop & 0x00ffu);
-    denise->video.visible_y_stop = (rigel_u16)((denise->regs.diwstop >> 8) & 0x00ffu);
+    denise->video.visible_x_stop  = (rigel_u16)(denise->regs.diwstop & 0x00ffu);
+
+    /* OCS Agnus extends DIWSTOP vertical byte: bit 7 clear → bit 8 is set (line 256+).
+     * This makes WB1.3 DIWSTOP vpos=0x2C decode to line 300 (0x12C) rather than 44. */
+    vstop_raw = (rigel_u16)((denise->regs.diwstop >> 8) & 0xFFu);
+    vstop = (vstop_raw & 0x80u) ? vstop_raw : (rigel_u16)(vstop_raw | 0x100u);
+    denise->video.visible_y_stop = vstop;
 
     width = 320;
     if (denise->video.visible_x_stop >= denise->video.visible_x_start) {

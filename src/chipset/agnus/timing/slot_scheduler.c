@@ -271,8 +271,8 @@ void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
 void agnus_slot_scheduler_set_diw(agnus_slot_scheduler_t *sched,
                                    rigel_u16 vdiwstrt, rigel_u16 vdiwstop)
 {
-    sched->vdiwstrt    = vdiwstrt & 0xFFu;
-    sched->vdiwstop    = vdiwstop & 0xFFu;
+    sched->vdiwstrt    = vdiwstrt & 0xFFu;   /* vstrt always fits in 8 bits */
+    sched->vdiwstop    = vdiwstop;            /* vstop is OCS-decoded (may be 256+) */
     sched->table_dirty = true;
 }
 

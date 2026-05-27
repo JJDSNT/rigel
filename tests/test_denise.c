@@ -27,7 +27,7 @@ int main(void)
         return 1;
     }
 
-    if (video.display_width != 65 || video.display_height != 1) {
+    if (video.display_width != 65 || video.display_height != 257) {
         rigel_destroy(ctx);
         return 1;
     }
