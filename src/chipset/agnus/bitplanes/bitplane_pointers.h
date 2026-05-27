@@ -15,7 +15,6 @@
 
 typedef struct bitplane_pointers {
     rigel_u32 bplpt[BITPLANE_COUNT];
-    rigel_i16 bplmod[2];   /* signed — negative modulo scrolls backwards */
 } bitplane_pointers_t;
 
 void bplpt_reset(bitplane_pointers_t *p);
@@ -25,11 +24,11 @@ void bplpt_set_lo(bitplane_pointers_t *p, unsigned plane, rigel_u16 val);
 /* Advance pointer by two bytes after a fetch word */
 void bplpt_advance(bitplane_pointers_t *p, unsigned plane);
 
-/* Store BPL1MOD (idx=0) or BPL2MOD (idx=1) */
-void bplpt_set_modulo(bitplane_pointers_t *p, unsigned idx, rigel_u16 val);
-
-/* Add the appropriate modulo to each active plane at end of line.
- * depth = number of active planes from BPLCON0[14:12]. */
-void bplpt_apply_modulo(bitplane_pointers_t *p, unsigned depth);
+/* Add BPL1MOD/BPL2MOD to each active plane at end of line.
+ * depth = number of active planes from BPLCON0[14:12].
+ * bpl1mod = BPL1MOD register value (applied to odd planes: 0,2,4).
+ * bpl2mod = BPL2MOD register value (applied to even planes: 1,3,5). */
+void bplpt_apply_modulo(bitplane_pointers_t *p, unsigned depth,
+                        rigel_i16 bpl1mod, rigel_i16 bpl2mod);
 
 #endif

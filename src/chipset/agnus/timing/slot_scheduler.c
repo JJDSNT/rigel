@@ -7,6 +7,7 @@
 #include "agnus/agnus_state.h"
 #include "agnus/bitplanes/bitplane_fetch.h"
 #include "agnus/bitplanes/bitplane_pointers.h"
+#include "agnus/mmio/agnus_regs.h"
 #include "agnus/dma/dmacon.h"
 #include "agnus/dma/refresh_dma.h"
 #include "agnus/blitter/blitter.h"
@@ -316,7 +317,10 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
             sched->fetch_plane_index = 0;
             /* Apply BPL1MOD/BPL2MOD at the end of each active display line */
             if (ctx && !sched->line_is_vbl) {
-                bplpt_apply_modulo(&ctx->chipset.agnus.bplpt, (unsigned)sched->depth);
+                rigel_i16 bpl1mod = (rigel_i16)rigel_context_read_reg(ctx, AGNUS_BPLMOD1);
+                rigel_i16 bpl2mod = (rigel_i16)rigel_context_read_reg(ctx, AGNUS_BPLMOD2);
+                bplpt_apply_modulo(&ctx->chipset.agnus.bplpt,
+                                   (unsigned)sched->depth, bpl1mod, bpl2mod);
             }
         }
         if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos)) {
