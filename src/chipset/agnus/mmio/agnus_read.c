@@ -38,7 +38,10 @@ rigel_u16 rigel_agnus_mmio_read_impl(RigelContext *ctx, rigel_u32 addr)
         return rigel_dma_domain_read_dmacon(&ctx->chipset.agnus.dma);
     case AGNUS_VPOSR:
         /* [15]=LOF [14:8]=chip_id (0x00 = OCS Agnus 8361/8370) [0]=vpos[8] */
-        return (rigel_u16)((ctx->chipset.agnus.beam.vpos >> 8) & 1u);
+        return (rigel_u16)(
+            ((rigel_u16)ctx->chipset.agnus.beam.lof << 15) |
+            ((ctx->chipset.agnus.beam.vpos >> 8) & 1u)
+        );
     case AGNUS_VHPOSR:
         /* [15:8]=vpos[7:0]  [7:0]=hpos in lores pixels (CCK / 2) */
         return (rigel_u16)(((ctx->chipset.agnus.beam.vpos & 0xFFu) << 8) |

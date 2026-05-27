@@ -3,6 +3,40 @@
 
 #include <stddef.h>
 
+static rigel_u16 beam_line_hmax(const beam_state_t *beam)
+{
+    return (rigel_u16)(beam->line_clocks + (beam->lol ? 1u : 0u));
+}
+
+static rigel_u16 beam_frame_vmax(const beam_state_t *beam)
+{
+    return (rigel_u16)(beam->frame_lines + (beam->lof ? 1u : 0u));
+}
+
+static void beam_advance_line(beam_state_t *beam)
+{
+    beam->hpos = 0;
+    beam->vpos = (rigel_u16)(beam->vpos + 1u);
+
+    if (beam->lol_toggle)
+        beam->lol ^= 1u;
+    else
+        beam->lol = 0u;
+
+    if (beam->vpos >= beam_frame_vmax(beam)) {
+        beam->vpos = 0;
+        beam->frame_count += 1u;
+
+        if (beam->lof_toggle)
+            beam->lof ^= 1u;
+        else
+            beam->lof = 0u;
+
+        if (!beam->lol_toggle)
+            beam->lol = 0u;
+    }
+}
+
 void beam_reset(beam_state_t *beam)
 {
     if (beam == NULL) {
@@ -15,15 +49,15 @@ void beam_reset(beam_state_t *beam)
     beam->frame_lines = RIGEL_BEAM_DEFAULT_FRAME_LINES;
     beam->visible_y_start = RIGEL_BEAM_DEFAULT_VISIBLE_Y_START;
     beam->visible_y_stop = RIGEL_BEAM_DEFAULT_VISIBLE_Y_STOP;
+    beam->lof = 0;
+    beam->lof_toggle = 0;
+    beam->lol = 0;
+    beam->lol_toggle = 0;
     beam->frame_count = 0;
 }
 
 void beam_step(beam_state_t *beam, rigel_u16 clocks)
 {
-    rigel_u32 total;
-    rigel_u32 line_advance;
-    rigel_u32 frame_advance;
-
     if (beam == NULL) {
         return;
     }
@@ -32,18 +66,26 @@ void beam_step(beam_state_t *beam, rigel_u16 clocks)
         beam_reset(beam);
     }
 
-    total = (rigel_u32)beam->hpos + (rigel_u32)clocks;
-    line_advance = total / beam->line_clocks;
-    beam->hpos = (rigel_u16)(total % beam->line_clocks);
+    while (clocks > 0u) {
+        rigel_u16 hmax = beam_line_hmax(beam);
+        rigel_u16 remaining = (rigel_u16)(hmax - beam->hpos);
 
-    if (line_advance == 0) {
-        return;
+        if (remaining == 0u) {
+            beam_advance_line(beam);
+            continue;
+        }
+
+        if (clocks < remaining) {
+            beam->hpos = (rigel_u16)(beam->hpos + clocks);
+            clocks = 0u;
+        } else {
+            beam->hpos = (rigel_u16)(beam->hpos + remaining);
+            clocks = (rigel_u16)(clocks - remaining);
+            if (beam->hpos >= hmax) {
+                beam_advance_line(beam);
+            }
+        }
     }
-
-    total = (rigel_u32)beam->vpos + line_advance;
-    frame_advance = total / beam->frame_lines;
-    beam->vpos = (rigel_u16)(total % beam->frame_lines);
-    beam->frame_count += frame_advance;
 }
 
 bool beam_in_vblank(const beam_state_t *beam)
@@ -70,5 +112,5 @@ rigel_u16 beam_cycles_until_line_end(const beam_state_t *beam)
         return 0;
     }
 
-    return (rigel_u16)(beam->line_clocks - beam->hpos);
+    return (rigel_u16)(beam_line_hmax(beam) - beam->hpos);
 }
