@@ -1,6 +1,7 @@
 #include "agnus/copper/copper.h"
 #include "agnus/beam.h"
 #include "agnus/dma.h"
+#include "agnus/dma/dmacon.h"
 #include "domains/copper/copper_domain.h"
 
 int main(void)
@@ -67,6 +68,16 @@ int main(void)
     /* Setting CDANG lets the copper write to low registers */
     copper.copcon = 0x0002u;
     if ((copper.copcon & 0x0002u) == 0) {
+        return 1;
+    }
+
+    if (dmacon_apply_write(0, DMACON_SETCLR | DMACON_DMAEN | DMACON_COPEN | DMACON_BLTPRI) !=
+        (DMACON_DMAEN | DMACON_COPEN | DMACON_BLTPRI)) {
+        return 1;
+    }
+
+    if (dmacon_apply_write(DMACON_DMAEN | DMACON_COPEN | DMACON_BLTPRI,
+                           DMACON_COPEN | DMACON_BLTPRI) != DMACON_DMAEN) {
         return 1;
     }
 

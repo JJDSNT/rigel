@@ -55,8 +55,8 @@ static inline bool dmacon_auden(rigel_u16 d, unsigned ch) {
 /* Apply a DMACON write (respects SETCLR bit). */
 static inline rigel_u16 dmacon_apply_write(rigel_u16 current, rigel_u16 value) {
     if (value & DMACON_SETCLR)
-        return current | (value & 0x1FFu);
-    return current & ~(value & 0x1FFu);
+        return current | (value & 0x7FFFu);
+    return current & ~(value & 0x7FFFu);
 }
 
 #endif
