@@ -117,6 +117,46 @@ int main(void)
         return 1;
     }
 
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_BPLCON0, 0x9000u);
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWHIGH, 0x2000u);
+    if (!rigel_denise_get_video_desc(ecs_ctx, &video) ||
+        video.visible_x_start != 0x0081u ||
+        video.visible_x_stop != 0x0301u ||
+        video.display_width != 640u ||
+        video.display_height != 256u) {
+        rigel_destroy(ecs_ctx);
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_BPLCON0, 0x0201u);
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWHIGH, 0x0000u);
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWSTRT, 0x0181u);
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWSTOP, 0x0281u);
+    if (!rigel_denise_get_video_desc(ecs_ctx, &video) ||
+        video.visible_x_start != 0x0081u ||
+        video.visible_x_stop != 0x0301u ||
+        video.display_width != 640u ||
+        video.display_height != 256u) {
+        rigel_destroy(ecs_ctx);
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWSTRT, 0x2c81u);
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWSTOP, 0x2cc1u);
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWHIGH, 0x2100u);
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_BPLCON0, 0xc205u);
+    if (!rigel_denise_get_video_desc(ecs_ctx, &video) ||
+        video.visible_x_start != 0x0081u ||
+        video.visible_x_stop != 0x0301u ||
+        video.display_width != 640u ||
+        video.display_height != 256u) {
+        rigel_destroy(ecs_ctx);
+        rigel_destroy(ctx);
+        return 1;
+    }
+
     rigel_destroy(ecs_ctx);
     rigel_destroy(ctx);
 

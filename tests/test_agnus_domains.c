@@ -1,7 +1,21 @@
 #include "agnus/agnus_state.h"
+#include "agnus/timing/slot_scheduler.h"
 #include "chipset/chipset.h"
 #include "core/rigel_context.h"
 #include "rigel/rigel.h"
+
+static unsigned count_bitplane_slots(const agnus_slot_scheduler_t *sched)
+{
+    unsigned count = 0;
+
+    for (unsigned i = 0; i < AGNUS_SLOTS_PER_LINE; ++i) {
+        if (sched->table[i] == AGNUS_SLOT_BITPLANE) {
+            count++;
+        }
+    }
+
+    return count;
+}
 
 static rigel_u16 test_chip_ram_read16(void *opaque, rigel_u32 addr)
 {
@@ -214,6 +228,30 @@ int main(void)
     rigel_custom_write16(ctx, RIGEL_REG_DIWSTOP, 0x2cc1u);
     if (chipset->agnus.raster.diwstrt != 0x2c81u ||
         chipset->agnus.raster.diwstop != 0x2cc1u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, RIGEL_REG_BPLCON0, 0xb200u);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTRT, 0x003cu);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTOP, 0x00d4u);
+    rigel_custom_write16(ctx, RIGEL_REG_DMACON,
+                         RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN);
+    agnus_slot_scheduler_rebuild(&chipset->agnus.scheduler,
+                                 44u,
+                                 &chipset->agnus.refresh);
+    if (count_bitplane_slots(&chipset->agnus.scheduler) != 120u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, RIGEL_REG_BPLCON0, 0x2302u);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTRT, 0x0038u);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTOP, 0x00d0u);
+    agnus_slot_scheduler_rebuild(&chipset->agnus.scheduler,
+                                 44u,
+                                 &chipset->agnus.refresh);
+    if (count_bitplane_slots(&chipset->agnus.scheduler) != 40u) {
         rigel_destroy(ctx);
         return 1;
     }

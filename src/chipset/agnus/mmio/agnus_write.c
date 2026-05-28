@@ -52,8 +52,10 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
             value,
             ctx->chipset.agnus.scheduler.ddfstop
         );
+        /* DDFSTRT stores HPOS/2 (each unit = 2 lores pixels).
+         * Compositor uses absolute lores pixel position, so multiply by 2. */
         ctx->chipset.denise.output.ddfstrt_lores =
-            (rigel_u16)(ctx->chipset.agnus.scheduler.ddfstrt & 0x00FEu);
+            (rigel_u16)((ctx->chipset.agnus.scheduler.ddfstrt & 0x00FCu) << 1u);
         rigel_context_write_reg(ctx, addr, value);
         break;
     case RIGEL_REG_DDFSTOP:

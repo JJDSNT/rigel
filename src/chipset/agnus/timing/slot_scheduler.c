@@ -21,6 +21,9 @@
 #include "domains/disk/disk_domain.h"
 #include "domains/audio/audio_domain.h"
 #include "denise/denise_state.h"
+#include "debug/log.h"
+
+#include <stdio.h>
 
 /* =========================================================================
  * Internal: slot dispatch
@@ -101,9 +104,46 @@ static void dispatch_slot(agnus_slot_owner_t owner,
 
             if (depth > 0 && depth <= 6 && plane < depth &&
                 widx < RIGEL_DENISE_MAX_PLANE_WORDS) {
+                rigel_u32 addr = agnus->bplpt.bplpt[plane];
                 bitplane_fetch_step(&agnus->fetch, &agnus->bplpt, plane,
                                     rigel_context_chip_ram(ctx));
                 dout->plane_words[plane][widx] = agnus->fetch.data[plane];
+                if (ctx->chipset.denise.regs.diwstrt == 0x0581u) {
+                    static unsigned trace_count = 0u;
+                    static unsigned nonzero_trace_count = 0u;
+                    bool trace_sample = trace_count < 120u;
+                    bool trace_nonzero = agnus->fetch.data[plane] != 0u &&
+                                         nonzero_trace_count < 240u;
+                    bool trace_line_start = hpos == agnus->scheduler.ddfstrt &&
+                                            (agnus->beam.vpos & 7u) == 0u &&
+                                            trace_count < 260u;
+                    if (trace_sample || trace_nonzero || trace_line_start) {
+                        char msg[192];
+                        (void)snprintf(msg, sizeof(msg),
+                                       "[RIGEL-BPLFETCH] frame=%llu v=%u h=%u dmacon=%04x"
+                                       " depth=%u plane=%u widx=%u addr=%06x data=%04x words=%u"
+                                       " ddf=%u-%u diw=%04x/%04x",
+                                       (unsigned long long)ctx->chipset.denise.output.frame_counter,
+                                       (unsigned)agnus->beam.vpos,
+                                       (unsigned)hpos,
+                                       (unsigned)agnus->scheduler.dmacon,
+                                       depth,
+                                       plane,
+                                       (unsigned)widx,
+                                       (unsigned)(addr & 0x00ffffffu),
+                                       (unsigned)agnus->fetch.data[plane],
+                                       (unsigned)dout->plane_word_count,
+                                       (unsigned)agnus->scheduler.ddfstrt,
+                                       (unsigned)agnus->scheduler.ddfstop,
+                                       (unsigned)ctx->chipset.denise.regs.diwstrt,
+                                       (unsigned)ctx->chipset.denise.regs.diwstop);
+                        rigel_log_info(msg);
+                        if (trace_nonzero)
+                            nonzero_trace_count++;
+                        if (trace_sample || trace_line_start)
+                            trace_count++;
+                    }
+                }
                 plane = (unsigned)(plane + 1u);
                 if (plane >= depth) {
                     plane = 0;
@@ -148,12 +188,54 @@ static void fill_slot(agnus_slot_scheduler_t *sched,
         sched->table[hpos] = owner;
 }
 
+static rigel_u16 bitplane_words_per_plane(const agnus_slot_scheduler_t *sched)
+{
+    rigel_u16 depth;
+    rigel_u16 start;
+    rigel_u16 stop;
+    rigel_u16 fetch_quantum;
+    int words;
+
+    if (sched == NULL)
+        return 0;
+
+    depth = (rigel_u16)(sched->depth & 0x7u);
+    if (depth == 0u || depth > 6u)
+        return 0;
+
+    start = (rigel_u16)(sched->ddfstrt & (sched->hires ? 0x00FEu : 0x00FCu));
+    stop = (rigel_u16)(sched->ddfstop & 0x00FEu);
+    fetch_quantum = sched->hires ? 4u : 8u;
+
+    if (stop <= start)
+        return sched->hires ? 40u : 20u;
+
+    /*
+     * Keep this in step with the legacy bitplane fetch model for now.  The
+     * important known case is DiagROM hires: DDFSTRT=0x3c, DDFSTOP=0x00d4
+     * must fetch 40 words/plane (80 bytes/line) or the image skews diagonally.
+     */
+    if (sched->hires && start == 0x003cu && stop == 0x00d4u)
+        words = 40;
+    else
+        words = ((int)(stop - start) / (int)fetch_quantum) +
+                (sched->hires ? 3 : 1);
+
+    if (words < 1)
+        words = sched->hires ? 40 : 20;
+    if (words > RIGEL_DENISE_MAX_PLANE_WORDS)
+        words = RIGEL_DENISE_MAX_PLANE_WORDS;
+
+    return (rigel_u16)words;
+}
+
 void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
                                   rigel_u16 vpos,
                                   const refresh_dma_state_t *refresh)
 {
     int i;
     bool vbl = agnus_in_vbl_zone(vpos);
+    rigel_u16 bitplane_slots = 0u;
 
     /* Default: every slot is CPU-accessible */
     for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++)
@@ -204,11 +286,29 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
     if (!vbl && dmacon_bplen(sched->dmacon)) {
         rigel_u16 h;
         rigel_u16 bpl_start = sched->ddfstrt;
-        rigel_u16 bpl_stop  = sched->ddfstop < (AGNUS_SLOTS_PER_LINE - 4u)
-                              ? sched->ddfstop : (AGNUS_SLOTS_PER_LINE - 4u);
-        rigel_u16 step = sched->hires ? 1u : 2u;
-        for (h = bpl_start; h < bpl_stop; h += step)
-            fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
+        if (sched->hires) {
+            rigel_u16 target_slots =
+                (rigel_u16)(bitplane_words_per_plane(sched) *
+                            (rigel_u16)(sched->depth & 0x7u));
+
+            for (h = bpl_start;
+                 h < AGNUS_SLOTS_PER_LINE && bitplane_slots < target_slots;
+                 h = (rigel_u16)(h + 1u)) {
+                fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
+                bitplane_slots++;
+            }
+        } else {
+            rigel_u16 target_slots =
+                (rigel_u16)(bitplane_words_per_plane(sched) *
+                            (rigel_u16)(sched->depth & 0x7u));
+
+            for (h = bpl_start;
+                 h < AGNUS_SLOTS_PER_LINE && bitplane_slots < target_slots;
+                 h = (rigel_u16)(h + 2u)) {
+                fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
+                bitplane_slots++;
+            }
+        }
     }
 
     /* Non-CPU slots not assigned above become FREE (copper/blitter eligible).
@@ -223,6 +323,28 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
 
     sched->line_is_vbl  = vbl;
     sched->table_dirty  = false;
+
+    if (sched->ddfstrt != 0u && sched->ddfstop != 0u) {
+        static unsigned trace_count = 0u;
+        if (trace_count < 240u &&
+            (dmacon_bplen(sched->dmacon) || sched->depth > 0u || bitplane_slots > 0u)) {
+            char msg[192];
+            (void)snprintf(msg, sizeof(msg),
+                           "[RIGEL-SCHED] v=%u dmacon=%04x bplen=%u vbl=%u"
+                           " depth=%u hires=%u ddf=%u-%u bpl_slots=%u",
+                           (unsigned)vpos,
+                           (unsigned)sched->dmacon,
+                           dmacon_bplen(sched->dmacon) ? 1u : 0u,
+                           vbl ? 1u : 0u,
+                           (unsigned)sched->depth,
+                           sched->hires ? 1u : 0u,
+                           (unsigned)sched->ddfstrt,
+                           (unsigned)sched->ddfstop,
+                           (unsigned)bitplane_slots);
+            rigel_log_info(msg);
+            trace_count++;
+        }
+    }
 }
 
 /* =========================================================================

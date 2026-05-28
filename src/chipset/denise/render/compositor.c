@@ -9,7 +9,10 @@
 #include "denise/render/ham.h"
 #include "denise/sprites/collisions.h"
 #include "denise/sprites/sprites.h"
+#include "debug/log.h"
 #include "rigel/rigel_denise_types.h"
+
+#include <stdio.h>
 
 static rigel_u16 rgb32_to_rgb565(rigel_u32 rgb)
 {
@@ -29,12 +32,18 @@ static void compose_line(RigelDenise *denise)
     rigel_u16 bplcon2 = denise->regs.bplcon2;
     bool is_ham  = (denise->regs.bplcon0 & 0x0800u) != 0u;
     bool is_dual = (denise->regs.bplcon0 & 0x0400u) != 0u;
+    bool is_hires = (denise->regs.bplcon0 & 0x8000u) != 0u;
     bool is_ehb  = !is_ham && !is_dual && depth == 6u && !(bplcon2 & 0x0040u);
     unsigned scroll  = denise->regs.bplcon1 & 0x0Fu;
     unsigned pf1p    = bplcon2 & 0x7u;
     unsigned pf2p    = (bplcon2 >> 3) & 0x7u;
-    /* Absolute lores position of the first DDF word; set by Agnus on DDFSTRT. */
-    unsigned ddf0    = (unsigned)output->ddfstrt_lores;
+    /* Absolute lores position of word 0 pixel 0.
+     * ddfstrt_lores is the raw HPOS (DDFSTRT*2).  Add 2*pipeline_lead to
+     * account for the Amiga shift-register pre-load: lores=8px, hires=4px.
+     * This matches the legacy src_first_pixel=1 formula:
+     *   src_first_pixel = (hstrt - pipeline_lead) - ddfstrt_lores - pipeline_lead */
+    unsigned pipeline_lead = is_hires ? 4u : 8u;
+    unsigned ddf0 = (unsigned)output->ddfstrt_lores + 2u * pipeline_lead;
     rigel_u16 x_start = denise->video.visible_x_start;
     rigel_u16 x_stop  = denise->video.visible_x_stop;   /* exclusive */
     rigel_u16 w, px;
@@ -46,6 +55,50 @@ static void compose_line(RigelDenise *denise)
     uint8_t spr_active[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
 
     if (!output->visible_scanline || output->scanline_width == 0) return;
+
+    {
+        static unsigned trace_count = 0u;
+        rigel_u16 nonzero = 0u;
+        rigel_u16 y = output->beam_vpos;
+        unsigned p;
+        unsigned wi;
+
+        for (p = 0u; p < depth && p < 6u; ++p) {
+            for (wi = 0u; wi < output->plane_word_count; ++wi) {
+                if (output->plane_words[p][wi] != 0u) {
+                    nonzero |= (rigel_u16)(1u << p);
+                    break;
+                }
+            }
+        }
+
+        if (denise->regs.diwstrt == 0x0581u &&
+            output->ddfstrt_lores != 0u &&
+            (output->plane_word_count > 0u ||
+             (trace_count < 360u &&
+              (depth > 0u || (y >= 40u && y <= 48u) ||
+               (y >= 240u && y <= 246u))))) {
+            char msg[192];
+            (void)snprintf(msg, sizeof(msg),
+                           "[RIGEL-COMPOSE] frame=%llu y=%u depth=%u words=%u"
+                           " nonzero=%02x bplcon0=%04x ddf0=%u x=%u-%u"
+                           " w0=%04x/%04x",
+                           (unsigned long long)output->frame_counter,
+                           (unsigned)y,
+                           depth,
+                           (unsigned)output->plane_word_count,
+                           (unsigned)nonzero,
+                           (unsigned)denise->regs.bplcon0,
+                           (unsigned)output->ddfstrt_lores,
+                           (unsigned)x_start,
+                           (unsigned)x_stop,
+                           (unsigned)((output->plane_word_count > 0u) ? output->plane_words[0][0] : 0u),
+                           (unsigned)((output->plane_word_count > 0u) ? output->plane_words[1][0] : 0u));
+            rigel_log_info(msg);
+            if (trace_count < 1000u)
+                trace_count++;
+        }
+    }
 
     /* Initialise the visible window in scanline_rgba and the per-pixel arrays. */
     for (px = x_start; px < x_stop && px < RIGEL_DENISE_MAX_SCANLINE_PIXELS; px++) {

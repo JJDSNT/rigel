@@ -126,6 +126,7 @@ void rigel_denise_registers_write(RigelDenise *denise, rigel_u32 addr, rigel_u16
     case RIGEL_REG_BPLCON0:
         denise->regs.bplcon0 = value;
         rigel_denise_playfield_update_mode(denise);
+        rigel_denise_display_window_update(denise);
         break;
     case RIGEL_REG_BPLCON1:
         denise->regs.bplcon1 = value;

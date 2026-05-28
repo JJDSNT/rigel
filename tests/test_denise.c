@@ -119,8 +119,8 @@ static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
          ((rigel_u64)1u << (TEST_VISIBLE_Y_START % 64u))) == 0u) {
         return 1;
     }
-    if (pixels[0] != 0x000000ffu || pixels[1] != 0x00ffffffu ||
-        pixels[2] != 0x000000ffu || pixels[3] != 0x00ffffffu) {
+    if (pixels[0] != 0x000000ffu || pixels[72] != 0x000000ffu ||
+        pixels[73] != 0x00ffffffu || pixels[74] != 0x000000ffu) {
         return 1;
     }
 
@@ -143,7 +143,7 @@ static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
         RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
     );
 
-    if (ctx->chipset.denise.output.ddfstrt_lores != 0x0040u)
+    if (ctx->chipset.denise.output.ddfstrt_lores != 0x0080u)
         return 1;
     if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
         return 1;
@@ -152,11 +152,11 @@ static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
     pixels = (const rigel_u32 *)frame.pixels;
     if (pixels[0] != 0x000000ffu)
         return 1;
-    if (pixels[7] != 0x000000ffu)
+    if (pixels[87] != 0x000000ffu)
         return 1;
-    if (pixels[8] != 0x00ffffffu)
+    if (pixels[88] != 0x00ffffffu)
         return 1;
-    if (pixels[23] != 0x00ffffffu)
+    if (pixels[103] != 0x00ffffffu)
         return 1;
 
     return 0;
@@ -183,7 +183,7 @@ static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *c
     if (!rigel_get_frame(ctx, &frame))
         return 1;
     pixels = (const rigel_u32 *)frame.pixels;
-    if (pixels[0] != 0x00ffffffu)
+    if (pixels[88] != 0x00ffffffu)
         return 1;
 
     rigel_custom_write16(ctx, RIGEL_REG_DMACON, RIGEL_DMACON_BPLEN);
@@ -194,7 +194,7 @@ static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *c
     if (!rigel_get_frame(ctx, &frame))
         return 1;
     pixels = (const rigel_u32 *)frame.pixels;
-    if (pixels[0] != 0x000000ffu || pixels[1] != 0x000000ffu)
+    if (pixels[88] != 0x000000ffu || pixels[89] != 0x000000ffu)
         return 1;
 
     return 0;
@@ -225,14 +225,14 @@ static int test_two_bitplane_fetch_window(RigelContext *ctx, rigel_u16 *chip_ram
     pixels = (const rigel_u32 *)frame.pixels;
 
     /* plane0=0101..., plane1=0011... -> color indices 0,1,2,3 repeating */
-    if (pixels[0] != 0x00000000u ||
-        pixels[1] != 0x000000ffu ||
-        pixels[2] != 0x0000ff00u ||
-        pixels[3] != 0x00ff0000u ||
-        pixels[4] != 0x00000000u ||
-        pixels[5] != 0x000000ffu ||
-        pixels[6] != 0x0000ff00u ||
-        pixels[7] != 0x00ff0000u) {
+    if (pixels[72] != 0x00000000u ||
+        pixels[73] != 0x000000ffu ||
+        pixels[74] != 0x0000ff00u ||
+        pixels[75] != 0x00ff0000u ||
+        pixels[76] != 0x00000000u ||
+        pixels[77] != 0x000000ffu ||
+        pixels[78] != 0x0000ff00u ||
+        pixels[79] != 0x00ff0000u) {
         return 1;
     }
 
@@ -287,10 +287,10 @@ static int test_rgb565_frame_format(rigel_u16 *chip_ram)
         if (frame.format != RIGEL_PIXEL_RGB565 ||
             frame.pitch != RIGEL_DENISE_MAX_SCANLINE_PIXELS * sizeof(rigel_u16) ||
             pixels == NULL ||
-            pixels[0] != 0x001fu ||
-            pixels[1] != 0xffffu ||
-            host_framebuffer[0] != 0x001fu ||
-            host_framebuffer[1] != 0xffffu) {
+            pixels[72] != 0x001fu ||
+            pixels[73] != 0xffffu ||
+            host_framebuffer[72] != 0x001fu ||
+            host_framebuffer[73] != 0xffffu) {
             result = 1;
         }
     }
@@ -301,13 +301,12 @@ static int test_rgb565_frame_format(rigel_u16 *chip_ram)
 
 static int check_rgb565_edge_target_bytes(const rigel_u8 *target)
 {
-    if (target[0] != 0x1fu || target[1] != 0x00u ||
-        target[2] != 0xffu || target[3] != 0xffu) {
+    if (target[16] != 0x1fu || target[17] != 0x00u) {
         return 1;
     }
 
-    if (target[4] != 0xaau || target[5] != 0xaau ||
-        target[6] != 0xaau || target[7] != 0xaau) {
+    if (target[40] != 0xaau || target[41] != 0xaau ||
+        target[42] != 0xaau || target[43] != 0xaau) {
         return 1;
     }
 
@@ -318,7 +317,7 @@ static void setup_rgb565_edge_scene(RigelContext *ctx, rigel_u16 *chip_ram)
 {
     memset(chip_ram, 0, 256u * sizeof(chip_ram[0]));
     fill_bitplane_words(chip_ram, 0x5555u);
-    setup_lores_single_bitplane(ctx, 0x0038u, 0x0060u);
+    setup_lores_single_bitplane(ctx, 0x0000u, 0x0060u);
     rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x000fu);
     rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x0fffu);
     rigel_custom_write16(
@@ -331,7 +330,7 @@ static void setup_rgb565_edge_scene(RigelContext *ctx, rigel_u16 *chip_ram)
 static int test_rgb565_write_target_edges(rigel_u16 *chip_ram)
 {
     rigel_config_t cfg = { 0 };
-    static rigel_u8 host_framebuffer[8];
+    static rigel_u8 host_framebuffer[80];
     RigelContext *ctx;
     int result = 0;
 
@@ -341,7 +340,7 @@ static int test_rgb565_write_target_edges(rigel_u16 *chip_ram)
     cfg.chip_ram.write16 = test_chip_ram_write16;
     cfg.pixel_format = RIGEL_PIXEL_RGB565;
     cfg.framebuffer.pixels = host_framebuffer;
-    cfg.framebuffer.width = 2u;
+    cfg.framebuffer.width = 20u;
     cfg.framebuffer.height = 1u;
     cfg.framebuffer.pitch = sizeof(host_framebuffer);
     cfg.framebuffer.format = RIGEL_PIXEL_RGB565;
@@ -416,6 +415,38 @@ int main(void)
         rigel_destroy(ctx);
         return 1;
     }
+
+    rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0x9000u);
+
+    if (!rigel_denise_get_video_desc(ctx, &video)) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    if (video.display_width != 640 || video.display_height != 256 ||
+        video.visible_x_start != 0x81 || video.visible_x_stop != 769) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0x0000u);
+
+    rigel_custom_write16(ctx, 0x08e, 0x057e);
+    rigel_custom_write16(ctx, 0x090, 0x40be);
+
+    if (!rigel_denise_get_video_desc(ctx, &video)) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    if (video.display_width != 320 || video.display_height != 256 ||
+        video.visible_y_start != 0x05u || video.visible_y_stop != 0x105u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, 0x08e, 0x2c81);
+    rigel_custom_write16(ctx, 0x090, 0x2cc1);
 
     rigel_step(ctx, 4);
 

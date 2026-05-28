@@ -17,12 +17,31 @@ void rigel_denise_display_window_reset(rigel_denise_video_state_t *video)
 void rigel_denise_display_window_update(RigelDenise *denise)
 {
     rigel_u16 hstrt, hstop, vstrt, vstop, width, height;
+    rigel_u16 hwidth;
+    bool hires;
+    bool ocs_diw;
 
     if (denise == NULL) {
         return;
     }
 
-    if (denise->chip_rev == AGNUS_REV_ECS && denise->regs.diwhigh != 0u) {
+    /*
+     * BPU=0 disables bitplane display.  Some software briefly clears BPU while
+     * rewriting DIW/DDF/BPLCON0 during a visible boot animation; do not let
+     * that transient blanking state resize the public frame geometry.  The
+     * latest DIW/DIWHIGH values remain latched and will be applied as soon as
+     * bitplanes are enabled again.
+     */
+    if (denise->regs.bplcon0 != 0u &&
+        ((denise->regs.bplcon0 >> 12) & 0x7u) == 0u &&
+        denise->video.width != 0u &&
+        denise->video.height != 0u) {
+        return;
+    }
+
+    ocs_diw = !(denise->chip_rev == AGNUS_REV_ECS && denise->regs.diwhigh != 0u);
+
+    if (!ocs_diw) {
         rigel_u16 start_hi = (rigel_u16)(denise->regs.diwhigh & 0x00FFu);
         rigel_u16 stop_hi  = (rigel_u16)((denise->regs.diwhigh >> 8) & 0x00FFu);
 
@@ -51,12 +70,43 @@ void rigel_denise_display_window_update(RigelDenise *denise)
         hstop = (rigel_u16)(hstop + 256u);
     }
 
+    /*
+     * Some ECS-era software touches DIWHIGH while still programming a normal
+     * OCS-sized horizontal DIW.  Until programmable wide beams are modelled,
+     * reject horizontal windows wider than the internal scanline buffer can
+     * represent and fall back to the OCS hstop encoding.  This keeps
+     * DIW=2c81/2cc1 hires at 640 pixels instead of producing impossible
+     * frame widths such as 2176 pixels.
+     */
+    if (!ocs_diw && hstop > hstrt && (rigel_u16)(hstop - hstrt) > 512u) {
+        hstrt = (rigel_u16)(denise->regs.diwstrt & 0x00FFu);
+        hstop = (rigel_u16)((denise->regs.diwstop & 0x00FFu) + 256u);
+        if (hstop <= hstrt) {
+            hstop = (rigel_u16)(hstop + 256u);
+        }
+    }
+
+    /* Workbench 1.3 can program DIWSTRT/DIWSTOP as 057e/40be.  A raw OCS
+     * vertical decode gives only 59 lines, but the intended display is the
+     * normal 256-line field that wraps through the next 8-bit VSTOP range.
+     * ECS machines still need this path when old software does not program
+     * DIWHIGH and therefore uses the OCS DIW encoding. */
+    if (ocs_diw &&
+        (rigel_u16)(vstop - vstrt) < 128u &&
+        vstrt < 32u) {
+        vstop = (rigel_u16)(vstrt + 256u);
+    }
+
+    hires = (denise->regs.bplcon0 & 0x8000u) != 0u;
+    hwidth = (hstop > hstrt) ? (rigel_u16)(hstop - hstrt) : 320u;
+
     denise->video.visible_x_start = hstrt;
     denise->video.visible_y_start = vstrt;
-    denise->video.visible_x_stop  = hstop;   /* exclusive */
+    denise->video.visible_x_stop  =
+        (rigel_u16)(hstrt + (hires ? (hwidth * 2u) : hwidth)); /* exclusive */
     denise->video.visible_y_stop  = vstop;   /* exclusive */
 
-    width  = (hstop > hstrt) ? (rigel_u16)(hstop - hstrt) : 320u;
+    width  = (rigel_u16)(hires ? (hwidth * 2u) : hwidth);
     height = (vstop > vstrt) ? (rigel_u16)(vstop - vstrt) : 256u;
 
     denise->video.width  = width;
