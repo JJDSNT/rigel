@@ -57,8 +57,9 @@ typedef struct rigel_config {
     time_t            rtc_time;
     /*
      * Optional host log callback. If non-NULL, Rigel internal log messages are
-     * delivered here instead of fprintf(stderr). Useful on bare-metal hosts that
-     * have no stderr but have a serial or kprintf sink.
+     * delivered here. When NULL, the default build writes to stderr; configure
+     * with RIGEL_ENABLE_STDIO_LOG=OFF to make the default a no-op for bare-metal
+     * hosts that provide no C stdio.
      */
     rigel_log_fn_t    log_fn;
     void             *log_opaque;

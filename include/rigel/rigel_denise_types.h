@@ -7,7 +7,9 @@
 typedef enum rigel_denise_mode_flags {
     RIGEL_DENISE_MODE_DUALPF = 1u << 0,
     RIGEL_DENISE_MODE_HAM    = 1u << 1,
-    RIGEL_DENISE_MODE_EHB    = 1u << 2
+    RIGEL_DENISE_MODE_EHB    = 1u << 2,
+    RIGEL_DENISE_MODE_HIRES  = 1u << 3,
+    RIGEL_DENISE_MODE_LACE   = 1u << 4
 } rigel_denise_mode_flags_t;
 
 typedef struct rigel_denise_video_desc {

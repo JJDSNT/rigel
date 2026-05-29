@@ -446,7 +446,6 @@ bool rigel_floppy_get_status(
     status->disk_changed = target->disk_changed != 0;
     status->write_protected = target->write_protected != 0;
     status->dma_active =
-        drive == RIGEL_FLOPPY_DRIVE_DF0 &&
         ctx->chipset.paula.disk.drive == target &&
         ctx->chipset.paula.disk.dma_active != 0;
     status->cylinder = (rigel_u8)target->cylinder;

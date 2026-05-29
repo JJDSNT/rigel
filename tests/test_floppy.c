@@ -1,6 +1,11 @@
 #include "rigel/rigel.h"
 #include "paula/disk.h"
 
+enum {
+    TEST_CIA_REG_PRB  = 0x1,
+    TEST_CIA_REG_DDRB = 0x3
+};
+
 static rigel_u8 g_test_adf[512u * 11u];
 
 int main(void)
@@ -66,6 +71,25 @@ int main(void)
     rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
 
     if (!rigel_floppy_get_status(ctx, RIGEL_FLOPPY_DRIVE_DF0, &status) || !status.dma_active) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, 0u);
+    rigel_cia_write(ctx, 1u, TEST_CIA_REG_DDRB, 0xffu);
+    rigel_cia_write(ctx, 1u, TEST_CIA_REG_PRB, 0x5fu); /* /MTR=0, /SEL2=0 */
+    rigel_custom_write16(ctx, RIGEL_REG_DSKPTH, 0x0000);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKPTL, 0x0000);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
+
+    if (!rigel_floppy_get_status(ctx, RIGEL_FLOPPY_DRIVE_DF2, &status) ||
+        !status.dma_active || !status.motor_on) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    if (!rigel_floppy_get_status(ctx, RIGEL_FLOPPY_DRIVE_DF0, &status) || status.dma_active) {
         rigel_destroy(ctx);
         return 1;
     }

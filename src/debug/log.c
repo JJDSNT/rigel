@@ -1,7 +1,14 @@
 #include "debug/log.h"
 
 #include <stddef.h>
+
+#ifndef RIGEL_ENABLE_STDIO_LOG
+#define RIGEL_ENABLE_STDIO_LOG 1
+#endif
+
+#if RIGEL_ENABLE_STDIO_LOG
 #include <stdio.h>
+#endif
 
 static rigel_log_fn_t s_log_fn     = NULL;
 static void          *s_log_opaque = NULL;
@@ -20,7 +27,10 @@ void rigel_log_info(const char *message)
 
     if (s_log_fn != NULL) {
         s_log_fn(message, s_log_opaque);
-    } else {
+    }
+#if RIGEL_ENABLE_STDIO_LOG
+    else {
         (void)fprintf(stderr, "[rigel] %s\n", message);
     }
+#endif
 }

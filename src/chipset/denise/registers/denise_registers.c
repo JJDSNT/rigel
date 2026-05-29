@@ -133,6 +133,7 @@ void rigel_denise_registers_write(RigelDenise *denise, rigel_u32 addr, rigel_u16
         break;
     case RIGEL_REG_BPLCON2:
         denise->regs.bplcon2 = value;
+        rigel_denise_playfield_update_mode(denise);
         break;
     case RIGEL_REG_BPLCON3:
         if (denise->chip_rev == AGNUS_REV_ECS)

@@ -114,6 +114,10 @@ void rigel_denise_write_reg(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
             &ctx->chipset.agnus.scheduler,
             (value >> 12) & 0x7u
         );
+        ctx->chipset.agnus.beam.lof_toggle = (value & 0x0004u) != 0u;
+        if ((value & 0x0004u) == 0u) {
+            ctx->chipset.agnus.beam.lof = 0u;
+        }
     }
 
     if (addr == RIGEL_REG_DIWSTRT) {
