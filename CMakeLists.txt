@@ -12,6 +12,8 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 option(RIGEL_BUILD_TESTS    "Build Rigel unit tests"          ON)
 option(RIGEL_BUILD_HARNESS  "Build Musashi integration harness" OFF)
+option(RIGEL_ENABLE_STDIO_LOG "Use stderr for Rigel logs when no host log callback is installed" ON)
+option(RIGEL_ENABLE_SIMD "Enable optional SIMD backends for internal pixel/buffer operations" ON)
 
 if(RIGEL_BUILD_TESTS OR RIGEL_BUILD_HARNESS)
     enable_testing()
@@ -107,6 +109,7 @@ add_library(rigel
     src/runtime/single_thread.c
     src/debug/log.c
     src/debug/trace.c
+    src/simd/rigel_simd.c
 )
 
 target_include_directories(rigel
@@ -120,6 +123,18 @@ target_include_directories(rigel
 target_compile_options(rigel PRIVATE
     $<$<C_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
 )
+
+if(RIGEL_ENABLE_STDIO_LOG)
+    target_compile_definitions(rigel PRIVATE RIGEL_ENABLE_STDIO_LOG=1)
+else()
+    target_compile_definitions(rigel PRIVATE RIGEL_ENABLE_STDIO_LOG=0)
+endif()
+
+if(RIGEL_ENABLE_SIMD)
+    target_compile_definitions(rigel PRIVATE RIGEL_ENABLE_SIMD=1)
+else()
+    target_compile_definitions(rigel PRIVATE RIGEL_ENABLE_SIMD=0)
+endif()
 
 if(RIGEL_BUILD_TESTS)
     set(RIGEL_TESTS
@@ -138,6 +153,8 @@ if(RIGEL_BUILD_TESTS)
         test_audio
         test_input
         test_denise
+        test_video_modes
+        test_simd
         test_blitter
         test_blitter_dma
         test_copper

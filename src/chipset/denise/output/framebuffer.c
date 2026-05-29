@@ -3,11 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 
-static void store_rgb565_le(rigel_u8 *dst, rigel_u16 value)
-{
-    dst[0] = (rigel_u8)(value & 0xffu);
-    dst[1] = (rigel_u8)(value >> 8);
-}
+#include "simd/rigel_simd.h"
 
 static void copy_visible_line_to_target(const RigelDenise *denise)
 {
@@ -16,7 +12,6 @@ static void copy_visible_line_to_target(const RigelDenise *denise)
     rigel_u16 raster_y;
     rigel_u32 row;
     rigel_u32 width;
-    rigel_u32 x;
     rigel_u16 x0;
     rigel_u8 *dst;
 
@@ -50,13 +45,10 @@ static void copy_visible_line_to_target(const RigelDenise *denise)
     dst = (rigel_u8 *)target->pixels + row * target->pitch;
 
     if (target->format == RIGEL_PIXEL_RGB565) {
-        for (x = 0; x < width; ++x) {
-            rigel_u16 value = output->scanline_rgb565[x0 + x];
-            if (target->little_endian) {
-                store_rgb565_le(dst + x * sizeof(rigel_u16), value);
-            } else {
-                ((rigel_u16 *)dst)[x] = value;
-            }
+        if (target->little_endian) {
+            rigel_simd_copy_u16_to_le(dst, &output->scanline_rgb565[x0], width);
+        } else {
+            rigel_simd_copy_u16((rigel_u16 *)dst, &output->scanline_rgb565[x0], width);
         }
     } else {
         (void)memcpy(dst,

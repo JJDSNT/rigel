@@ -11,6 +11,7 @@
 #include "denise/sprites/sprites.h"
 #include "debug/log.h"
 #include "rigel/rigel_denise_types.h"
+#include "simd/rigel_simd.h"
 
 #include <stdio.h>
 
@@ -47,6 +48,7 @@ static void compose_line(RigelDenise *denise)
     rigel_u16 x_start = denise->video.visible_x_start;
     rigel_u16 x_stop  = denise->video.visible_x_stop;   /* exclusive */
     rigel_u16 w, px;
+    rigel_u32 visible_count;
 
     /* Per-pixel arrays indexed by absolute lores position [0..1023]. */
     uint8_t pf_color[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
@@ -100,14 +102,25 @@ static void compose_line(RigelDenise *denise)
         }
     }
 
+    visible_count = 0u;
+    if (x_start < RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
+        rigel_u16 clipped_stop = x_stop;
+        if (clipped_stop > RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
+            clipped_stop = RIGEL_DENISE_MAX_SCANLINE_PIXELS;
+        }
+        if (clipped_stop > x_start) {
+            visible_count = (rigel_u32)(clipped_stop - x_start);
+        }
+    }
+
     /* Initialise the visible window in scanline_rgba and the per-pixel arrays. */
-    for (px = x_start; px < x_stop && px < RIGEL_DENISE_MAX_SCANLINE_PIXELS; px++) {
-        output->scanline_rgba[px] = palette[0];
-        output->scanline_rgb565[px] = palette565[0];
-        pf_color[px]   = 0;
-        pf_prio[px]    = (uint8_t)pf1p;
-        pf_active[px]  = 0;
-        spr_active[px] = 0;
+    if (visible_count > 0u) {
+        rigel_simd_fill_u32(&output->scanline_rgba[x_start], palette[0], visible_count);
+        rigel_simd_fill_u16(&output->scanline_rgb565[x_start], palette565[0], visible_count);
+        rigel_simd_zero_u8(&pf_color[x_start], visible_count);
+        rigel_simd_fill_u8(&pf_prio[x_start], (rigel_u8)pf1p, visible_count);
+        rigel_simd_zero_u8(&pf_active[x_start], visible_count);
+        rigel_simd_zero_u8(&spr_active[x_start], visible_count);
     }
 
     if (depth > 0 && depth <= 6 && output->plane_word_count > 0) {

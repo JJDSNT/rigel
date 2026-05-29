@@ -21,6 +21,21 @@ cmake -S . -B build-harness -DRIGEL_BUILD_HARNESS=ON -DRIGEL_BUILD_TESTS=OFF
 cmake --build build-harness
 ```
 
+Bare-metal or freestanding-style hosts can disable the default `stderr` log sink:
+
+```sh
+cmake -S . -B build-bare -DRIGEL_ENABLE_STDIO_LOG=OFF -DRIGEL_BUILD_TESTS=OFF
+cmake --build build-bare
+```
+
+SIMD pixel/buffer helpers are enabled by default where Rigel has a backend
+(SSE2 on x86_64, NEON on AArch64). Disable them with:
+
+```sh
+cmake -S . -B build-nosimd -DRIGEL_ENABLE_SIMD=OFF
+cmake --build build-nosimd
+```
+
 ## Public API
 
 All headers are included via `<rigel/rigel.h>`.
@@ -64,7 +79,24 @@ rigel_u16 rigel_get_intena(const RigelContext *ctx);
 rigel_u8  rigel_get_ipl(const RigelContext *ctx);
 ```
 
-**Peripherals:** `rigel_floppy_*`, `rigel_input_*`, `rigel_rtc_*`
+**Video output:** `rigel_get_frame()`, `rigel_get_scanline()`, and
+`rigel_denise_get_video_desc()` expose the completed frame, visible window, and
+debug mode flags. Current mode flags cover lores/hires distinction, interlace
+intent, dual-playfield, HAM6, and EHB. ECS identity, `DIWHIGH`, and PAL/NTSC
+`BEAMCON0` switching are present; ECS SuperHires/Productivity/Euro/Dbl modes are
+tracked as planned work and are not advertised as supported modes yet.
+
+**Peripherals:** `rigel_floppy_*` supports DF0-DF3 media/status and selected-drive
+DMA routing; `rigel_input_*`, `rigel_rtc_*`, `rigel_serial_*`, and
+`rigel_audio_*` expose the other integrated devices.
+
+**Host logging:** set `rigel_config_t.log_fn` to receive internal log messages.
+With `RIGEL_ENABLE_STDIO_LOG=OFF`, a NULL log callback becomes a no-op so Rigel
+does not require `stderr`.
+
+**SIMD:** the public API remains scalar and deterministic. Optional internal SIMD
+helpers accelerate video buffer fills/copies when available, with scalar fallback
+for unsupported targets or `RIGEL_ENABLE_SIMD=OFF`.
 
 ## Host loop
 
