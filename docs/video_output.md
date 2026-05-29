@@ -13,6 +13,7 @@ Rigel / chipset:                  Host:
   sprites (priority, collision)     overlay / debug UI
   palette (COLOR00–COLOR31)
   raster output line by line
+  optional SIMD buffer helpers
 ```
 
 Planar→chunky is not a format conversion — it is the materialisation of what
@@ -66,33 +67,27 @@ The compositor is called once per `rigel_step`:
 
 This handles the case where a single `rigel_step` crosses multiple raster lines.
 
+## Implemented metadata
+
+Dirty line tracking and frame flags are implemented in `rigel_frame_t`.
+
+`delta.dirty_lines[]` marks composed raster lines. Each bit maps to a raster
+line; `dirty_lines[5]` covers the 312-line PAL frame. `full_redraw` exists in
+the public struct but is currently reserved and always false.
+
+`flags` currently reports:
+
+```c
+RIGEL_FRAME_HAM
+RIGEL_FRAME_DUAL_PLAYFIELD
+RIGEL_FRAME_SPRITES_ACTIVE
+```
+
+The enum also reserves `RIGEL_FRAME_COPPER_ACTIVE`,
+`RIGEL_FRAME_INTERLACE_ODD`, and `RIGEL_FRAME_INTERLACE_EVEN`; those bits are
+not emitted yet.
+
 ## Future extensions
-
-The following are not yet implemented:
-
-**Dirty line tracking** — a bitmask of which lines changed vs. the previous
-frame, useful for hosts with a physical framebuffer (Pi, USB display) that do
-not want to push a full frame when most lines are unchanged:
-
-```c
-typedef struct rigel_frame_delta {
-    uint64_t dirty_lines[4];  /* 1 bit per line, covers 256 lines */
-    bool     full_redraw;     /* palette or resolution changed globally */
-} rigel_frame_delta_t;
-```
-
-**Frame flags** — metadata about what happened this frame:
-
-```c
-typedef enum rigel_frame_flags {
-    RIGEL_FRAME_INTERLACE_ODD   = 1 << 0,
-    RIGEL_FRAME_INTERLACE_EVEN  = 1 << 1,
-    RIGEL_FRAME_COPPER_ACTIVE   = 1 << 2,
-    RIGEL_FRAME_SPRITES_ACTIVE  = 1 << 3,
-    RIGEL_FRAME_HAM             = 1 << 4,
-    RIGEL_FRAME_DUAL_PLAYFIELD  = 1 << 5
-} rigel_frame_flags_t;
-```
 
 **Pixel formats** — `RIGEL_PIXEL_RGBA8888` is the default and
 `RIGEL_PIXEL_RGB565` is available via `rigel_config_t.pixel_format`.
@@ -129,6 +124,10 @@ With `little_endian = true`, the two bytes are stored in little-endian order.
 This matches SDL's `SDL_PIXELFORMAT_RGB565` on little-endian hosts and simple
 bare-metal `uint16_t *` framebuffers. The internal double-buffered frame remains
 available through `rigel_get_frame()`.
+
+When `RIGEL_ENABLE_SIMD=ON`, internal fill/copy helpers can accelerate scanline
+background initialisation and RGB565 target copies. Unsupported architectures
+and `RIGEL_ENABLE_SIMD=OFF` use the scalar fallback with identical output.
 
 `libamivideo` was evaluated for this layer. It is useful as a standalone
 planar/palette conversion reference, but Rigel already performs Denise

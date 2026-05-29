@@ -23,6 +23,8 @@ src/domains/         ← hardware state machines
 src/bus/             ← access interfaces and Chip RAM callbacks
 src/runtime/         ← host execution policy
 src/rtc/             ← auxiliary peripheral outside custom MMIO
+src/debug/           ← optional host logging and structured trace routing
+src/simd/            ← optional internal SIMD helpers with scalar fallback
 ```
 
 ## Public surface
@@ -44,6 +46,10 @@ Organized into thematic headers, all re-exported by `rigel.h`:
 | `rigel_config.h`        | Context creation configuration                      |
 | `rigel_snapshot.h`      | Save / load state (preliminary)                     |
 | `rigel_custom.h`        | Register validity and domain query helpers          |
+
+`rigel_config_t` also carries optional logging hooks. Text logs use
+`log_fn`; runtime traces use `log_event_fn` with structured numeric fields so
+bare-metal hosts do not need `stdio` formatting in chipset paths.
 
 ## Temporal API
 
@@ -148,6 +154,10 @@ conversion — it is Denise's actual execution during the DMA slot sequence.
 
 The host receives a `rigel_frame_t` with ready pixels, metadata (`flags`) and
 dirty tracking (`delta`). See `docs/video_output.md`.
+
+Internal SIMD helpers may accelerate buffer fills/copies in the video path, but
+they are optional implementation detail (`RIGEL_ENABLE_SIMD`) and do not change
+timing, public structs, or host-visible semantics.
 
 ## Boundary
 

@@ -93,6 +93,27 @@ rigel_config_t config = {
 };
 ```
 
+## Host logging and traces
+
+Rigel has two host logging surfaces:
+
+```c
+rigel_config_t config = {
+    .log_fn = host_text_log,             /* optional formatted messages */
+    .log_opaque = host_log_state,
+    .log_event_fn = host_trace_event,    /* optional structured trace events */
+    .log_event_opaque = host_trace_state,
+};
+```
+
+`log_fn` receives already formatted text. `log_event_fn` receives
+`rigel_log_event_t` with an event ID and numeric fields, so bare-metal hosts can
+route traces to serial, memory buffers, or platform diagnostics without libc
+formatting in Rigel's runtime paths.
+
+`RIGEL_ENABLE_STDIO_LOG=OFF` makes the default sink a no-op and removes stdio
+references from `librigel.a`. This is verified by `test_baremetal_no_stdio`.
+
 ## Bus observation (fine integration)
 
 For hosts that need real bus contention:

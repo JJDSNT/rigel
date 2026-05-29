@@ -86,6 +86,11 @@
   - `DF0..DF3`
   - insert/eject
   - status query per drive
+- CIA-B PRB/DDRB selects DF0-DF3 through `/SELx`; Paula disk DMA follows the
+  first selected drive and public status reports `dma_active` for that selected
+  drive.
+- CIA-B TOD receives a synthetic floppy `/INDEX` pulse when the active drive has
+  media and motor on.
 - RTC is now considered part of the library scope, but not part of the custom chip family.
 - Denise is now being scaffolded as a visual composition/output subsystem.
 - Denise direction:
@@ -124,6 +129,14 @@
   - `test_dualpf`: plane splitting + priority resolution
   - `test_sprites`: hstart/vstart/vstop, pixel shifting, transparency, attached detection
 - Priority fix: `denise_priority_resolve` was double-mapping sprite pixel index; corrected to pass palette index as-is
+- Video mode surface tests cover OCS PAL/NTSC, lores/hires, interlace intent,
+  HAM6/EHB and ECS unsupported-mode guards.
+- Runtime traces now go through structured `rigel_log_event_t` events rather
+  than direct formatting in chipset paths. Bare-metal builds can set
+  `RIGEL_ENABLE_STDIO_LOG=OFF`; `test_baremetal_no_stdio` checks that
+  `librigel.a` has no `printf`/`fprintf`/`snprintf`/`stderr` references.
+- Optional SIMD video-buffer helpers live under `src/simd/` with SSE2/NEON
+  backends and scalar fallback; public API and timing remain deterministic.
 
 - Dead code removed: `pixel_pipeline.c/h` (compositor implementa o pipeline inline em `compose_line`), `scanline.c/h` (API nunca chamada), `agnus/dma/dma.c/h` e `agnus/timing/beam.c/h` (stubs de forwarding sem callers), `agnus/bitplanes/display_window.c/h` (substituído por raster.c)
 - `agnus_irq.c` reduzido a `agnus_irq_raise_vblank`; `raise_blitter_done` e `raise_copper` eram dead code (blitter usa `BlitterIrqSink`, copper não levanta IRQ pelo agnus_irq path)
@@ -188,7 +201,8 @@
   - `dma_active`
   - `cylinder`
   - `side`
-- only `DF0` is currently wired into `Paula disk` DMA; `DF1..DF3` are exposed to the host but not yet selected by chipset control paths.
+- DF0-DF3 are selected through CIA-B control paths; Paula disk DMA follows the
+  selected drive.
 
 # Notes
 

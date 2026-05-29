@@ -1,6 +1,6 @@
 # API Integration Status
 
-_Last updated: 2026-05-26 — frame double-buffering, BPL1MOD/BPL2MOD, audio+disk deadline contributions, blitter LINE mode per-slot, raster config, refresh DMA, DIWSTRT/DIWSTOP cross-domain fix, BPLCON0/1/2 consolidated, Denise render unit tests (priority/HAM/dualpf/sprites), priority double-map fix_
+_Last updated: 2026-05-29 — DF0-DF3 selected-drive DMA/status, CIA-B INDEX/TOD pulse, video-mode surface tests, optional SIMD video-buffer helpers, and bare-metal friendly structured trace events_
 
 Legend: ✅ done · ⚠️ partial / known issue · ❌ missing
 
@@ -27,7 +27,7 @@ void rigel_keyboard_inject(RigelContext *ctx, rigel_u8 amiga_keycode, bool press
 - CIA-A: endereços `0xBFExxx`, bytes ímpares. Reg = bits [11:8] do endereço.
 - CIA-B: endereços `0xBFDxxx`, bytes pares. Idem.
 - Timers CIA-A e CIA-B: programados via MMIO pelo CPU (não precisam de API própria).
-- CIA-B TOD (INDEX pulse do floppy) ainda não incrementa — falta wiring do /INDEX.
+- CIA-B TOD recebe pulso sintético de `/INDEX` quando o drive activo tem mídia e motor ligado.
 
 ---
 
@@ -76,7 +76,8 @@ CIA-B PRB → floppy implementado. Writes a CIA-B PRB/DDRB agora:
 - Actualizam `disk_state_t.drive` para o drive seleccionado (Paula DMA)
 - Actualizam CIA-B PRA ext inputs com `/DSKRDY`, `/TRK0`, `/WPROT`, `/CHNG` do drive activo
 
-**Nota:** CIA-B TOD (/INDEX pulse) ainda não incrementa — wiring de /INDEX pendente.
+**Nota:** `rigel_floppy_get_status()` reporta `dma_active` para o drive actualmente
+seleccionado, não apenas DF0.
 
 ### Mouse e Joystick — fire button ✅ / movimento ✅ / botão direito ✅
 
@@ -122,6 +123,27 @@ para quando o estado interno estabilizar).
 Podem disparar no mesmo `rigel_step`. VBLANK é o sinal hardware (linhas 0–25);
 FRAME_READY é o evento de "frame completo disponível". A relação está descrita
 em `include/rigel/rigel_events.h` e no guia de integração.
+
+---
+
+### Logging / traces bare-metal ✅
+
+`rigel_config_t.log_fn` continua disponível para mensagens textuais. Traces de
+runtime que precisam sobreviver em bare-metal usam agora `rigel_config_t.log_event_fn`
+e `rigel_log_event_t`: o caminho quente emite ID + campos numéricos, e a formatação
+fica centralizada em `debug/log.c` quando `RIGEL_ENABLE_STDIO_LOG=ON`.
+
+Com `RIGEL_ENABLE_STDIO_LOG=OFF`, `librigel.a` não referencia `printf`, `fprintf`,
+`snprintf` ou `stderr`; isto é coberto por `test_baremetal_no_stdio`.
+
+---
+
+### SIMD interno opcional ✅
+
+`RIGEL_ENABLE_SIMD` activa helpers internos para fill/copy de buffers de vídeo:
+SSE2 em x86_64, NEON em AArch64 e fallback escalar. A API pública e o timing
+permanecem escalares/determinísticos. Coberto por `test_simd` e por build com
+`RIGEL_ENABLE_SIMD=OFF`.
 
 ---
 
@@ -174,7 +196,7 @@ sem race condition dentro do mesmo `rigel_step`.
 | Serial | ✅ | ✅ | ✅ | ✅ `rigel_serial_*` | TX FIFO 16 bytes, RBF+TBE IRQ |
 | Input (joy/pot/mouse) | ✅ | ✅ | — | ✅ | joydat, fire(CIA-A), pot buttons |
 | Teclado | ✅ via CIA-B SDR | ✅ | ✅ EXTER | `rigel_keyboard_inject` | ✅ |
-| CIA-A / CIA-B | ✅ | ✅ step+MMIO | ✅ PORTS/EXTER | `rigel_cia_read/write` | CIA-B TOD sem /INDEX |
+| CIA-A / CIA-B | ✅ | ✅ step+MMIO | ✅ PORTS/EXTER | `rigel_cia_read/write` | CIA-B TOD recebe `/INDEX` sintético |
 | RTC | ✅ | ✅ | — | ✅ | config + pós-init |
 | Sprites | ✅ DMA | ✅ SPRxPOS/CTL/DATA/DATB | — | via Denise | overlay+BPLCON2 priority ✅; attached 4bpp ✅; CLXDAT/CLXCON ✅ |
 | Denise video | ✅ | ✅ | — | `rigel_get_frame` / `rigel_get_scanline` / framebuffer target | HAM6/EHB/dual-pf/priority/attached ✅; dirty/flags ✅; RGBA8888/RGB565 |
