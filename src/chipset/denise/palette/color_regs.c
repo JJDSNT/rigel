@@ -45,6 +45,9 @@ void rigel_denise_color_regs_write(RigelDenise *denise, rigel_u32 addr, rigel_u1
     }
 
     index = (addr - RIGEL_REG_COLOR00) >> 1;
+    if (denise->regs.color[index] != value) {
+        denise->output.pending_full_redraw = true;
+    }
     denise->regs.color[index] = value;
     denise->palette.rgb32[index] = rigel_denise_color_expand_12bit(value);
     denise->palette.rgb565[index] = rigel_denise_color_expand_rgb565(value);

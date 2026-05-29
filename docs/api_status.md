@@ -1,6 +1,6 @@
 # API Integration Status
 
-_Last updated: 2026-05-29 — DF0-DF3 selected-drive DMA/status, CIA-B INDEX/TOD pulse, video-mode surface tests, optional SIMD video-buffer helpers, and bare-metal friendly structured trace events_
+_Last updated: 2026-05-29 — DF0-DF3 selected-drive DMA/status, CIA-B INDEX/TOD pulse, video-mode/full-redraw/frame-flag tests, optional SIMD video-buffer helpers, and bare-metal friendly structured trace events_
 
 Legend: ✅ done · ⚠️ partial / known issue · ❌ missing
 
@@ -160,8 +160,8 @@ sem race condition dentro do mesmo `rigel_step`.
 
 | Item | Estado | Nota |
 |---|---|---|
-| `rigel_frame_t.flags` (interlace, HAM, etc.) | ✅ | HAM/DUAL_PF/SPRITES_ACTIVE; INTERLACE/COPPER reservados |
-| `rigel_frame_t.delta` (dirty lines bitmask) | ✅ | `dirty_lines[5]` — 1 bit/linha; pending→completed no frame boundary |
+| `rigel_frame_t.flags` (interlace, HAM, etc.) | ✅ | HAM/DUAL_PF/SPRITES_ACTIVE/COPPER_ACTIVE/INTERLACE_ODD/INTERLACE_EVEN |
+| `rigel_frame_t.delta` (dirty lines + full redraw) | ✅ | `dirty_lines[5]` — 1 bit/linha; `full_redraw` para paleta/modo/scroll/janela |
 | Pixel format config (`RGBA8888` / `RGB565` / `INDEXED_8BIT`) | ⚠️ | RGBA8888 default and RGB565 implemented, including external write target; INDEXED_8BIT pending |
 | `rigel_get_scanline(ctx, y)` por linha arbitrária | ✅ | raster y 0-311; `pixels_rgba` → frame_rgba[y][visible_x_start] |
 | Double-buffering de frame | ✅ | `frame_rgba[2]` + `front_idx`; swap atómico no boundary de frame |

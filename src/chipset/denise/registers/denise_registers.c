@@ -78,6 +78,13 @@ rigel_u16 rigel_denise_registers_read(RigelDenise *denise, rigel_u32 addr)
 
 void rigel_denise_registers_write(RigelDenise *denise, rigel_u32 addr, rigel_u16 value)
 {
+    rigel_u16 old_width;
+    rigel_u16 old_height;
+    rigel_u16 old_x_start;
+    rigel_u16 old_x_stop;
+    rigel_u16 old_y_start;
+    rigel_u16 old_y_stop;
+
     if (denise == NULL) {
         return;
     }
@@ -119,6 +126,13 @@ void rigel_denise_registers_write(RigelDenise *denise, rigel_u32 addr, rigel_u16
         return;
     }
 
+    old_width = denise->video.width;
+    old_height = denise->video.height;
+    old_x_start = denise->video.visible_x_start;
+    old_x_stop = denise->video.visible_x_stop;
+    old_y_start = denise->video.visible_y_start;
+    old_y_stop = denise->video.visible_y_stop;
+
     switch (addr) {
     case RIGEL_REG_CLXCON:
         collision_write_clxcon(&denise->coll, value);
@@ -155,5 +169,24 @@ void rigel_denise_registers_write(RigelDenise *denise, rigel_u32 addr, rigel_u16
         break;
     default:
         break;
+    }
+
+    if (addr == RIGEL_REG_BPLCON0 ||
+        addr == RIGEL_REG_BPLCON1 ||
+        addr == RIGEL_REG_BPLCON2 ||
+        addr == RIGEL_REG_BPLCON3 ||
+        addr == RIGEL_REG_DIWSTRT ||
+        addr == RIGEL_REG_DIWSTOP ||
+        addr == RIGEL_REG_DIWHIGH) {
+        denise->output.pending_full_redraw = true;
+    }
+
+    if (old_width != denise->video.width ||
+        old_height != denise->video.height ||
+        old_x_start != denise->video.visible_x_start ||
+        old_x_stop != denise->video.visible_x_stop ||
+        old_y_start != denise->video.visible_y_start ||
+        old_y_stop != denise->video.visible_y_stop) {
+        denise->output.pending_full_redraw = true;
     }
 }

@@ -81,10 +81,14 @@ void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
     output->visible_scanline = false;
     output->scanline_dirty = false;
     output->frame_dirty = true;
+    output->beam_lof = 0;
+    output->beam_lof_toggle = 0;
     output->pending_flags   = 0;
     output->completed_flags = 0;
     (void)memset(output->pending_dirty,   0, sizeof(output->pending_dirty));
     (void)memset(output->completed_dirty, 0, sizeof(output->completed_dirty));
+    output->pending_full_redraw = false;
+    output->completed_full_redraw = false;
     output->has_write_target = false;
     (void)memset(&output->write_target, 0, sizeof(output->write_target));
 }
@@ -155,17 +159,26 @@ void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_sta
     /* At frame boundary: snapshot metadata, then make the back buffer visible.
      * Swap runs after writing the last scanline so the front buffer is complete. */
     if (frame_changed) {
+        if (output->beam_lof_toggle) {
+            output->pending_flags |= output->beam_lof
+                ? (rigel_u32)RIGEL_FRAME_INTERLACE_ODD
+                : (rigel_u32)RIGEL_FRAME_INTERLACE_EVEN;
+        }
         output->completed_flags = output->pending_flags;
         (void)memcpy(output->completed_dirty, output->pending_dirty,
                      sizeof(output->completed_dirty));
+        output->completed_full_redraw = output->pending_full_redraw;
         output->pending_flags = 0;
         (void)memset(output->pending_dirty, 0, sizeof(output->pending_dirty));
+        output->pending_full_redraw = false;
         output->front_idx ^= 1u;
     }
 
     output->frame_counter = beam->frame_count;
     output->beam_hpos = beam->hpos;
     output->beam_vpos = beam->vpos;
+    output->beam_lof = beam->lof;
+    output->beam_lof_toggle = beam->lof_toggle;
     output->frame_dirty = frame_changed;
     output->visible_scanline = beam_in_visible_area(beam);
     output->scanline_width = denise->video.width;

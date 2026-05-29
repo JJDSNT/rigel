@@ -35,15 +35,15 @@ typedef enum rigel_frame_flags {
     RIGEL_FRAME_HAM            = 1u << 0,  /* HAM6 active on at least one visible line */
     RIGEL_FRAME_DUAL_PLAYFIELD = 1u << 1,  /* dual-playfield active on at least one line */
     RIGEL_FRAME_SPRITES_ACTIVE = 1u << 2,  /* at least one sprite was armed this frame */
-    RIGEL_FRAME_COPPER_ACTIVE  = 1u << 3,  /* reserved — copper mid-frame writes */
-    RIGEL_FRAME_INTERLACE_ODD  = 1u << 4,  /* reserved — odd interlace field */
-    RIGEL_FRAME_INTERLACE_EVEN = 1u << 5   /* reserved — even interlace field */
+    RIGEL_FRAME_COPPER_ACTIVE  = 1u << 3,  /* Copper executed at least one MOVE this frame */
+    RIGEL_FRAME_INTERLACE_ODD  = 1u << 4,  /* completed odd interlace field */
+    RIGEL_FRAME_INTERLACE_EVEN = 1u << 5   /* completed even interlace field */
 } rigel_frame_flags_t;
 
 /* Per-frame dirty tracking. Each bit in dirty_lines represents one raster line.
  * Bit n of dirty_lines[n/64] corresponds to raster line n (0 = top of field).
  * A set bit means compose_line ran for that line (i.e., it was in the visible window).
- * full_redraw is reserved for future use (palette invalidation, resolution change). */
+ * full_redraw is set for global video invalidation (palette, mode, scroll, window). */
 typedef struct rigel_frame_delta {
     rigel_u64 dirty_lines[5]; /* covers 320 bits — sufficient for 312 PAL lines */
     bool      full_redraw;

@@ -60,6 +60,8 @@ typedef struct rigel_denise_output_state {
     bool visible_scanline;
     bool scanline_dirty;
     bool frame_dirty;
+    rigel_u8 beam_lof;
+    rigel_u8 beam_lof_toggle;
     /* Bitplane line buffer — words fetched per plane for the current scanline */
     rigel_u16 plane_words[6][RIGEL_DENISE_MAX_PLANE_WORDS];
     rigel_u16 plane_word_count;
@@ -72,6 +74,8 @@ typedef struct rigel_denise_output_state {
     rigel_u64 pending_dirty[5];
     rigel_u32 completed_flags;
     rigel_u64 completed_dirty[5];
+    bool pending_full_redraw;
+    bool completed_full_redraw;
     bool has_write_target;
     rigel_framebuffer_target_t write_target;
 } rigel_denise_output_state_t;

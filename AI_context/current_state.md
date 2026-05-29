@@ -131,6 +131,8 @@
 - Priority fix: `denise_priority_resolve` was double-mapping sprite pixel index; corrected to pass palette index as-is
 - Video mode surface tests cover OCS PAL/NTSC, lores/hires, interlace intent,
   HAM6/EHB and ECS unsupported-mode guards.
+- Frame metadata now reports dirty lines, `full_redraw`, Copper activity, and
+  interlace odd/even fields in addition to HAM/dual-playfield/sprite activity.
 - Runtime traces now go through structured `rigel_log_event_t` events rather
   than direct formatting in chipset paths. Bare-metal builds can set
   `RIGEL_ENABLE_STDIO_LOG=OFF`; `test_baremetal_no_stdio` checks that

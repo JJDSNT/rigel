@@ -17,6 +17,7 @@ void copper_exec_move(RigelContext *ctx, rigel_u16 ir1, rigel_u16 ir2)
     reg   = (rigel_u32)(ir1 & 0x01FEu);
     cdang = (ctx->chipset.agnus.copper.copcon & 0x0002u) != 0;
     if (reg >= 0x40u || cdang) {
+        ctx->chipset.denise.output.pending_flags |= (rigel_u32)RIGEL_FRAME_COPPER_ACTIVE;
         if (reg == 0x096u || reg == 0x100u) {
             static unsigned trace_count = 0u;
             if (trace_count < 512u) {

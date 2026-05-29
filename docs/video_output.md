@@ -72,8 +72,9 @@ This handles the case where a single `rigel_step` crosses multiple raster lines.
 Dirty line tracking and frame flags are implemented in `rigel_frame_t`.
 
 `delta.dirty_lines[]` marks composed raster lines. Each bit maps to a raster
-line; `dirty_lines[5]` covers the 312-line PAL frame. `full_redraw` exists in
-the public struct but is currently reserved and always false.
+line; `dirty_lines[5]` covers the 312-line PAL frame. `full_redraw` is set when
+global video state changes, such as palette, mode, scroll or display-window
+register writes.
 
 `flags` currently reports:
 
@@ -81,11 +82,14 @@ the public struct but is currently reserved and always false.
 RIGEL_FRAME_HAM
 RIGEL_FRAME_DUAL_PLAYFIELD
 RIGEL_FRAME_SPRITES_ACTIVE
+RIGEL_FRAME_COPPER_ACTIVE
+RIGEL_FRAME_INTERLACE_ODD
+RIGEL_FRAME_INTERLACE_EVEN
 ```
 
-The enum also reserves `RIGEL_FRAME_COPPER_ACTIVE`,
-`RIGEL_FRAME_INTERLACE_ODD`, and `RIGEL_FRAME_INTERLACE_EVEN`; those bits are
-not emitted yet.
+`RIGEL_FRAME_COPPER_ACTIVE` is set when the Copper executes at least one MOVE
+during the completed frame. The interlace bits identify the completed field when
+BPLCON0 LACE is active.
 
 ## Future extensions
 

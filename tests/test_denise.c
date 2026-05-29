@@ -1,4 +1,5 @@
 #include "rigel/rigel.h"
+#include "agnus/copper/copper_exec.h"
 #include "core/rigel_context.h"
 
 #include <string.h>
@@ -371,6 +372,87 @@ static int test_rgb565_write_target_edges(rigel_u16 *chip_ram)
     return result;
 }
 
+static int test_frame_metadata_flags(rigel_u16 *chip_ram)
+{
+    rigel_config_t cfg = { 0 };
+    RigelContext *ctx;
+    rigel_frame_t frame;
+    int result = 0;
+
+    cfg.chip_ram.opaque = chip_ram;
+    cfg.chip_ram.read16 = test_chip_ram_read16;
+    cfg.chip_ram.write16 = test_chip_ram_write16;
+
+    ctx = rigel_create(&cfg);
+    if (ctx == NULL) {
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x000fu);
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0 ||
+        !rigel_get_frame(ctx, &frame) ||
+        !frame.delta.full_redraw) {
+        result = 1;
+    }
+
+    if (result == 0 &&
+        ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0 ||
+         !rigel_get_frame(ctx, &frame) ||
+         frame.delta.full_redraw)) {
+        result = 1;
+    }
+
+    if (result == 0) {
+        copper_exec_move(ctx, RIGEL_REG_COLOR00, 0x00f0u);
+        if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0 ||
+            !rigel_get_frame(ctx, &frame) ||
+            (frame.flags & RIGEL_FRAME_COPPER_ACTIVE) == 0u ||
+            !frame.delta.full_redraw) {
+            result = 1;
+        }
+    }
+
+    rigel_destroy(ctx);
+    return result;
+}
+
+static int test_interlace_frame_flags(rigel_u16 *chip_ram)
+{
+    rigel_config_t cfg = { 0 };
+    RigelContext *ctx;
+    rigel_frame_t frame;
+    int result = 0;
+
+    cfg.chip_ram.opaque = chip_ram;
+    cfg.chip_ram.read16 = test_chip_ram_read16;
+    cfg.chip_ram.write16 = test_chip_ram_write16;
+
+    ctx = rigel_create(&cfg);
+    if (ctx == NULL) {
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0x1004u);
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0 ||
+        !rigel_get_frame(ctx, &frame) ||
+        (frame.flags & RIGEL_FRAME_INTERLACE_EVEN) == 0u ||
+        (frame.flags & RIGEL_FRAME_INTERLACE_ODD) != 0u) {
+        result = 1;
+    }
+
+    if (result == 0 &&
+        ((rigel_step(ctx, (rigel_cycle_t)(TEST_FRAME_CYCLES + 227u)).events & RIGEL_EVENT_FRAME_READY) == 0 ||
+         !rigel_get_frame(ctx, &frame) ||
+         (frame.flags & RIGEL_FRAME_INTERLACE_ODD) == 0u ||
+         (frame.flags & RIGEL_FRAME_INTERLACE_EVEN) != 0u)) {
+        result = 1;
+    }
+
+    rigel_destroy(ctx);
+    return result;
+}
+
 int main(void)
 {
     rigel_config_t cfg = { 0 };
@@ -529,6 +611,22 @@ int main(void)
 
     {
         int rc = test_rgb565_write_target_edges(chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_frame_metadata_flags(chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_interlace_frame_flags(chip_ram);
         if (rc != 0) {
             rigel_destroy(ctx);
             return 1;

@@ -107,7 +107,7 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
                             : &denise->output.frame_rgba[denise->output.front_idx][0][0];
     }
     frame->flags       = (rigel_frame_flags_t)denise->output.completed_flags;
-    frame->delta.full_redraw = false;
+    frame->delta.full_redraw = denise->output.completed_full_redraw;
     (void)memcpy(frame->delta.dirty_lines, denise->output.completed_dirty,
                  sizeof(frame->delta.dirty_lines));
     return true;
