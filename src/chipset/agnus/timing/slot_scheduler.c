@@ -23,8 +23,6 @@
 #include "denise/denise_state.h"
 #include "debug/log.h"
 
-#include <stdio.h>
-
 /* =========================================================================
  * Internal: slot dispatch
  *
@@ -104,13 +102,13 @@ static void dispatch_slot(agnus_slot_owner_t owner,
 
             if (depth > 0 && depth <= 6 && plane < depth &&
                 widx < RIGEL_DENISE_MAX_PLANE_WORDS) {
-                rigel_u32 addr = agnus->bplpt.bplpt[plane];
                 bitplane_fetch_step(&agnus->fetch, &agnus->bplpt, plane,
                                     rigel_context_chip_ram(ctx));
                 dout->plane_words[plane][widx] = agnus->fetch.data[plane];
                 if (ctx->chipset.denise.regs.diwstrt == 0x0581u) {
                     static unsigned trace_count = 0u;
                     static unsigned nonzero_trace_count = 0u;
+                    rigel_u32 addr = agnus->bplpt.bplpt[plane];
                     bool trace_sample = trace_count < 120u;
                     bool trace_nonzero = agnus->fetch.data[plane] != 0u &&
                                          nonzero_trace_count < 240u;
@@ -118,26 +116,29 @@ static void dispatch_slot(agnus_slot_owner_t owner,
                                             (agnus->beam.vpos & 7u) == 0u &&
                                             trace_count < 260u;
                     if (trace_sample || trace_nonzero || trace_line_start) {
-                        char msg[192];
-                        (void)snprintf(msg, sizeof(msg),
-                                       "[RIGEL-BPLFETCH] frame=%llu v=%u h=%u dmacon=%04x"
-                                       " depth=%u plane=%u widx=%u addr=%06x data=%04x words=%u"
-                                       " ddf=%u-%u diw=%04x/%04x",
-                                       (unsigned long long)ctx->chipset.denise.output.frame_counter,
-                                       (unsigned)agnus->beam.vpos,
-                                       (unsigned)hpos,
-                                       (unsigned)agnus->scheduler.dmacon,
-                                       depth,
-                                       plane,
-                                       (unsigned)widx,
-                                       (unsigned)(addr & 0x00ffffffu),
-                                       (unsigned)agnus->fetch.data[plane],
-                                       (unsigned)dout->plane_word_count,
-                                       (unsigned)agnus->scheduler.ddfstrt,
-                                       (unsigned)agnus->scheduler.ddfstop,
-                                       (unsigned)ctx->chipset.denise.regs.diwstrt,
-                                       (unsigned)ctx->chipset.denise.regs.diwstop);
-                        rigel_log_info(msg);
+                        rigel_log_event_t event = {
+                            RIGEL_LOG_EVENT_BPL_FETCH,
+                            "bpl_fetch",
+                            {
+                                (rigel_u32)(ctx->chipset.denise.output.frame_counter & 0xffffffffu),
+                                (rigel_u32)(ctx->chipset.denise.output.frame_counter >> 32),
+                                agnus->beam.vpos,
+                                hpos,
+                                agnus->scheduler.dmacon,
+                                depth,
+                                plane,
+                                widx,
+                                addr & 0x00ffffffu,
+                                agnus->fetch.data[plane],
+                                dout->plane_word_count,
+                                agnus->scheduler.ddfstrt,
+                                agnus->scheduler.ddfstop,
+                                ctx->chipset.denise.regs.diwstrt,
+                                ctx->chipset.denise.regs.diwstop
+                            },
+                            15u
+                        };
+                        rigel_log_event(&event);
                         if (trace_nonzero)
                             nonzero_trace_count++;
                         if (trace_sample || trace_line_start)
@@ -328,20 +329,23 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
         static unsigned trace_count = 0u;
         if (trace_count < 240u &&
             (dmacon_bplen(sched->dmacon) || sched->depth > 0u || bitplane_slots > 0u)) {
-            char msg[192];
-            (void)snprintf(msg, sizeof(msg),
-                           "[RIGEL-SCHED] v=%u dmacon=%04x bplen=%u vbl=%u"
-                           " depth=%u hires=%u ddf=%u-%u bpl_slots=%u",
-                           (unsigned)vpos,
-                           (unsigned)sched->dmacon,
-                           dmacon_bplen(sched->dmacon) ? 1u : 0u,
-                           vbl ? 1u : 0u,
-                           (unsigned)sched->depth,
-                           sched->hires ? 1u : 0u,
-                           (unsigned)sched->ddfstrt,
-                           (unsigned)sched->ddfstop,
-                           (unsigned)bitplane_slots);
-            rigel_log_info(msg);
+            rigel_log_event_t event = {
+                RIGEL_LOG_EVENT_SCHEDULER,
+                "scheduler",
+                {
+                    vpos,
+                    sched->dmacon,
+                    dmacon_bplen(sched->dmacon) ? 1u : 0u,
+                    vbl ? 1u : 0u,
+                    sched->depth,
+                    sched->hires ? 1u : 0u,
+                    sched->ddfstrt,
+                    sched->ddfstop,
+                    bitplane_slots
+                },
+                9u
+            };
+            rigel_log_event(&event);
             trace_count++;
         }
     }

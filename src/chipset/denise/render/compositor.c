@@ -13,8 +13,6 @@
 #include "rigel/rigel_denise_types.h"
 #include "simd/rigel_simd.h"
 
-#include <stdio.h>
-
 static rigel_u16 rgb32_to_rgb565(rigel_u32 rgb)
 {
     rigel_u32 r = (rgb >> 16) & 0xffu;
@@ -80,23 +78,26 @@ static void compose_line(RigelDenise *denise)
              (trace_count < 360u &&
               (depth > 0u || (y >= 40u && y <= 48u) ||
                (y >= 240u && y <= 246u))))) {
-            char msg[192];
-            (void)snprintf(msg, sizeof(msg),
-                           "[RIGEL-COMPOSE] frame=%llu y=%u depth=%u words=%u"
-                           " nonzero=%02x bplcon0=%04x ddf0=%u x=%u-%u"
-                           " w0=%04x/%04x",
-                           (unsigned long long)output->frame_counter,
-                           (unsigned)y,
-                           depth,
-                           (unsigned)output->plane_word_count,
-                           (unsigned)nonzero,
-                           (unsigned)denise->regs.bplcon0,
-                           (unsigned)output->ddfstrt_lores,
-                           (unsigned)x_start,
-                           (unsigned)x_stop,
-                           (unsigned)((output->plane_word_count > 0u) ? output->plane_words[0][0] : 0u),
-                           (unsigned)((output->plane_word_count > 0u) ? output->plane_words[1][0] : 0u));
-            rigel_log_info(msg);
+            rigel_log_event_t event = {
+                RIGEL_LOG_EVENT_COMPOSE,
+                "compose",
+                {
+                    (rigel_u32)(output->frame_counter & 0xffffffffu),
+                    (rigel_u32)(output->frame_counter >> 32),
+                    y,
+                    depth,
+                    output->plane_word_count,
+                    nonzero,
+                    denise->regs.bplcon0,
+                    output->ddfstrt_lores,
+                    x_start,
+                    x_stop,
+                    (output->plane_word_count > 0u) ? output->plane_words[0][0] : 0u,
+                    (output->plane_word_count > 0u) ? output->plane_words[1][0] : 0u
+                },
+                12u
+            };
+            rigel_log_event(&event);
             if (trace_count < 1000u)
                 trace_count++;
         }

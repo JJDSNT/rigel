@@ -11,6 +11,25 @@
  * the host should add any prefix or newline it needs. */
 typedef void (*rigel_log_fn_t)(const char *message, void *opaque);
 
+typedef enum rigel_log_event_id {
+    RIGEL_LOG_EVENT_COPPER_WRITE = 1,
+    RIGEL_LOG_EVENT_BPL_FETCH    = 2,
+    RIGEL_LOG_EVENT_SCHEDULER    = 3,
+    RIGEL_LOG_EVENT_COMPOSE      = 4
+} rigel_log_event_id_t;
+
+typedef struct rigel_log_event {
+    rigel_log_event_id_t id;
+    const char *name;
+    rigel_u32 fields[16];
+    rigel_u8 field_count;
+} rigel_log_event_t;
+
+/* Structured event callback for hosts that want trace data without libc
+ * formatting. Field meanings are event-specific and documented next to each
+ * internal emission site. */
+typedef void (*rigel_log_event_fn_t)(const rigel_log_event_t *event, void *opaque);
+
 typedef enum rigel_video_std {
     RIGEL_VIDEO_NTSC = 0,
     RIGEL_VIDEO_PAL  = 1,
@@ -63,6 +82,8 @@ typedef struct rigel_config {
      */
     rigel_log_fn_t    log_fn;
     void             *log_opaque;
+    rigel_log_event_fn_t log_event_fn;
+    void             *log_event_opaque;
     rigel_video_std_t video_std;
     rigel_chipset_model_t chipset_model;
     rigel_pixel_format_t pixel_format;

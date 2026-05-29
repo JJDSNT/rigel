@@ -57,6 +57,9 @@ RigelContext *rigel_create(const rigel_config_t *config)
     if (config->log_fn != NULL) {
         rigel_log_set_fn(config->log_fn, config->log_opaque);
     }
+    if (config->log_event_fn != NULL) {
+        rigel_log_set_event_fn(config->log_event_fn, config->log_event_opaque);
+    }
 
     ctx->config = *config;
     rigel_reset(ctx);

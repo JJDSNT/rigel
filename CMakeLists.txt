@@ -155,6 +155,7 @@ if(RIGEL_BUILD_TESTS)
         test_denise
         test_video_modes
         test_simd
+        test_baremetal_log
         test_blitter
         test_blitter_dma
         test_copper
@@ -188,6 +189,16 @@ if(RIGEL_BUILD_TESTS)
         )
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()
+
+    if(NOT RIGEL_ENABLE_STDIO_LOG AND CMAKE_NM)
+        add_test(
+            NAME test_baremetal_no_stdio
+            COMMAND ${CMAKE_COMMAND}
+                -DNM=${CMAKE_NM}
+                -DLIB=$<TARGET_FILE:rigel>
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_no_stdio.cmake
+        )
+    endif()
 endif()
 
 if(RIGEL_BUILD_HARNESS)
