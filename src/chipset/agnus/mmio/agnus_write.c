@@ -1,7 +1,6 @@
 #include "agnus/mmio/agnus_mmio.h"
 
 #include <stddef.h>
-
 #include "agnus/agnus_config.h"
 #include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/copper/copper_regs.h"
@@ -13,6 +12,7 @@
 #include "core/rigel_context.h"
 #include "domains/blitter/blitter_domain.h"
 #include "domains/dma/dma_domain.h"
+#include "paula/paula_state.h"
 #include "rigel/rigel_custom.h"
 
 void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
@@ -22,6 +22,12 @@ void rigel_agnus_mmio_write_impl(RigelContext *ctx, rigel_u32 addr, rigel_u16 va
     }
 
     if (rigel_blitter_domain_owns_reg(addr)) {
+        if (addr == AGNUS_BLTSIZE) {
+            rigel_paula_clear_irq(
+                &ctx->chipset.paula,
+                BLITTER_INTREQ_BLIT
+            );
+        }
         rigel_blitter_domain_write_reg(&ctx->chipset.agnus.blitter, addr, value);
         rigel_context_write_reg(ctx, addr, value);
         return;

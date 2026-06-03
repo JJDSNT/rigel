@@ -22,43 +22,56 @@ static rigel_u32 rigel_context_chip_ram_visible_size(const RigelContext *ctx)
     return model_limit;
 }
 
-static rigel_u32 rigel_context_chip_ram_addr(const RigelContext *ctx, rigel_u32 addr)
+static int rigel_context_chip_ram_map_addr(const RigelContext *ctx, rigel_u32 addr, rigel_u32 *mapped)
 {
     rigel_u32 visible_size = rigel_context_chip_ram_visible_size(ctx);
 
     addr &= ~1u;
-    if (visible_size == 0u) {
-        return addr;
+    if (visible_size != 0u && addr >= visible_size) {
+        return 0;
     }
 
-    return addr % visible_size;
+    if (mapped != NULL) {
+        *mapped = addr;
+    }
+    return 1;
 }
 
 static rigel_u16 rigel_context_chip_ram_read16(void *opaque, rigel_u32 addr)
 {
     RigelContext *ctx = (RigelContext *)opaque;
+    rigel_u32 mapped;
 
     if (ctx == NULL || ctx->config.chip_ram.read16 == NULL) {
         return 0;
     }
 
+    if (!rigel_context_chip_ram_map_addr(ctx, addr, &mapped)) {
+        return 0xffffu;
+    }
+
     return ctx->config.chip_ram.read16(
         ctx->config.chip_ram.opaque,
-        rigel_context_chip_ram_addr(ctx, addr)
+        mapped
     );
 }
 
 static void rigel_context_chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
 {
     RigelContext *ctx = (RigelContext *)opaque;
+    rigel_u32 mapped;
 
     if (ctx == NULL || ctx->config.chip_ram.write16 == NULL) {
         return;
     }
 
+    if (!rigel_context_chip_ram_map_addr(ctx, addr, &mapped)) {
+        return;
+    }
+
     ctx->config.chip_ram.write16(
         ctx->config.chip_ram.opaque,
-        rigel_context_chip_ram_addr(ctx, addr),
+        mapped,
         value
     );
 }

@@ -23,6 +23,11 @@ int main(void)
         return 1;
     }
 
+    if ((rigel_custom_read16(ctx, 0x002u) & AGNUS_DMACON_BZERO) == 0u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
     rigel_destroy(ctx);
     return 0;
 }

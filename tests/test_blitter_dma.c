@@ -6,6 +6,12 @@ typedef struct TestChipRam {
     rigel_u16 words[16];
 } TestChipRam;
 
+typedef struct TraceChipRam {
+    rigel_u32 low_writes;
+    rigel_u32 dst_writes;
+    rigel_u32 other_writes;
+} TraceChipRam;
+
 static rigel_u16 test_chip_ram_read16(void *opaque, rigel_u32 addr)
 {
     TestChipRam *ram = (TestChipRam *)opaque;
@@ -18,6 +24,28 @@ static void test_chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
     TestChipRam *ram = (TestChipRam *)opaque;
     rigel_u32 index = (addr >> 1) & 0x0fU;
     ram->words[index] = value;
+}
+
+static rigel_u16 trace_chip_ram_read16(void *opaque, rigel_u32 addr)
+{
+    (void)opaque;
+    (void)addr;
+    return 0x0000u;
+}
+
+static void trace_chip_ram_write16(void *opaque, rigel_u32 addr, rigel_u16 value)
+{
+    TraceChipRam *ram = (TraceChipRam *)opaque;
+
+    (void)value;
+
+    if (addr >= 0x000700u && addr < 0x000712u) {
+        ram->low_writes++;
+    } else if (addr >= 0x016608u && addr < 0x019508u) {
+        ram->dst_writes++;
+    } else {
+        ram->other_writes++;
+    }
 }
 
 int main(void)
@@ -127,5 +155,49 @@ int main(void)
     }
 
     rigel_destroy(ctx);
+
+    {
+        TraceChipRam trace_ram = { 0 };
+        rigel_config_t trace_cfg = { 0 };
+
+        trace_cfg.chip_ram.opaque = &trace_ram;
+        trace_cfg.chip_ram.read16 = trace_chip_ram_read16;
+        trace_cfg.chip_ram.write16 = trace_chip_ram_write16;
+
+        ctx = rigel_create(&trace_cfg);
+        if (ctx == NULL) {
+            return 1;
+        }
+
+        rigel_custom_write16(
+            ctx,
+            RIGEL_REG_DMACON,
+            RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BLTEN
+        );
+
+        rigel_custom_write16(ctx, AGNUS_BLTAFWM, 0xffffu);
+        rigel_custom_write16(ctx, AGNUS_BLTALWM, 0xffffu);
+        rigel_custom_write16(ctx, AGNUS_BLTBMOD, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTAMOD, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTDMOD, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTCDAT, 0x5555u);
+        rigel_custom_write16(ctx, AGNUS_BLTCON0, 0x05ccu);
+        rigel_custom_write16(ctx, AGNUS_BLTCON1, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTBPTH, 0x0001u);
+        rigel_custom_write16(ctx, AGNUS_BLTBPTL, 0x6c84u);
+        rigel_custom_write16(ctx, AGNUS_BLTDPTH, 0x0001u);
+        rigel_custom_write16(ctx, AGNUS_BLTDPTL, 0x6608u);
+        rigel_custom_write16(ctx, AGNUS_BLTSIZE, 0x2ee0u);
+
+        rigel_agnus_step(ctx, 20000u);
+
+        if (trace_ram.low_writes != 0u || trace_ram.dst_writes == 0u) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+
+        rigel_destroy(ctx);
+    }
+
     return 0;
 }
