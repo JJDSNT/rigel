@@ -1,4 +1,5 @@
 #include "agnus/agnus_state.h"
+#include "agnus/blitter/blitter.h"
 #include "agnus/timing/slot_scheduler.h"
 #include "chipset/chipset.h"
 #include "core/rigel_context.h"
@@ -165,6 +166,26 @@ int main(void)
     }
 
     if (rigel_custom_read16(ctx, RIGEL_REG_COLOR00) != 0x0f00u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_reset(ctx);
+    chip_ram[0x40u >> 1] = AGNUS_BLTSIZE;
+    chip_ram[0x42u >> 1] = 0x0001u;
+    rigel_custom_write16(ctx, RIGEL_REG_COP1LCH, 0x0000);
+    rigel_custom_write16(ctx, RIGEL_REG_COP1LCL, 0x0040);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_COPEN
+    );
+    rigel_custom_write16(ctx, RIGEL_REG_COPJMP1, 0);
+    result = rigel_step(ctx, 4);
+
+    if ((result.events & RIGEL_EVENT_COPPER) == 0 ||
+        rigel_custom_read16(ctx, AGNUS_BLTSIZE) != 0u ||
+        blitter_is_busy(&chipset->agnus.blitter) != 0) {
         rigel_destroy(ctx);
         return 1;
     }

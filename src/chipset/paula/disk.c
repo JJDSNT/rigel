@@ -1,6 +1,32 @@
 #include "paula/disk.h"
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+static int disk_trace_enabled(void)
+{
+    static int enabled = -1;
+
+    if (enabled < 0) {
+        const char *env = getenv("RIGEL_DISK_TRACE");
+        enabled = (env != NULL && env[0] != '\0' && env[0] != '0');
+    }
+
+    return enabled;
+}
+
+static int disk_dsksyn_irq_enabled(void)
+{
+    static int enabled = -1;
+
+    if (enabled < 0) {
+        const char *env = getenv("RIGEL_DISK_NO_DSKSYN_IRQ");
+        enabled = (env == NULL || env[0] == '\0' || env[0] == '0');
+    }
+
+    return enabled;
+}
 
 static rigel_u16 disk_read_be16(const rigel_u8 *src)
 {
@@ -17,23 +43,6 @@ static rigel_u32 disk_track_offset(const FloppyDrive *drive)
 
     track = (rigel_u32)((drive->cylinder << 1) | (drive->side ? 1 : 0));
     return track * AMIGA_TRACK_SIZE;
-}
-
-static int disk_track_has_sync(const rigel_u8 *src, rigel_u32 len, rigel_u16 sync)
-{
-    rigel_u32 i;
-
-    if (src == NULL || len < 2) {
-        return 0;
-    }
-
-    for (i = 0; i + 1 < len; ++i) {
-        if (disk_read_be16(src + i) == sync) {
-            return 1;
-        }
-    }
-
-    return 0;
 }
 
 static rigel_u32 disk_track_find_sync(const rigel_u8 *src, rigel_u32 len, rigel_u16 sync)
@@ -53,6 +62,48 @@ static rigel_u32 disk_track_find_sync(const rigel_u8 *src, rigel_u32 len, rigel_
     return len;
 }
 
+static rigel_u32 disk_count_sync_words(const rigel_u8 *src, rigel_u32 len, rigel_u16 sync)
+{
+    rigel_u32 count = 0;
+    rigel_u32 i;
+
+    if (src == NULL || len < 2) {
+        return 0;
+    }
+
+    for (i = 0; i + 1 < len; i += 2) {
+        if (disk_read_be16(src + i) == sync) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
+static rigel_u32 disk_count_dma_sync_words(const disk_state_t *disk)
+{
+    rigel_u32 count = 0;
+    rigel_u32 src;
+    rigel_u32 done;
+
+    if (disk == NULL || disk->dma_track_len < 2) {
+        return 0;
+    }
+
+    src = disk->dma_src_offset;
+    for (done = 0; done < disk->dma_bytes_total; done += 2) {
+        if (src + 1u >= disk->dma_track_len) {
+            src = 0;
+        }
+        if (disk_read_be16(disk->dma_track_buf + src) == disk->dsksync) {
+            count++;
+        }
+        src = (src + 2u) % disk->dma_track_len;
+    }
+
+    return count;
+}
+
 static void disk_emit_irq(disk_state_t *disk, rigel_u16 mask)
 {
     if (disk == NULL || disk->irq.raise == NULL) {
@@ -62,24 +113,31 @@ static void disk_emit_irq(disk_state_t *disk, rigel_u16 mask)
     disk->irq.raise(disk->irq.opaque, mask);
 }
 
-static void disk_load_dskbytr(disk_state_t *disk, rigel_u16 word)
-{
-    disk->dskbytr_data = (rigel_u16)(0x8000u | (word & 0x00ffu));
-    disk->dskdatr = word;
-}
-
 static void disk_maybe_emit_sync(disk_state_t *disk)
 {
     if (disk == NULL) {
         return;
     }
-
-    if (!disk->sync_seen || !(disk->adkcon & RIGEL_PAULA_ADKCON_WORDSYNC) || disk->sync_irq_fired) {
+    if (!disk->sync_seen) {
+        return;
+    }
+    if ((disk->adkcon & RIGEL_PAULA_ADKCON_WORDSYNC) == 0) {
+        return;
+    }
+    if (disk->sync_irq_fired) {
         return;
     }
 
     disk->sync_irq_fired = 1;
-    disk_emit_irq(disk, 0x1000u);
+    if (disk_dsksyn_irq_enabled()) {
+        disk_emit_irq(disk, 0x1000u);
+    }
+}
+
+static void disk_load_dskbytr(disk_state_t *disk, rigel_u16 word)
+{
+    disk->dskbytr_data = (rigel_u16)(0x8000u | (word & 0x00ffu));
+    disk->dskdatr = word;
 }
 
 void disk_reset(disk_state_t *disk)
@@ -202,8 +260,10 @@ static void disk_start_dma(disk_state_t *disk, rigel_u16 value)
     rigel_u32 adf_offset;
     rigel_u32 sync_offset;
     rigel_u32 track;
+    int trace;
 
     len_words = (rigel_u32)(value & RIGEL_PAULA_DSKLEN_LEN);
+    trace = disk_trace_enabled();
 
     disk->dsklen = value;
     disk->write_mode = (value & RIGEL_PAULA_DSKLEN_WRITE) != 0;
@@ -223,18 +283,44 @@ static void disk_start_dma(disk_state_t *disk, rigel_u16 value)
     disk->dma_track_len = 0;
     disk->dma_fill_word = 0;
 
+    if (trace) {
+        fprintf(stderr,
+                "[RIGEL-DISK-START] dskptr=%06x dsklen=%04x words=%u write=%d dsksync=%04x "
+                "drive=%p media=%d cyl=%d side=%d\n",
+                (unsigned)(disk->dskptr & 0x00ffffffu),
+                (unsigned)value,
+                (unsigned)len_words,
+                disk->write_mode ? 1 : 0,
+                (unsigned)disk->dsksync,
+                (void *)disk->drive,
+                (disk->drive != NULL && floppy_has_media(disk->drive)) ? 1 : 0,
+                disk->drive != NULL ? disk->drive->cylinder : -1,
+                disk->drive != NULL ? disk->drive->side : -1);
+    }
+
     if (disk->write_mode || len_words == 0) {
         return;
     }
 
     if (disk->drive == NULL || !floppy_has_media(disk->drive)) {
         disk->countdown = RIGEL_PAULA_DISK_FAKE_DMA_CYCLES;
+        if (trace) {
+            fprintf(stderr, "[RIGEL-DISK-FAKE] reason=no-media countdown=%u\n",
+                    (unsigned)disk->countdown);
+        }
         return;
     }
 
     adf_offset = disk_track_offset(disk->drive);
     if (adf_offset >= disk->drive->adf_size || AMIGA_TRACK_SIZE > disk->drive->adf_size - adf_offset) {
         disk->countdown = RIGEL_PAULA_DISK_FAKE_DMA_CYCLES;
+        if (trace) {
+            fprintf(stderr,
+                    "[RIGEL-DISK-FAKE] reason=track-oob adf_offset=%u adf_size=%u countdown=%u\n",
+                    (unsigned)adf_offset,
+                    (unsigned)disk->drive->adf_size,
+                    (unsigned)disk->countdown);
+        }
         return;
     }
 
@@ -246,19 +332,41 @@ static void disk_start_dma(disk_state_t *disk, rigel_u16 value)
             track,
             AMIGA_SECTORS_PER_TRACK)) {
         disk->countdown = RIGEL_PAULA_DISK_FAKE_DMA_CYCLES;
+        if (trace) {
+            fprintf(stderr, "[RIGEL-DISK-FAKE] reason=encode-failed countdown=%u\n",
+                    (unsigned)disk->countdown);
+        }
         return;
     }
 
-    disk->dma_track_len = AMIGA_MFM_TRACK_SIZE;
-    disk->sync_seen = disk_track_has_sync(disk->dma_track_buf, disk->dma_track_len, disk->dsksync);
+    disk->dma_track_len = (rigel_u32)sizeof(disk->dma_track_buf);
     sync_offset = disk_track_find_sync(disk->dma_track_buf, disk->dma_track_len, disk->dsksync);
-    if (sync_offset + 1 < disk->dma_track_len) {
+    if (sync_offset + 1u < disk->dma_track_len) {
         disk_load_dskbytr(disk, disk_read_be16(disk->dma_track_buf + sync_offset));
-        disk->dma_src_offset = sync_offset;
     }
-
+    disk->dma_src_offset = 0u;
+    disk->sync_seen = (sync_offset + 1u < disk->dma_track_len) ? 1 : 0;
     disk_maybe_emit_sync(disk);
+
     disk->dma_bytes_total = len_words << 1;
+
+    if (trace) {
+        fprintf(stderr,
+                "[RIGEL-DISK-DMA] track=%u adf_offset=%u track_len=%u sync_offset=%u "
+                "track_syncs=%u copy_syncs=%u bytes=%u start_src=%u first=%04x %04x %04x %04x\n",
+                (unsigned)track,
+                (unsigned)adf_offset,
+                (unsigned)disk->dma_track_len,
+                (unsigned)sync_offset,
+                (unsigned)disk_count_sync_words(disk->dma_track_buf, disk->dma_track_len, disk->dsksync),
+                (unsigned)disk_count_dma_sync_words(disk),
+                (unsigned)disk->dma_bytes_total,
+                (unsigned)disk->dma_src_offset,
+                (unsigned)disk_read_be16(disk->dma_track_buf + 0),
+                (unsigned)disk_read_be16(disk->dma_track_buf + 2),
+                (unsigned)disk_read_be16(disk->dma_track_buf + 4),
+                (unsigned)disk_read_be16(disk->dma_track_buf + 6));
+    }
 }
 
 void disk_write_dsklen(disk_state_t *disk, rigel_u16 value)
@@ -306,6 +414,17 @@ rigel_u16 disk_read_dskbytr(disk_state_t *disk)
 
     if (disk->dma_active) {
         value = (rigel_u16)(value | RIGEL_PAULA_DSKBYTR_DMAON);
+    }
+
+    if (disk_trace_enabled()) {
+        fprintf(stderr,
+                "[RIGEL-DISK-DSKBYTR] value=%04x data=%04x sync=%d active=%d done=%u total=%u\n",
+                (unsigned)value,
+                (unsigned)disk->dskbytr_data,
+                disk->sync_seen,
+                disk->dma_active,
+                (unsigned)disk->dma_bytes_done,
+                (unsigned)disk->dma_bytes_total);
     }
 
     disk->dskbytr_data = (rigel_u16)(disk->dskbytr_data & (rigel_u16)(~0x8000u));
@@ -386,11 +505,33 @@ void disk_dma_service_grant(disk_state_t *disk)
 
     disk->chip_ram.write16(disk->chip_ram.opaque, dst, word);
     disk_load_dskbytr(disk, word);
+    if (word == disk->dsksync) {
+        disk->sync_seen = 1;
+        disk_maybe_emit_sync(disk);
+    }
     disk->dma_bytes_done += 2;
     disk->dma_src_offset = (disk->dma_src_offset + 2) % disk->dma_track_len;
 
     if (disk->dma_bytes_done < disk->dma_bytes_total) {
         return;
+    }
+
+    /*
+     * Re-fire DSKSYNC before DSKBLK if a sync word was seen during this DMA.
+     * On real hardware the disk never stops spinning: the sync mark passes
+     * under the head again (next revolution) near the end of the transfer,
+     * so DSKSYNC is pending in INTREQ alongside DSKBLK when the interrupt
+     * fires.  KS1.3's DSKBLK handler checks INTREQR for a pending DSKSYNC to
+     * decide which completion path to take; without it the handler skips the
+     * subroutine that re-enables disk DMA before starting the next read.
+     *
+     * In Rigel, hardware-accurate DMA timing lets VBL handlers run during the
+     * transfer and clear DSKSYNC from INTREQ.  Restoring it here at completion
+     * keeps the KS1.3 handler on the correct path.
+     */
+    if (disk->sync_seen) {
+        disk->sync_irq_fired = 0;
+        disk_maybe_emit_sync(disk);
     }
 
     disk->dma_active = 0;
@@ -401,6 +542,14 @@ void disk_dma_service_grant(disk_state_t *disk)
     disk->dskbytr = (rigel_u16)(disk->dskbytr & (rigel_u16)(~RIGEL_PAULA_DSKBYTR_DMAON));
     disk->dsklen = (rigel_u16)(disk->dsklen & (rigel_u16)(~RIGEL_PAULA_DSKLEN_DMAEN));
     disk->dskptr = disk->dma_ptr_base + disk->dma_bytes_total;
+    if (disk_trace_enabled()) {
+        fprintf(stderr,
+                "[RIGEL-DISK-DONE] base=%06x bytes=%u endptr=%06x last_src=%u irq=0002\n",
+                (unsigned)(disk->dma_ptr_base & 0x00ffffffu),
+                (unsigned)disk->dma_bytes_total,
+                (unsigned)(disk->dskptr & 0x00ffffffu),
+                (unsigned)disk->dma_src_offset);
+    }
     disk_emit_irq(disk, 0x0002u);
 }
 

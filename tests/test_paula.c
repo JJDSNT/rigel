@@ -81,11 +81,11 @@ int main(void)
     }
 
     disk_dma_service_grant(&paula.disk);
-    if (ram.words[0] != 0x4489u) {
+    if (ram.words[0] != 0xaaaau) {
         return 1;
     }
 
-    if (disk_read_dskdatr(&paula.disk) != 0x4489u) {
+    if (disk_read_dskdatr(&paula.disk) != 0xaaaau) {
         return 1;
     }
 
@@ -140,12 +140,37 @@ int main(void)
     /* Disk DMA slot is at hpos=7; step 8 CCKs to reach and fire it. */
     rigel_step(ctx, 8);
 
-    if (rigel_custom_read16(ctx, RIGEL_REG_DSKDATR) != 0x4489u) {
+    if (ram.words[0] != 0xaaaau) {
         rigel_destroy(ctx);
         return 1;
     }
 
     if ((rigel_get_intreq(ctx) & 0x0002u) == 0) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_destroy(ctx);
+
+    ram.words[0] = 0;
+    ctx = rigel_create(&cfg);
+    if (ctx == NULL) {
+        return 1;
+    }
+
+    if (rigel_floppy_insert(ctx, RIGEL_FLOPPY_DRIVE_DF0, g_test_adf, sizeof(g_test_adf)) != RIGEL_STATUS_OK) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_custom_write16(ctx, RIGEL_REG_DMACON, RIGEL_SETCLR | RIGEL_DMACON_DMAEN);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKPTH, 0x0000);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKPTL, 0x0000);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
+    rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
+    rigel_step(ctx, 32);
+
+    if (ram.words[0] != 0xaaaau) {
         rigel_destroy(ctx);
         return 1;
     }

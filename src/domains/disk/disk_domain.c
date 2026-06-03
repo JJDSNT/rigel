@@ -59,6 +59,14 @@ rigel_u16 rigel_disk_domain_read_reg(const disk_state_t *disk, rigel_u32 addr)
         return disk != NULL ? disk->adkcon : 0;
     case RIGEL_REG_DSKBYTR:
         return disk_read_dskbytr((disk_state_t *)disk);
+    case RIGEL_REG_DSKPTH:
+        return disk != NULL ? (rigel_u16)((disk->dskptr >> 16) & 0xffffu) : 0;
+    case RIGEL_REG_DSKPTL:
+        return disk != NULL ? (rigel_u16)(disk->dskptr & 0xffffu) : 0;
+    case RIGEL_REG_DSKLEN:
+        return disk != NULL ? disk->dsklen : 0;
+    case RIGEL_REG_DSKSYNC:
+        return disk != NULL ? disk->dsksync : 0;
     default:
         return 0;
     }

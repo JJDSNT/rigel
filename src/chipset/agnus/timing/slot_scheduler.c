@@ -23,6 +23,8 @@
 #include "denise/denise_state.h"
 #include "debug/log.h"
 
+#include <stdlib.h>
+
 /* =========================================================================
  * Internal: slot dispatch
  *
@@ -172,6 +174,18 @@ static void dispatch_slot(agnus_slot_owner_t owner,
         }
         break;
     }
+}
+
+static bool disk_legacy_priority_enabled(void)
+{
+    static int enabled = -1;
+
+    if (enabled < 0) {
+        const char *env = getenv("RIGEL_DISK_NOMINAL_SLOTS");
+        enabled = (env == NULL || env[0] == '\0' || env[0] == '0') ? 1 : 0;
+    }
+
+    return enabled != 0;
 }
 
 /* =========================================================================
@@ -411,7 +425,17 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
 
     /* Derive dynamic flags from live state so queries stay accurate */
     if (ctx) {
-        sched->blitter_active = blitter_is_busy(&ctx->chipset.agnus.blitter) != 0;
+        rigel_u16 live_dmacon =
+            rigel_dma_domain_read_dmacon(&ctx->chipset.agnus.dma);
+
+        if (sched->dmacon != live_dmacon) {
+            sched->dmacon = live_dmacon;
+            sched->table_dirty = true;
+        }
+
+        sched->blitter_active =
+            blitter_is_busy(&ctx->chipset.agnus.blitter) != 0 &&
+            dmacon_blten(sched->dmacon);
         sched->copper_active  = dmacon_copen(sched->dmacon);
         sched->blitter_nasty  = (sched->dmacon & DMACON_BLTPRI) != 0;
         sched->hpos           = beam->hpos;
@@ -428,6 +452,32 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
 
     hpos  = sched->hpos;
     owner = sched->table[hpos < AGNUS_SLOTS_PER_LINE ? hpos : 0];
+
+    /*
+     * Bellatrix's legacy Agnus arbitration gave an active DSKLEN transfer first
+     * priority while master DMA was enabled.  KS1.3 can clear DMACON.DSKEN
+     * after arming DSKLEN; if the in-flight transfer is then gated by DSKEN it
+     * remains active forever and trackdisk never receives DSKBLK.
+     *
+     * When DSKEN is cleared mid-transfer we also restore it: KS1.3 trackdisk
+     * clears DSKEN as part of a display-setup sequence before re-arming DSKLEN.
+     * Without this restore the chip-internal state is inconsistent — the in-
+     * flight DMA completes via legacy priority but the DSKBLK handler sees
+     * DSKEN=0 and skips re-arming future DMAs, so START stays at 2 forever.
+     */
+    if (owner != AGNUS_SLOT_REFRESH &&
+        ctx != NULL &&
+        disk_legacy_priority_enabled() &&
+        dmacon_master(sched->dmacon) &&
+        rigel_disk_domain_dma_wants_service(&ctx->chipset.paula.disk)) {
+        owner = AGNUS_SLOT_DISK;
+        if (!dmacon_dsken(sched->dmacon)) {
+            rigel_dma_domain_write_dmacon(&ctx->chipset.agnus.dma,
+                                           DMACON_SETCLR | DMACON_DSKEN);
+            sched->dmacon       = rigel_dma_domain_read_dmacon(&ctx->chipset.agnus.dma);
+            sched->table_dirty  = true;
+        }
+    }
 
     /* Dynamic slot overrides:
      *   Blitter steals FREE slots when active; also CPU slots when nasty.
