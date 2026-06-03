@@ -146,6 +146,7 @@ if(RIGEL_BUILD_TESTS)
         test_beam
         test_agnus_domains
         test_cia
+        test_mfm_decode
         test_floppy
         test_paula
         test_rtc
