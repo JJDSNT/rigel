@@ -5,6 +5,7 @@
 
 #include "chipset/chipset.h"
 #include "cia/cia.h"
+#include "cia/cia_ports.h"
 #include "debug/log.h"
 #include "chipset/agnus/agnus_config.h"
 #include "chipset/agnus/beam.h"
@@ -21,6 +22,72 @@
 #include "paula/paula_state.h"
 
 enum { RIGEL_DMACON_BLTPRI = 0x0400u };
+
+static void rigel_sync_floppy_cia_lines(RigelContext *ctx)
+{
+    CIA *cia_b;
+    CIA *cia_a;
+    rigel_u8 prb;
+    rigel_u8 pra;
+    int mtr;
+    int sel[4];
+    int idmode;
+    int i;
+    int selected_count;
+    FloppyDrive *active;
+
+    if (ctx == NULL) {
+        return;
+    }
+
+    cia_b = &ctx->chipset.cia[1];
+    cia_a = &ctx->chipset.cia[0];
+    prb = cia_port_b_value(cia_b);
+
+    mtr    = !(prb & 0x80u);
+    sel[3] = !(prb & 0x40u);
+    sel[2] = !(prb & 0x20u);
+    sel[1] = !(prb & 0x10u);
+    sel[0] = !(prb & 0x08u);
+
+    active = &ctx->chipset.floppy[0];
+    selected_count = 0;
+    for (i = 0; i < 4; i++) {
+        if (sel[i]) {
+            if (selected_count == 0) {
+                active = &ctx->chipset.floppy[i];
+            }
+            selected_count++;
+        }
+    }
+    rigel_paula_set_disk_drive(&ctx->chipset.paula, active);
+
+    pra = cia_port_a_value(cia_a);
+    pra |= 0x3Cu;
+
+    if (selected_count == 1) {
+        idmode = !mtr && (active->id_count < 32);
+        if (idmode) {
+            if (!floppy_get_idbit(active)) {
+                pra &= (rigel_u8)~0x04u;
+            }
+        } else if (!floppy_get_dskchg(active, active->motor)) {
+            pra &= (rigel_u8)~0x04u;
+        }
+
+        if (!floppy_get_wpro(active)) {
+            pra &= (rigel_u8)~0x08u;
+        }
+        if (floppy_get_track0(active)) {
+            pra &= (rigel_u8)~0x10u;
+        }
+        if (floppy_get_ready(active)) {
+            pra &= (rigel_u8)~0x20u;
+        }
+    }
+
+    cia_set_external_pra(cia_a, pra);
+}
 
 static rigel_bus_owner_t slot_to_bus_owner(agnus_slot_owner_t slot)
 {
@@ -390,6 +457,7 @@ rigel_status_t rigel_floppy_insert(
     }
 
     floppy_insert(target, data, size);
+    rigel_sync_floppy_cia_lines(ctx);
     return RIGEL_STATUS_OK;
 }
 
@@ -407,6 +475,7 @@ void rigel_floppy_eject(RigelContext *ctx, rigel_floppy_drive_id_t drive)
     }
 
     floppy_eject(target);
+    rigel_sync_floppy_cia_lines(ctx);
 }
 
 bool rigel_floppy_has_media(const RigelContext *ctx, rigel_floppy_drive_id_t drive)
@@ -432,6 +501,8 @@ bool rigel_floppy_get_status(
 )
 {
     const FloppyDrive *target;
+    rigel_u8 prb;
+    rigel_u8 sel_bit;
 
     if (ctx == NULL || status == NULL) {
         return false;
@@ -442,7 +513,11 @@ bool rigel_floppy_get_status(
         return false;
     }
 
+    prb = cia_port_b_value(&ctx->chipset.cia[1]);
+    sel_bit = (rigel_u8)(0x08u << (rigel_u8)drive);
+
     status->has_media = floppy_has_media(target) != 0;
+    status->selected = (prb & sel_bit) == 0u;
     status->motor_on = target->motor != 0;
     status->ready = target->ready != 0;
     status->track0 = target->track0 != 0;

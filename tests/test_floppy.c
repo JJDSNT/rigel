@@ -31,7 +31,7 @@ int main(void)
         return 1;
     }
 
-    if (status.has_media || status.dma_active || !status.track0 || status.cylinder != 0 || status.side != 0) {
+    if (status.has_media || status.selected || status.dma_active || !status.track0 || status.cylinder != 0 || status.side != 0) {
         rigel_destroy(ctx);
         return 1;
     }
@@ -84,12 +84,13 @@ int main(void)
     rigel_custom_write16(ctx, RIGEL_REG_DSKLEN, RIGEL_PAULA_DSKLEN_DMAEN | 1u);
 
     if (!rigel_floppy_get_status(ctx, RIGEL_FLOPPY_DRIVE_DF2, &status) ||
-        !status.dma_active || !status.motor_on) {
+        !status.dma_active || !status.motor_on || !status.selected) {
         rigel_destroy(ctx);
         return 1;
     }
 
-    if (!rigel_floppy_get_status(ctx, RIGEL_FLOPPY_DRIVE_DF0, &status) || status.dma_active) {
+    if (!rigel_floppy_get_status(ctx, RIGEL_FLOPPY_DRIVE_DF0, &status) ||
+        status.dma_active || status.selected) {
         rigel_destroy(ctx);
         return 1;
     }

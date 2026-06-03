@@ -12,6 +12,7 @@ typedef enum rigel_floppy_drive_id {
 
 typedef struct rigel_floppy_status {
     bool has_media;
+    bool selected;
     bool motor_on;
     bool ready;
     bool track0;

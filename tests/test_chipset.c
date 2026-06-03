@@ -1,4 +1,6 @@
 #include "rigel/rigel.h"
+#include "rigel/rigel_cia.h"
+#include "cia/cia.h"
 #include "chipset/chipset.h"
 #include "core/rigel_context.h"
 
@@ -23,6 +25,12 @@ int main(void)
     rigel_take_snapshot(ctx, &snapshot);
 
     if (snapshot.cycles != 4) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    rigel_step(ctx, chipset->agnus.beam.line_clocks);
+    if (rigel_cia_read(ctx, 1u, CIA_REG_TODLO) == 0u) {
         rigel_destroy(ctx);
         return 1;
     }

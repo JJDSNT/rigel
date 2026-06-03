@@ -27,7 +27,6 @@ struct RigelChipset {
     rigel_u32   cia_eclock_rem;       /* fractional E-clock tick accumulator */
     RigelRTC    rtc;
     FloppyDrive floppy[RIGEL_FLOPPY_DRIVE_COUNT];
-    rigel_u32   floppy_index_cck;  /* CCK accumulator for /INDEX pulse generation */
     rigel_u16   custom_regs[RIGEL_CUSTOM_REG_COUNT];
 };
 

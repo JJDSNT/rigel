@@ -71,18 +71,12 @@ enum {
 /* TOD timing (PAL model for the current classic chipset profile)            */
 /* ------------------------------------------------------------------------- */
 
-/*
- * CIA-A TOD: increment once per frame (VBL).
- * Value in E-clock ticks (CIA runs at CPU/10).
- * PAL: 454*313 CPU cycles/frame / 10 = 14220 E-clock ticks/frame.
- */
-#define CIA_A_TOD_TICKS_PER_INCREMENT (454u * 313u / 10u)
+/* CIA-A TOD is externally pulsed once per VBL by the machine/chipset glue
+ * (cia_tod_pulse). Setting ticks_per_inc=0 disables the redundant E-clock
+ * path in cia_tod_step, preventing double-counting (~3x/frame instead of 1x). */
+#define CIA_A_TOD_TICKS_PER_INCREMENT 0u
 
-/*
- * CIA-B TOD: driven by floppy /INDEX pulse, not CPU cycles.
- * With no disk attached the counter never increments, so use 0
- * (cia_tod_step returns immediately when ticks_per_inc == 0).
- */
+/* CIA-B TOD is externally pulsed from Agnus HSYNC by the machine/chipset glue. */
 #define CIA_B_TOD_TICKS_PER_INCREMENT 0u
 
 /* ------------------------------------------------------------------------- */

@@ -16,10 +16,10 @@ typedef struct RigelContext RigelContext;
  *
  * pressed: true = key down, false = key up.
  *
- * Internally serialises the key code into CIA-B SDR using the Amiga keyboard
- * protocol (inverted, MSB first) and raises EXTER (IPL 6).
+ * Internally serialises the key code into CIA-A SDR using the Amiga keyboard
+ * protocol (inverted, MSB first) and raises PORTS (IPL 2).
  * The host's interrupt handler will see RIGEL_EVENT_IRQ_CHANGED and can deliver
- * IPL 6 to the CPU; the CPU's interrupt handler reads CIA-B SDR to get the code.
+ * IPL 2 to the CPU; the CPU's interrupt handler reads CIA-A SDR to get the code.
  */
 void rigel_keyboard_inject(RigelContext *ctx, rigel_u8 amiga_keycode, bool pressed);
 

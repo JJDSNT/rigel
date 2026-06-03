@@ -17,11 +17,6 @@
 /* CIA-A runs at E-clock = CCK/5. One E-clock tick per 5 CCK. */
 #define CIA_CCK_PER_ECLOCK 5u
 
-/* Floppy INDEX pulse: 300 RPM = 5 revolutions per second.
- * PAL CCK rate ≈ 3,546,895 Hz → one revolution ≈ 709,379 CCKs.
- * Rounded to a multiple convenient for integer arithmetic. */
-#define FLOPPY_CCK_PER_INDEX 709379u
-
 void rigel_chipset_reset(RigelChipset *chipset)
 {
     rigel_u32 i;
@@ -32,7 +27,6 @@ void rigel_chipset_reset(RigelChipset *chipset)
 
     chipset->cycles = 0;
     chipset->cia_eclock_rem = 0;
-    chipset->floppy_index_cck = 0;
     for (i = 0; i < RIGEL_FLOPPY_DRIVE_COUNT; ++i) {
         floppy_reset(&chipset->floppy[i]);
     }
@@ -62,11 +56,18 @@ void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles)
 
     bool vblank_before;
     rigel_u32 eclock_ticks;
+    rigel_u16 vpos_before;
+    rigel_u16 frame_lines;
+    rigel_u64 frame_before;
+    rigel_u64 hsync_pulses;
 
     chipset = &ctx->chipset;
     chipset->cycles = rigel_timing_advance(chipset->cycles, cycles);
 
     vblank_before = beam_in_vblank(&chipset->agnus.beam);
+    vpos_before = chipset->agnus.beam.vpos;
+    frame_before = chipset->agnus.beam.frame_count;
+    frame_lines = chipset->agnus.beam.frame_lines;
 
     rigel_paula_set_dmacon(&chipset->paula, chipset->agnus.dma.dmacon);
     rigel_agnus_step(ctx, cycles);
@@ -75,6 +76,16 @@ void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles)
     /* CIA-A TOD increments once per VBL (used by Exec as frame counter) */
     if (!vblank_before && beam_in_vblank(&chipset->agnus.beam)) {
         cia_tod_pulse(&chipset->cia[0], 1u);
+    }
+
+    /* CIA-B TOD follows Agnus HSYNC, matching the legacy chipset glue. */
+    if (frame_lines != 0u) {
+        hsync_pulses =
+            ((chipset->agnus.beam.frame_count * (rigel_u64)frame_lines) + chipset->agnus.beam.vpos) -
+            ((frame_before * (rigel_u64)frame_lines) + vpos_before);
+        if (hsync_pulses > 0u) {
+            cia_tod_pulse(&chipset->cia[1], (rigel_u32)hsync_pulses);
+        }
     }
 
     /* CIA timers run at E-clock = CCK/5; accumulate remainder to avoid drift */
@@ -86,20 +97,6 @@ void rigel_chipset_step(RigelContext *ctx, rigel_u32 cycles)
         cia_step(&chipset->cia[1], (uint64_t)eclock_ticks);
     }
 
-    /* Floppy /INDEX pulse → CIA-B TOD. Fires once per revolution (300 RPM).
-     * Only when the active drive has a disk inserted and motor running. */
-    {
-        const FloppyDrive *active = chipset->paula.disk.drive;
-        if (active && active->motor && active->disk_inserted) {
-            chipset->floppy_index_cck += cycles;
-            if (chipset->floppy_index_cck >= FLOPPY_CCK_PER_INDEX) {
-                chipset->floppy_index_cck -= FLOPPY_CCK_PER_INDEX;
-                cia_tod_pulse(&chipset->cia[1], 1u);
-            }
-        } else {
-            chipset->floppy_index_cck = 0u;
-        }
-    }
 }
 
 void rigel_chipset_take_snapshot(const RigelChipset *chipset, rigel_snapshot_t *snapshot)

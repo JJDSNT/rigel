@@ -13,13 +13,16 @@
 static void cia_b_prb_update_floppy(RigelContext *ctx)
 {
     CIA *cia_b;
+    CIA *cia_a;
     uint8_t prb;
+    uint8_t pra;
     FloppySignals sig;
     int sel[4];
-    int mtr, i;
+    int mtr, i, idmode, selected_count;
     FloppyDrive *active;
 
     cia_b = &ctx->chipset.cia[1];
+    cia_a = &ctx->chipset.cia[0];
     prb   = cia_port_b_value(cia_b);
 
     /* Decode CIA-B PRB (active-low drive control signals) */
@@ -28,7 +31,7 @@ static void cia_b_prb_update_floppy(RigelContext *ctx)
     sel[2] = !(prb & 0x20u);        /* bit 5: /SEL2 */
     sel[1] = !(prb & 0x10u);        /* bit 4: /SEL1 */
     sel[0] = !(prb & 0x08u);        /* bit 3: /SEL0 */
-    sig.side      = (int)((prb >> 2) & 1u); /* bit 2: SIDE (not inverted) */
+    sig.side      = (int)(((prb >> 2) & 1u) == 0u); /* bit 2: /SIDE active-low, 0=side1, 1=side0 */
     sig.direction = (int)((prb >> 1) & 1u); /* bit 1: DIR  (1=out) */
     sig.step      = !(prb & 0x01u);         /* bit 0: /STEP active-low */
 
@@ -40,27 +43,55 @@ static void cia_b_prb_update_floppy(RigelContext *ctx)
 
     /* Route DMA reads to first selected drive (hardware allows only one at a time) */
     active = &ctx->chipset.floppy[0];
+    selected_count = 0;
     for (i = 0; i < 4; i++) {
         if (sel[i]) {
-            active = &ctx->chipset.floppy[i];
-            break;
+            if (selected_count == 0) {
+                active = &ctx->chipset.floppy[i];
+            }
+            selected_count++;
         }
     }
     rigel_paula_set_disk_drive(&ctx->chipset.paula, active);
 
-    /* Update CIA-B PRA ext inputs with drive status from the active drive */
-    {
-        uint8_t pra = 0xFFu; /* default all high (inactive) */
-        if (floppy_get_ready(active))
-            pra &= ~0x10u;   /* bit 4: /DSKRDY active low */
+    /*
+     * Update CIA-A PRA ext inputs (bits 2-5) with drive status.
+     * Read-modify-write preserves fire button bits (6-7) set elsewhere.
+     * CIA-A PRA: bit2=/CHNG, bit3=/WPROT, bit4=/TRK0, bit5=/DSKRDY (active low).
+     */
+    pra = cia_port_a_value(cia_a);
+    pra |= 0x3Cu; /* default all floppy lines high (inactive) */
+
+    if (selected_count == 1) {
+        idmode = !mtr && (active->id_count < 32);
+        if (idmode) {
+            /* During drive ID scan, /CHNG outputs the ID shift register bit */
+            if (!floppy_get_idbit(active))
+                pra &= ~0x04u;  /* bit 2: /CHNG */
+        } else {
+            if (!floppy_get_dskchg(active, active->motor))
+                pra &= ~0x04u;  /* bit 2: /CHNG active low (0 = change sensed) */
+        }
+        if (!floppy_get_wpro(active))
+            pra &= ~0x08u;  /* bit 3: /WPROT active low */
         if (floppy_get_track0(active))
-            pra &= ~0x08u;   /* bit 3: /TRK0 active low */
-        if (active->write_protected)
-            pra &= ~0x04u;   /* bit 2: /WPROT active low */
-        if (!floppy_get_dskchg(active, active->motor))
-            pra &= ~0x02u;   /* bit 1: /CHNG active low (0 = change sensed) */
-        cia_set_external_pra(cia_b, pra);
+            pra &= ~0x10u;  /* bit 4: /TRK0 active low */
+        if (floppy_get_ready(active))
+            pra &= ~0x20u;  /* bit 5: /DSKRDY active low */
+    } else {
+        /*
+         * /DSKRDY is an open-collector signal driven LOW by any drive whose
+         * motor is spinning and media is present, regardless of drive selection.
+         * Trackdisk often deselects the drive (PRB=0xff) right after motor-on
+         * and relies on /DSKRDY staying asserted while polling the spin-up.
+         */
+        for (i = 0; i < 4; i++) {
+            if (floppy_get_ready(&ctx->chipset.floppy[i]))
+                pra &= ~0x20u;
+        }
     }
+
+    cia_set_external_pra(cia_a, pra);
 }
 
 rigel_u8 rigel_cia_read(RigelContext *ctx, rigel_u32 cia_id, rigel_u8 reg)
@@ -97,9 +128,9 @@ void rigel_keyboard_inject(RigelContext *ctx, rigel_u8 amiga_keycode, bool press
     /*
      * Amiga keyboard wire format: ~((keycode << 1) | up_flag), MSB first.
      * up_flag = 0 for keydown, 1 for keyup.
-     * cia_receive_sdr injects the byte into CIA-B SDR and fires SP interrupt
-     * → Paula INTREQ EXTER → IPL 6.
+     * cia_receive_sdr injects the byte into CIA-A SDR and fires SP interrupt
+     * -> Paula INTREQ PORTS -> IPL 2.
      */
     sdr_byte = (rigel_u8)(~(((rigel_u8)(amiga_keycode << 1u)) | (pressed ? 0u : 1u)));
-    cia_receive_sdr(&ctx->chipset.cia[1], sdr_byte);
+    cia_receive_sdr(&ctx->chipset.cia[0], sdr_byte);
 }
