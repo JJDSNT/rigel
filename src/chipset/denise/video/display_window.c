@@ -97,6 +97,17 @@ void rigel_denise_display_window_update(RigelDenise *denise)
         vstop = (rigel_u16)(vstrt + 256u);
     }
 
+    /*
+     * Guard: if the computed vertical window falls entirely outside the valid
+     * raster range, the register values are a VBL "blanking" sequence (e.g.
+     * the copper writing DIWSTRT=0xffff before clearing BPLCON0 depth).
+     * Preserve the previous valid window state so the display keeps showing
+     * the last good frame rather than flickering through invalid geometry.
+     */
+    if (vstrt >= (rigel_u16)RIGEL_DENISE_MAX_LINES ||
+        vstop > (rigel_u16)RIGEL_DENISE_MAX_LINES)
+        return;
+
     hires = (denise->regs.bplcon0 & 0x8000u) != 0u;
     hwidth = (hstop > hstrt) ? (rigel_u16)(hstop - hstrt) : 320u;
 

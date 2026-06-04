@@ -91,6 +91,28 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
     y0 = denise->video.visible_y_start;
     x0 = denise->video.visible_x_start;
 
+    /*
+     * Guard: if visible_y_start is outside the valid raster range (e.g. because
+     * the VBL copper wrote DIWSTRT=0xffff+DIWHIGH=0x00ff before BPLCON0 was reset
+     * to depth=0, which makes the ECS decode produce vstrt=2047), the subtraction
+     * visible_y_stop - y0 would wrap to a huge uint32.  Return an empty frame.
+     */
+    if (y0 >= (rigel_u16)RIGEL_DENISE_MAX_LINES ||
+        denise->video.visible_y_stop <= y0 ||
+        denise->video.visible_x_stop <= x0) {
+        frame->width       = 0u;
+        frame->height      = 0u;
+        frame->pitch       = 0u;
+        frame->frame_count = denise->output.frame_counter;
+        frame->format      = format;
+        frame->pixels      = NULL;
+        frame->flags       = (rigel_frame_flags_t)denise->output.completed_flags;
+        frame->delta.full_redraw = denise->output.completed_full_redraw;
+        (void)memcpy(frame->delta.dirty_lines, denise->output.completed_dirty,
+                     sizeof(frame->delta.dirty_lines));
+        return true;
+    }
+
     frame->width       = (rigel_u32)(denise->video.visible_x_stop - x0);
     frame->height      = (rigel_u32)(denise->video.visible_y_stop  - y0);
     frame->frame_count = denise->output.frame_counter;
