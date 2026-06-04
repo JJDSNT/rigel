@@ -27,8 +27,13 @@ static int rigel_context_chip_ram_map_addr(const RigelContext *ctx, rigel_u32 ad
     rigel_u32 visible_size = rigel_context_chip_ram_visible_size(ctx);
 
     addr &= ~1u;
-    if (visible_size != 0u && addr >= visible_size) {
-        return 0;
+    /*
+     * Chip RAM is mirrored: addresses beyond the physical size wrap modulo
+     * visible_size (hardware behaviour).  Reject-on-overflow was wrong and
+     * broke the chip-RAM masking contract tested by test_mmio.
+     */
+    if (visible_size > 0u) {
+        addr &= visible_size - 1u;
     }
 
     if (mapped != NULL) {
