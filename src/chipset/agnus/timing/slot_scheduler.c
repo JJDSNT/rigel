@@ -232,15 +232,24 @@ static rigel_u16 bitplane_words_per_plane(const agnus_slot_scheduler_t *sched)
         return sched->hires ? 40u : 20u;
 
     /*
-     * Keep this in step with the legacy bitplane fetch model for now.  The
-     * important known case is DiagROM hires: DDFSTRT=0x3c, DDFSTOP=0x00d4
-     * must fetch 40 words/plane (80 bytes/line) or the image skews diagonally.
+     * OCS hires DDF pipeline overhead depends on whether the DDF span
+     * (stop - start) is a multiple of 8 CCK or only of 4 CCK:
+     *
+     *   span & 4 == 0  (multiple of 8 CCK): 2 pipeline words
+     *   span & 4 != 0  (multiple of 4 CCK only): 3 pipeline words
+     *
+     * Derivation from known-good cases:
+     *   AROS    0x3c→0xd0: span=148, 148&4=4 → +3 → 37+3=40 ✓
+     *   DiagROM 0x3c→0xd4: span=152, 152&4=0 → +2 → 38+2=40 ✓
+     *   DiagROM 0x38→0xd0: span=152, 152&4=0 → +2 → 38+2=40 ✓
+     *   KS20    0x40→0xd0: span=144, 144&4=0 → +2 → 36+2=38 ✓
      */
-    if (sched->hires && start == 0x003cu && stop == 0x00d4u)
-        words = 40;
-    else
-        words = ((int)(stop - start) / (int)fetch_quantum) +
-                (sched->hires ? 3 : 1);
+    if (sched->hires) {
+        int pipeline = ((int)(stop - start) & 4) ? 3 : 2;
+        words = ((int)(stop - start) / (int)fetch_quantum) + pipeline;
+    } else {
+        words = ((int)(stop - start) / (int)fetch_quantum) + 1;
+    }
 
     if (words < 1)
         words = sched->hires ? 40 : 20;
@@ -328,6 +337,22 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
                  h = (rigel_u16)(h + 2u)) {
                 fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
                 bitplane_slots++;
+            }
+            /*
+             * OCS 5-/6-plane lores overflow: target_slots * 2 CCK can exceed
+             * the line length (e.g. 5 planes * 20 words * 2 = 200 CCK from
+             * pos 56 → end at 254 > 227).  Real OCS hardware wraps the
+             * remaining fetches into the free CCK slots at the START of the
+             * same line (before DDFSTRT).  Approximate this by continuing the
+             * stride-2 sequence from h=0 until all slots are scheduled.
+             */
+            if (bitplane_slots < target_slots) {
+                for (h = 0u;
+                     h < bpl_start && bitplane_slots < target_slots;
+                     h = (rigel_u16)(h + 2u)) {
+                    fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
+                    bitplane_slots++;
+                }
             }
         }
     }
