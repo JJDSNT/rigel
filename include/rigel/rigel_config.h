@@ -63,11 +63,16 @@ typedef struct rigel_chip_ram_if {
     rigel_chip_ram_write16_fn write16;
 } rigel_chip_ram_if_t;
 
+typedef struct rigel_serial_config {
+    bool tx_instant; /* bypass baud-rate timing for immediate SERDAT TX */
+} rigel_serial_config_t;
+
 typedef struct rigel_config {
     rigel_u32         clock_hz;
     rigel_u32         chip_ram_size;
     bool              enable_trace;
     rigel_chip_ram_if_t chip_ram;
+    rigel_serial_config_t serial;
     /*
      * RTC: set rtc_model to RIGEL_RTC_MODEL_NONE to disable.
      * rtc_time: initial Amiga calendar time; 0 = use host system clock.

@@ -40,6 +40,8 @@ void rigel_chipset_reset(RigelChipset *chipset)
     cia_init(&chipset->cia[1], CIA_PORT_B);
     cia_attach_paula(&chipset->cia[0], &chipset->paula);
     cia_attach_paula(&chipset->cia[1], &chipset->paula);
+    /* PA0 (OVL) and PA1 (LED) are outputs — required for ROM overlay control. */
+    chipset->cia[0].ddra = 0x03u;
     /* /FIR0, /FIR1 and parallel port lines default to high (inactive) */
     cia_set_external_pra(&chipset->cia[0], 0xFFu);
 

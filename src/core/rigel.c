@@ -1,4 +1,5 @@
 #include "rigel/rigel.h"
+#include "rigel/rigel_serial.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -130,10 +131,7 @@ RigelContext *rigel_create(const rigel_config_t *config)
 
     ctx->config = *config;
     rigel_reset(ctx);
-
-    rigel_paula_set_disk_memory_if(&ctx->chipset.paula, rigel_context_chip_ram(ctx));
-    rigel_paula_set_disk_irq_sink(&ctx->chipset.paula, rigel_paula_disk_irq_sink(ctx));
-    rigel_paula_set_serial_irq_sink(&ctx->chipset.paula, rigel_paula_serial_irq_sink(ctx));
+    rigel_chipset_wire(ctx);
 
     if (config->rtc_model != RIGEL_RTC_MODEL_NONE) {
         rtc_set_model(&ctx->chipset.rtc, config->rtc_model);
@@ -148,6 +146,21 @@ RigelContext *rigel_create(const rigel_config_t *config)
 void rigel_destroy(RigelContext *ctx)
 {
     free(ctx);
+}
+
+void rigel_chipset_wire(RigelContext *ctx)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    rigel_paula_set_disk_memory_if(&ctx->chipset.paula, rigel_context_chip_ram(ctx));
+    rigel_paula_set_disk_irq_sink(&ctx->chipset.paula, rigel_paula_disk_irq_sink(ctx));
+    rigel_paula_set_serial_irq_sink(&ctx->chipset.paula, rigel_paula_serial_irq_sink(ctx));
+
+    if (ctx->config.serial.tx_instant) {
+        rigel_serial_set_tx_instant(ctx, true);
+    }
 }
 
 void rigel_reset(RigelContext *ctx)
@@ -170,7 +183,7 @@ void rigel_reset(RigelContext *ctx)
         ctx->config.video_std == RIGEL_VIDEO_PAL ? AGNUS_VIDEO_PAL : AGNUS_VIDEO_NTSC
     );
     rigel_denise_set_framebuffer_target(&ctx->chipset.denise, &ctx->config.framebuffer);
-    rigel_paula_set_disk_memory_if(&ctx->chipset.paula, rigel_context_chip_ram(ctx));
+    rigel_chipset_wire(ctx);
 }
 
 rigel_u32 rigel_get_clock_hz(const RigelContext *ctx)

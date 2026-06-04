@@ -22,6 +22,13 @@
 RigelContext *rigel_create(const rigel_config_t *config);
 void rigel_destroy(RigelContext *ctx);
 
+/*
+ * Wire all chipset-internal connections and apply peripheral config.
+ * Called automatically by rigel_create(). Can be called explicitly after
+ * modifying the stored config (e.g. changing serial settings at runtime).
+ */
+void rigel_chipset_wire(RigelContext *ctx);
+
 void rigel_reset(RigelContext *ctx);
 
 void rigel_take_snapshot(const RigelContext *ctx, rigel_snapshot_t *snapshot);
