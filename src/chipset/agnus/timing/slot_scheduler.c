@@ -23,7 +23,9 @@
 #include "denise/denise_state.h"
 #include "debug/log.h"
 
+#if RIGEL_ENABLE_STDLIB_ENV
 #include <stdlib.h>
+#endif
 
 /* =========================================================================
  * Internal: slot dispatch
@@ -178,6 +180,7 @@ static void dispatch_slot(agnus_slot_owner_t owner,
 
 static bool disk_legacy_priority_enabled(void)
 {
+#if RIGEL_ENABLE_STDLIB_ENV
     static int enabled = -1;
 
     if (enabled < 0) {
@@ -186,6 +189,9 @@ static bool disk_legacy_priority_enabled(void)
     }
 
     return enabled != 0;
+#else
+    return true;
+#endif
 }
 
 /* =========================================================================

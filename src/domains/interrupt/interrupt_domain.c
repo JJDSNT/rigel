@@ -1,10 +1,13 @@
 #include "domains/interrupt/interrupt_domain.h"
 
 #include <stdio.h>
+#if RIGEL_ENABLE_STDLIB_ENV
 #include <stdlib.h>
+#endif
 
 static int rigel_irq_trace_enabled(void)
 {
+#if RIGEL_ENABLE_STDLIB_ENV
     static int enabled = -1;
 
     if (enabled < 0) {
@@ -13,6 +16,9 @@ static int rigel_irq_trace_enabled(void)
     }
 
     return enabled;
+#else
+    return 0;
+#endif
 }
 
 bool rigel_interrupt_domain_owns_reg(rigel_u32 addr)

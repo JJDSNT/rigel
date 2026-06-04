@@ -2,10 +2,13 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#if RIGEL_ENABLE_STDLIB_ENV
 #include <stdlib.h>
+#endif
 
 static int disk_trace_enabled(void)
 {
+#if RIGEL_ENABLE_STDLIB_ENV
     static int enabled = -1;
 
     if (enabled < 0) {
@@ -14,10 +17,14 @@ static int disk_trace_enabled(void)
     }
 
     return enabled;
+#else
+    return 0;
+#endif
 }
 
 static int disk_dsksyn_irq_enabled(void)
 {
+#if RIGEL_ENABLE_STDLIB_ENV
     static int enabled = -1;
 
     if (enabled < 0) {
@@ -26,6 +33,9 @@ static int disk_dsksyn_irq_enabled(void)
     }
 
     return enabled;
+#else
+    return 1;
+#endif
 }
 
 static rigel_u16 disk_read_be16(const rigel_u8 *src)
