@@ -135,6 +135,10 @@ typedef struct agnus_slot_scheduler {
     /* Hires mode (BPLCON0 bit 15): doubles bitplane fetch rate.
      * Must be kept in sync with BPLCON0 via agnus_slot_scheduler_set_hires(). */
     bool hires;
+
+    /* Vertical DIW start line — bitplane DMA is suppressed for vpos < vstrt.
+     * Updated via agnus_slot_scheduler_set_vstrt() when DIWSTRT is written. */
+    rigel_u16 vstrt;
 } agnus_slot_scheduler_t;
 
 /* =========================================================================
@@ -157,6 +161,9 @@ void agnus_slot_scheduler_set_depth(agnus_slot_scheduler_t *sched, rigel_u16 dep
 
 /* Call whenever BPLCON0 bit 15 (hires) changes — marks the table for rebuild. */
 void agnus_slot_scheduler_set_hires(agnus_slot_scheduler_t *sched, bool hires);
+
+/* Call whenever DIWSTRT is written — updates the vertical DIW start line. */
+void agnus_slot_scheduler_set_vstrt(agnus_slot_scheduler_t *sched, rigel_u16 diwstrt);
 
 /* Rebuild the slot table from the current DMACON and beam vpos.
  * Called automatically by step functions when table_dirty is set. */

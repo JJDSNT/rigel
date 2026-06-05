@@ -310,10 +310,11 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
         fill_slot(sched, AGNUS_HPOS_SPRITE_7_B, AGNUS_SLOT_SPRITE_7);
     }
 
-    /* Bitplane DMA — suppressed during VBL only. DIWSTRT/DIWSTOP gate Denise's
-     * display output, not Agnus DMA. Range from DDFSTRT/DDFSTOP.
-     * Hires mode (BPLCON0 bit 15): fills every CCK slot instead of every other. */
-    if (!vbl && dmacon_bplen(sched->dmacon)) {
+    /* Bitplane DMA — suppressed during VBL and before DIWSTRT vertical line.
+     * On OCS/ECS hardware the bitplane DMA gate is controlled vertically by the
+     * DIW start line (DIWSTRT.VSTRT): DMA is inactive for vpos < vstrt.
+     * Horizontally it is bounded by DDFSTRT/DDFSTOP. */
+    if (!vbl && vpos >= sched->vstrt && dmacon_bplen(sched->dmacon)) {
         rigel_u16 h;
         rigel_u16 bpl_start = sched->ddfstrt;
         if (sched->hires) {
@@ -415,6 +416,7 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
     sched->blitter_active    = false;
     sched->fetch_plane_index = 0;
     sched->hires             = false;
+    sched->vstrt             = AGNUS_VBL_LINE_END + 1u; /* default: allow all non-VBL lines */
 
     for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++)
         sched->table[i] = AGNUS_SLOT_CPU;
@@ -430,6 +432,15 @@ void agnus_slot_scheduler_set_hires(agnus_slot_scheduler_t *sched, bool hires)
 {
     if (sched->hires != hires) {
         sched->hires       = hires;
+        sched->table_dirty = true;
+    }
+}
+
+void agnus_slot_scheduler_set_vstrt(agnus_slot_scheduler_t *sched, rigel_u16 diwstrt)
+{
+    rigel_u16 vstrt = (rigel_u16)((diwstrt >> 8) & 0x00FFu);
+    if (sched->vstrt != vstrt) {
+        sched->vstrt       = vstrt;
         sched->table_dirty = true;
     }
 }

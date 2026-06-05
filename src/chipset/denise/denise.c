@@ -122,6 +122,7 @@ void rigel_denise_write_reg(RigelContext *ctx, rigel_u32 addr, rigel_u16 value)
 
     if (addr == RIGEL_REG_DIWSTRT) {
         raster_set_diwstrt(&ctx->chipset.agnus.raster, value);
+        agnus_slot_scheduler_set_vstrt(&ctx->chipset.agnus.scheduler, value);
     }
     if (addr == RIGEL_REG_DIWSTOP) {
         raster_set_diwstop(&ctx->chipset.agnus.raster, value);

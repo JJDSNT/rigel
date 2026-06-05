@@ -68,8 +68,9 @@ void rigel_agnus_set_video_std(RigelAgnus *agnus, agnus_video_std_t std)
     }
 
     raster_reset(&agnus->raster, std);
-    agnus->beam.line_clocks = agnus->raster.line_clocks;
-    agnus->beam.frame_lines = agnus->raster.frame_lines;
+    agnus->beam.line_clocks   = agnus->raster.line_clocks;
+    agnus->beam.frame_lines   = agnus->raster.frame_lines;
+    agnus->beam.visible_y_stop = (rigel_u16)(agnus->raster.frame_lines - 1u);
 }
 
 BlitterMemory rigel_agnus_blitter_memory(RigelContext *ctx)
