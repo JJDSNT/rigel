@@ -11,6 +11,8 @@ void copper_wait_arm(copper_state_t *copper, rigel_u16 ir1, rigel_u16 ir2)
     copper->wait_vpmask = (ir2 >> 8) & 0xFFu;
     copper->wait_hpmask = ir2 & 0xFEu;
     copper->waiting     = true;
+    copper->wait_blitter = (ir2 & 0x8000u) == 0u;
+    copper->stopped_until_vbl = (ir1 == 0xffffu && ir2 == 0xfffeu);
 }
 
 bool copper_wait_satisfied(const copper_state_t *copper,

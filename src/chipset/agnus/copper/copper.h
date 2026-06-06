@@ -14,6 +14,8 @@ typedef struct copper_state {
     rigel_u16 wait_hpmask;   /* HP mask from IR2[7:1];  0xFE = compare all 7 hpos bits */
     rigel_u16 copcon;          /* COPCON register: bit 1 = CDANG (allow writes < 0x40) */
     bool waiting;
+    bool wait_blitter;
+    bool stopped_until_vbl;
     bool enabled;
     bool triggered;
     bool event_latched;   /* set on every MOVE/WAIT-release; cleared by rigel_step */

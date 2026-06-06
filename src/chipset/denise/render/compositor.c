@@ -72,7 +72,8 @@ static void compose_line(RigelDenise *denise)
             }
         }
 
-        if (denise->regs.diwstrt == 0x0581u &&
+        if ((denise->regs.diwstrt == 0x0581u ||
+             denise->regs.diwstrt == 0x2c81u) &&
             output->ddfstrt_lores != 0u &&
             (output->plane_word_count > 0u ||
              (trace_count < 360u &&

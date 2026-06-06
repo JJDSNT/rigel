@@ -17,6 +17,8 @@ void copper_reset(copper_state_t *copper)
     copper->wait_hpmask = 0xFEu;
     copper->copcon      = 0;
     copper->waiting       = false;
+    copper->wait_blitter  = false;
+    copper->stopped_until_vbl = false;
     copper->enabled       = false;
     copper->triggered     = false;
     copper->event_latched = false;
@@ -32,6 +34,8 @@ void copper_vbl_reload(copper_state_t *copper)
     if ((copper->cop1lc & 0x001ffffeu) == 0u) {
         copper->program_counter = 0u;
         copper->waiting         = false;
+        copper->wait_blitter    = false;
+        copper->stopped_until_vbl = false;
         copper->fetch_pending   = false;
         copper->triggered       = false;
         copper->event_latched   = false;
@@ -40,6 +44,8 @@ void copper_vbl_reload(copper_state_t *copper)
 
     copper->program_counter = copper->cop1lc & 0x001ffffeu;
     copper->waiting         = false;
+    copper->wait_blitter    = false;
+    copper->stopped_until_vbl = false;
     copper->fetch_pending   = true;
     copper->triggered       = false;
     copper->event_latched   = false;

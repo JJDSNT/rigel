@@ -109,7 +109,8 @@ static void dispatch_slot(agnus_slot_owner_t owner,
                 bitplane_fetch_step(&agnus->fetch, &agnus->bplpt, plane,
                                     rigel_context_chip_ram(ctx));
                 dout->plane_words[plane][widx] = agnus->fetch.data[plane];
-                if (ctx->chipset.denise.regs.diwstrt == 0x0581u) {
+                if (ctx->chipset.denise.regs.diwstrt == 0x0581u ||
+                    ctx->chipset.denise.regs.diwstrt == 0x2c81u) {
                     static unsigned trace_count = 0u;
                     static unsigned nonzero_trace_count = 0u;
                     rigel_u32 addr = agnus->bplpt.bplpt[plane];
@@ -164,7 +165,8 @@ static void dispatch_slot(agnus_slot_owner_t owner,
             rigel_copper_domain_step(
                 &ctx->chipset.agnus.copper,
                 &ctx->chipset.agnus.beam,
-                &ctx->chipset.agnus.dma
+                &ctx->chipset.agnus.dma,
+                blitter_is_busy(&ctx->chipset.agnus.blitter) != 0
             );
             rigel_copper_service_step_program(ctx);
         }

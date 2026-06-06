@@ -89,7 +89,8 @@ rigel_u32 rigel_copper_domain_cycles_to_wait(const copper_state_t *copper,
     return (rigel_u32)(beam->line_clocks - beam->hpos);
 }
 
-void rigel_copper_domain_step(copper_state_t *copper, const beam_state_t *beam, const dma_state_t *dma)
+void rigel_copper_domain_step(copper_state_t *copper, const beam_state_t *beam,
+                              const dma_state_t *dma, bool blitter_busy)
 {
     bool enabled;
 
@@ -105,11 +106,15 @@ void rigel_copper_domain_step(copper_state_t *copper, const beam_state_t *beam, 
     if (!enabled || !copper->waiting) {
         return;
     }
+    if (copper->wait_blitter && blitter_busy) {
+        return;
+    }
 
     if (copper_beam_cmp(beam->vpos, beam->hpos,
                         copper->wait_vpos, copper->wait_hpos,
                         copper->wait_vpmask, copper->wait_hpmask)) {
         copper->waiting         = false;
+        copper->wait_blitter    = false;
         copper->program_counter += 4u;
         copper->triggered       = true;
         copper->event_latched   = true;

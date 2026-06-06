@@ -4,6 +4,27 @@
 #include "debug/log.h"
 #include "mmio/custom_regs.h"
 
+#if RIGEL_ENABLE_STDLIB_ENV
+#include <stdio.h>
+#include <stdlib.h>
+#endif
+
+static bool copper_dmacon_trace_enabled(void)
+{
+#if RIGEL_ENABLE_STDLIB_ENV
+    static int enabled = -1;
+
+    if (enabled < 0) {
+        const char *env = getenv("RIGEL_COPPER_DMACON_TRACE");
+        enabled = (env != NULL && env[0] != '\0' && env[0] != '0') ? 1 : 0;
+    }
+
+    return enabled != 0;
+#else
+    return false;
+#endif
+}
+
 /* copper_exec_move: IR1 = register address (bits 8:1, bit 0 must be 0)
  *                   IR2 = 16-bit data value to write.
  * Respects COPCON CDANG: when clear, writes below 0x80 are blocked; when set,
@@ -18,11 +39,31 @@ void copper_exec_move(RigelContext *ctx, rigel_u16 ir1, rigel_u16 ir2)
     reg   = (rigel_u32)(ir1 & 0x01FEu);
     cdang = (ctx->chipset.agnus.copper.copcon & 0x0002u) != 0;
     if ((!cdang && reg < 0x80u) || (cdang && reg < 0x40u)) {
+        ctx->chipset.agnus.copper.waiting = false;
+        ctx->chipset.agnus.copper.fetch_pending = false;
+        ctx->chipset.agnus.copper.stopped_until_vbl = true;
         return;
     }
 
     ctx->chipset.denise.output.pending_flags |= (rigel_u32)RIGEL_FRAME_COPPER_ACTIVE;
-    if (reg == 0x096u || reg == 0x100u) {
+    if (reg == 0x096u && copper_dmacon_trace_enabled()) {
+#if RIGEL_ENABLE_STDLIB_ENV
+        char msg[128];
+
+        snprintf(msg, sizeof(msg),
+                 "[RIGEL-COPPER-DMACON] value=%04x cop_pc=%06x h=%u v=%u frame=%llu",
+                 (unsigned)ir2,
+                 (unsigned)(ctx->chipset.agnus.copper.program_counter & 0x00ffffffu),
+                 (unsigned)ctx->chipset.agnus.beam.hpos,
+                 (unsigned)ctx->chipset.agnus.beam.vpos,
+                 (unsigned long long)ctx->chipset.agnus.beam.frame_count);
+        rigel_log_info(msg);
+#endif
+    }
+    if (reg == 0x096u || reg == 0x100u ||
+        (reg >= 0x0e0u && reg <= 0x0f6u) ||
+        reg == 0x108u || reg == 0x10au ||
+        (reg >= 0x180u && reg <= 0x19eu)) {
         static unsigned trace_count = 0u;
         if (trace_count < 512u) {
             rigel_log_event_t event = {
