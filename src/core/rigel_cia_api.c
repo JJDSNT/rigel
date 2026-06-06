@@ -78,17 +78,6 @@ static void cia_b_prb_update_floppy(RigelContext *ctx)
             pra &= ~0x10u;  /* bit 4: /TRK0 active low */
         if (floppy_get_ready(active))
             pra &= ~0x20u;  /* bit 5: /DSKRDY active low */
-    } else {
-        /*
-         * /DSKRDY is an open-collector signal driven LOW by any drive whose
-         * motor is spinning and media is present, regardless of drive selection.
-         * Trackdisk often deselects the drive (PRB=0xff) right after motor-on
-         * and relies on /DSKRDY staying asserted while polling the spin-up.
-         */
-        for (i = 0; i < 4; i++) {
-            if (floppy_get_ready(&ctx->chipset.floppy[i]))
-                pra &= ~0x20u;
-        }
     }
 
     cia_set_external_pra(cia_a, pra);
