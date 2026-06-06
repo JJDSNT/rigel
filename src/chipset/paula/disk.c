@@ -354,7 +354,12 @@ static void disk_start_dma(disk_state_t *disk, rigel_u16 value)
     if (sync_offset + 1u < disk->dma_track_len) {
         disk_load_dskbytr(disk, disk_read_be16(disk->dma_track_buf + sync_offset));
     }
-    disk->dma_src_offset = 0u;
+    if ((disk->adkcon & RIGEL_PAULA_ADKCON_WORDSYNC) != 0 &&
+        sync_offset + 1u < disk->dma_track_len) {
+        disk->dma_src_offset = sync_offset;
+    } else {
+        disk->dma_src_offset = 0u;
+    }
     disk->sync_seen = (sync_offset + 1u < disk->dma_track_len) ? 1 : 0;
     disk_maybe_emit_sync(disk);
 
@@ -363,7 +368,8 @@ static void disk_start_dma(disk_state_t *disk, rigel_u16 value)
     if (trace) {
         fprintf(stderr,
                 "[RIGEL-DISK-DMA] track=%u adf_offset=%u track_len=%u sync_offset=%u "
-                "track_syncs=%u copy_syncs=%u bytes=%u start_src=%u first=%04x %04x %04x %04x\n",
+                "track_syncs=%u copy_syncs=%u bytes=%u start_src=%u "
+                "first=%04x %04x %04x %04x\n",
                 (unsigned)track,
                 (unsigned)adf_offset,
                 (unsigned)disk->dma_track_len,

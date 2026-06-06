@@ -140,7 +140,7 @@ int main(void)
     /* Disk DMA slot is at hpos=7; step 8 CCKs to reach and fire it. */
     rigel_step(ctx, 8);
 
-    if (ram.words[0] != 0xaaaau) {
+    if (ram.words[0] != 0x4489u) {
         rigel_destroy(ctx);
         return 1;
     }
