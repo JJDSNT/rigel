@@ -1,6 +1,24 @@
 #include "floppy/floppy_drive.h"
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "debug/log.h"
+
+static int floppy_trace_enabled(void)
+{
+    static int initialized;
+    static int enabled;
+
+    if (!initialized) {
+        const char *env = getenv("RIGEL_FLOPPY_TRACE");
+        enabled = env != NULL && env[0] != '\0' && env[0] != '0';
+        initialized = 1;
+    }
+
+    return enabled;
+}
 
 /* ------------------------------------------------------------------------- */
 /* Init                                                                      */
@@ -131,6 +149,16 @@ void floppy_step(FloppyDrive *d, const FloppySignals *sig)
              */
             d->ready = floppy_has_media(d) ? 1 : 0;
             d->id_count = 0;
+            if (floppy_trace_enabled()) {
+                char msg[160];
+                (void)snprintf(msg, sizeof(msg),
+                    "[RIGEL-FLOPPY-DRIVE] motor-on ready=%d media=%d cyl=%d side=%d",
+                    d->ready,
+                    floppy_has_media(d),
+                    d->cylinder,
+                    d->side);
+                rigel_log_info(msg);
+            }
         }
     }
     else
@@ -139,6 +167,14 @@ void floppy_step(FloppyDrive *d, const FloppySignals *sig)
         {
             d->motor = 0;
             d->ready = 0;
+            if (floppy_trace_enabled()) {
+                char msg[128];
+                (void)snprintf(msg, sizeof(msg),
+                    "[RIGEL-FLOPPY-DRIVE] motor-off cyl=%d side=%d",
+                    d->cylinder,
+                    d->side);
+                rigel_log_info(msg);
+            }
         }
     }
 
@@ -182,8 +218,20 @@ void floppy_step(FloppyDrive *d, const FloppySignals *sig)
          */
         d->disk_changed = floppy_has_media(d) ? 0 : 1;
 
-        (void)old_cylinder;
-        (void)old_dskchg;
+        if (floppy_trace_enabled()) {
+            char msg[192];
+            (void)snprintf(msg, sizeof(msg),
+                "[RIGEL-FLOPPY-DRIVE] step dir=%s cyl=%d->%d side=%d dskchg=%d->%d track0=%d media=%d",
+                sig->direction ? "out" : "in",
+                old_cylinder,
+                d->cylinder,
+                d->side,
+                old_dskchg,
+                d->disk_changed,
+                d->cylinder == 0,
+                floppy_has_media(d));
+            rigel_log_info(msg);
+        }
     }
 
     if (!sig->step)
