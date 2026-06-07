@@ -2,6 +2,12 @@
 
 #include "rigel/rigel_custom.h"
 
+#if RIGEL_ENABLE_STDLIB_ENV
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#endif
+
 static rigel_u32 rigel_context_chip_ram_visible_size(const RigelContext *ctx)
 {
     rigel_u32 model_limit;
@@ -48,12 +54,47 @@ static rigel_u16 rigel_context_chip_ram_read16(void *opaque, rigel_u32 addr)
     rigel_u32 mapped;
 
     if (ctx == NULL || ctx->config.chip_ram.read16 == NULL) {
+#if RIGEL_ENABLE_STDLIB_ENV
+        {
+            static int warned = 0;
+            const char *e = getenv("RIGEL_BPL_FETCH_PROBE");
+            if (!warned && e && e[0] != '\0' && e[0] != '0') {
+                warned = 1;
+                printf("[BPL-CTX-PROBE] EARLY-NULL ctx=%p fn=%p addr=%06x\n",
+                       (void *)ctx,
+                       ctx ? (void *)(uintptr_t)ctx->config.chip_ram.read16 : NULL,
+                       (unsigned)addr);
+            }
+        }
+#endif
         return 0;
     }
 
     if (!rigel_context_chip_ram_map_addr(ctx, addr, &mapped)) {
         return 0xffffu;
     }
+
+#if RIGEL_ENABLE_STDLIB_ENV
+    {
+        static int p_enabled = -1;
+        static unsigned p_count = 0u;
+        if (p_enabled < 0) {
+            const char *e = getenv("RIGEL_BPL_FETCH_PROBE");
+            p_enabled = (e != NULL && e[0] != '\0' && e[0] != '0') ? 1 : 0;
+        }
+        if (p_enabled && p_count < 16u && addr >= 0xC0000u && addr < 0xD0000u) {
+            rigel_u16 r = ctx->config.chip_ram.read16(ctx->config.chip_ram.opaque, mapped);
+            printf("[BPL-CTX-PROBE] addr=%06x mapped=%06x inner_op=%p inner_fn=%p result=%04x null=%d\n",
+                   (unsigned)addr, (unsigned)mapped,
+                   ctx->config.chip_ram.opaque,
+                   (void *)(uintptr_t)(ctx->config.chip_ram.read16),
+                   (unsigned)r,
+                   ctx->config.chip_ram.read16 == NULL ? 1 : 0);
+            p_count++;
+            return r;
+        }
+    }
+#endif
 
     return ctx->config.chip_ram.read16(
         ctx->config.chip_ram.opaque,

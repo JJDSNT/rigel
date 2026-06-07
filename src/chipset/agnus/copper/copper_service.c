@@ -53,7 +53,7 @@ static bool rigel_copper_trace_pc(rigel_u32 pc)
 {
     rigel_u32 chip_pc = pc & 0x001ffffeu;
 
-    return chip_pc < 0x03000u;
+    return chip_pc < 0x200000u;
 }
 
 static void rigel_copper_trace_fetch(RigelContext *ctx, const copper_state_t *copper,
