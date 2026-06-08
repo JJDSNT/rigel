@@ -241,10 +241,10 @@ static void compose_line(RigelDenise *denise)
             hstart = denise_sprite_hstart(sp);
             for (px_idx = 0; px_idx < 16u; px_idx++) {
                 rigel_u16 amiga_x = (rigel_u16)(hstart + px_idx);
-                rigel_u16 scan_px = amiga_x;   /* absolute lores position */
+                rigel_u16 scan_px = (rigel_u16)((hstart + px_idx) * hscale);
+                unsigned repeat;
                 uint8_t pix;
                 rigel_u32 color;
-                if (scan_px >= RIGEL_DENISE_MAX_SCANLINE_PIXELS) break;
                 if (attached_even) {
                     pix = denise_sprite_attached_pixel(&denise->sprites, spr, amiga_x);
                     if (pix == 0) continue;
@@ -254,11 +254,18 @@ static void compose_line(RigelDenise *denise)
                     if (pix == 0) continue;
                     color = palette[(16u + pair * 4u + pix) & 31u];
                 }
-                spr_active[scan_px] |= (uint8_t)(1u << spr);
+                for (repeat = 0; repeat < hscale; ++repeat) {
+                    rigel_u16 dst_px = (rigel_u16)(scan_px + repeat);
+                    if (dst_px < x_start)
+                        continue;
+                    if (dst_px >= x_stop || dst_px >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+                        break;
+                    spr_active[dst_px] |= (uint8_t)(1u << spr);
 
-                if (pf_color[scan_px] == 0 || pair + pf_prio[scan_px] < 4u) {
-                    output->scanline_rgba[scan_px] = color;
-                    output->scanline_rgb565[scan_px] = rgb32_to_rgb565(color);
+                    if (pf_color[dst_px] == 0 || pair + pf_prio[dst_px] < 4u) {
+                        output->scanline_rgba[dst_px] = color;
+                        output->scanline_rgb565[dst_px] = rgb32_to_rgb565(color);
+                    }
                 }
             }
         }
