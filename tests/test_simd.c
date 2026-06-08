@@ -1,4 +1,5 @@
 #include "simd/rigel_simd.h"
+#include "denise/output/planar.h"
 
 #include <string.h>
 
@@ -87,11 +88,62 @@ static int test_copy_u16_to_le(void)
            dst[8] != 0xffu || dst[9] != 0x00u;
 }
 
+static uint8_t reference_planar_pixel(const rigel_u16 plane_words[6],
+                                      unsigned num_planes,
+                                      unsigned bit)
+{
+    uint8_t index = 0u;
+    unsigned p;
+
+    if (num_planes > 6u) {
+        num_planes = 6u;
+    }
+    for (p = 0u; p < num_planes; ++p) {
+        index |= (uint8_t)(((plane_words[p] >> (15u - bit)) & 1u) << p);
+    }
+
+    return index;
+}
+
+static int test_planar_to_chunky(void)
+{
+    static const rigel_u16 patterns[][6] = {
+        { 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u },
+        { 0xffffu, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u },
+        { 0xaaaau, 0x5555u, 0xf0f0u, 0x0f0fu, 0xcc33u, 0x33ccu },
+        { 0x8001u, 0x4002u, 0x2004u, 0x1008u, 0x0810u, 0x0420u },
+        { 0x1357u, 0x2468u, 0x369cu, 0x5a5au, 0xc3c3u, 0x7e81u }
+    };
+    rigel_u8 pixels[16];
+    unsigned pattern;
+    unsigned planes;
+    unsigned bit;
+
+    for (pattern = 0u; pattern < sizeof(patterns) / sizeof(patterns[0]); ++pattern) {
+        for (planes = 0u; planes <= 7u; ++planes) {
+            memset(pixels, 0xa5, sizeof(pixels));
+            planar_to_chunky(patterns[pattern], planes, pixels);
+
+            for (bit = 0u; bit < 16u; ++bit) {
+                if (pixels[bit] != reference_planar_pixel(patterns[pattern], planes, bit)) {
+                    return 1;
+                }
+                if (pixels[bit] != planar_pixel_at(patterns[pattern], planes, bit)) {
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
 int main(void)
 {
     if (test_fill_u32() ||
         test_fill_u16_and_zero() ||
-        test_copy_u16_to_le()) {
+        test_copy_u16_to_le() ||
+        test_planar_to_chunky()) {
         return 1;
     }
 
