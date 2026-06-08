@@ -131,6 +131,7 @@ typedef struct agnus_slot_scheduler {
 
     /* Bitplane fetch cycling: which plane to fetch on the next BITPLANE slot */
     rigel_u16 fetch_plane_index;
+    bool      bitplane_dma_this_line;
 
     /* Hires mode (BPLCON0 bit 15): doubles bitplane fetch rate.
      * Must be kept in sync with BPLCON0 via agnus_slot_scheduler_set_hires(). */

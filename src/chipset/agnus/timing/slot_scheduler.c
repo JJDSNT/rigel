@@ -109,6 +109,7 @@ static void dispatch_slot(agnus_slot_owner_t owner,
                 bitplane_fetch_step(&agnus->fetch, &agnus->bplpt, plane,
                                     rigel_context_chip_ram(ctx));
                 dout->plane_words[plane][widx] = agnus->fetch.data[plane];
+                agnus->scheduler.bitplane_dma_this_line = true;
                 if (ctx->chipset.denise.regs.diwstrt == 0x0581u ||
                     ctx->chipset.denise.regs.diwstrt == 0x2c81u) {
                     static unsigned trace_count = 0u;
@@ -417,6 +418,7 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
     sched->blitter_nasty     = false;
     sched->blitter_active    = false;
     sched->fetch_plane_index = 0;
+    sched->bitplane_dma_this_line = false;
     sched->hires             = false;
     sched->vstrt             = AGNUS_VBL_LINE_END + 1u; /* default: allow all non-VBL lines */
 
@@ -545,13 +547,15 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
         if (beam->hpos == 0) {
             sched->table_dirty = true;  /* new line: VBL status may change */
             sched->fetch_plane_index = 0;
-            /* Apply BPL1MOD/BPL2MOD at the end of each active display line */
-            if (ctx && !sched->line_is_vbl) {
+            /* Apply BPL1MOD/BPL2MOD only after a line that actually fetched
+             * bitplane DMA. Lines before DIWSTRT must not consume modulo. */
+            if (ctx && sched->bitplane_dma_this_line) {
                 rigel_i16 bpl1mod = (rigel_i16)rigel_context_read_reg(ctx, AGNUS_BPLMOD1);
                 rigel_i16 bpl2mod = (rigel_i16)rigel_context_read_reg(ctx, AGNUS_BPLMOD2);
                 bplpt_apply_modulo(&ctx->chipset.agnus.bplpt,
                                    (unsigned)sched->depth, bpl1mod, bpl2mod);
             }
+            sched->bitplane_dma_this_line = false;
         }
         if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos)) {
             agnus_irq_raise_vblank(ctx);

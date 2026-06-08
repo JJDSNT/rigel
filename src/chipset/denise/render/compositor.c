@@ -42,7 +42,8 @@ static void compose_line(RigelDenise *denise)
      * This matches the legacy src_first_pixel=1 formula:
      *   src_first_pixel = (hstrt - pipeline_lead) - ddfstrt_lores - pipeline_lead */
     unsigned pipeline_lead = is_hires ? 4u : 8u;
-    unsigned ddf0 = (unsigned)output->ddfstrt_lores + 2u * pipeline_lead;
+    unsigned hscale = is_hires ? 2u : 1u;
+    unsigned ddf0 = ((unsigned)output->ddfstrt_lores + 2u * pipeline_lead) * hscale;
     rigel_u16 x_start = denise->video.visible_x_start;
     rigel_u16 x_stop  = denise->video.visible_x_stop;   /* exclusive */
     rigel_u16 w, px;
@@ -216,17 +217,26 @@ static void compose_line(RigelDenise *denise)
      * A sprite pair p beats PFx when the PF pixel is transparent or pair+PFxP < 4. */
     {
         unsigned spr;
+        rigel_u16 y = output->beam_vpos;
         for (spr = DENISE_SPRITE_COUNT; spr-- > 0; ) {
             const denise_sprite_t *sp = &denise->sprites.sp[spr];
             unsigned pair = spr / 2u;
             bool is_odd          = (spr & 1u) != 0u;
             bool attached_odd    = is_odd  && denise_sprite_is_attached(&denise->sprites, spr);
             bool attached_even   = !is_odd && denise_sprite_is_attached(&denise->sprites, spr + 1u);
+            rigel_u16 vstart;
+            rigel_u16 vstop;
             rigel_u16 hstart;
             unsigned px_idx;
 
             if (attached_odd) continue;
             if (!sp->armed) continue;
+            vstart = denise_sprite_vstart(sp);
+            vstop = denise_sprite_vstop(sp);
+            if (vstop <= vstart)
+                vstop = (rigel_u16)(vstop + 256u);
+            if (y < vstart || y >= vstop)
+                continue;
 
             hstart = denise_sprite_hstart(sp);
             for (px_idx = 0; px_idx < 16u; px_idx++) {

@@ -18,6 +18,7 @@ void rigel_denise_display_window_update(RigelDenise *denise)
 {
     rigel_u16 hstrt, hstop, vstrt, vstop, width, height;
     rigel_u16 hwidth;
+    rigel_u16 hscale;
     bool hires;
     bool ocs_diw;
 
@@ -109,15 +110,16 @@ void rigel_denise_display_window_update(RigelDenise *denise)
         return;
 
     hires = (denise->regs.bplcon0 & 0x8000u) != 0u;
+    hscale = hires ? 2u : 1u;
     hwidth = (hstop > hstrt) ? (rigel_u16)(hstop - hstrt) : 320u;
 
-    denise->video.visible_x_start = hstrt;
+    denise->video.visible_x_start = (rigel_u16)(hstrt * hscale);
     denise->video.visible_y_start = vstrt;
     denise->video.visible_x_stop  =
-        (rigel_u16)(hstrt + (hires ? (hwidth * 2u) : hwidth)); /* exclusive */
+        (rigel_u16)(denise->video.visible_x_start + (hwidth * hscale)); /* exclusive */
     denise->video.visible_y_stop  = vstop;   /* exclusive */
 
-    width  = (rigel_u16)(hires ? (hwidth * 2u) : hwidth);
+    width  = (rigel_u16)(hwidth * hscale);
     height = (vstop > vstrt) ? (rigel_u16)(vstop - vstrt) : 256u;
 
     denise->video.width  = width;
