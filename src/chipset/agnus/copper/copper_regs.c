@@ -11,19 +11,17 @@
 #include <stdlib.h>
 #endif
 
+#if RIGEL_ENABLE_STDLIB_ENV
 static bool rigel_cop_reg_trace_enabled(void)
 {
-#if RIGEL_ENABLE_STDLIB_ENV
     static int enabled = -1;
     if (enabled < 0) {
         const char *env = getenv("RIGEL_COP_REG_TRACE");
         enabled = (env != NULL && env[0] != '\0' && env[0] != '0') ? 1 : 0;
     }
     return enabled != 0;
-#else
-    return false;
-#endif
 }
+#endif
 
 static void rigel_cop_reg_trace(RigelContext *ctx, const char *name,
                                 rigel_u32 addr, rigel_u16 value,

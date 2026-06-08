@@ -13,9 +13,9 @@
 #include <stdlib.h>
 #endif
 
+#if RIGEL_ENABLE_STDLIB_ENV
 static bool rigel_copper_trace_enabled(void)
 {
-#if RIGEL_ENABLE_STDLIB_ENV
     static int enabled = -1;
 
     if (enabled < 0) {
@@ -24,14 +24,10 @@ static bool rigel_copper_trace_enabled(void)
     }
 
     return enabled != 0;
-#else
-    return false;
-#endif
 }
 
 static rigel_u32 rigel_copper_trace_frame_from(void)
 {
-#if RIGEL_ENABLE_STDLIB_ENV
     static int initialized = 0;
     static rigel_u32 frame_from = 0u;
 
@@ -44,9 +40,6 @@ static rigel_u32 rigel_copper_trace_frame_from(void)
     }
 
     return frame_from;
-#else
-    return 0u;
-#endif
 }
 
 static bool rigel_copper_trace_pc(rigel_u32 pc)
@@ -55,6 +48,7 @@ static bool rigel_copper_trace_pc(rigel_u32 pc)
 
     return chip_pc < 0x200000u;
 }
+#endif
 
 static void rigel_copper_trace_fetch(RigelContext *ctx, const copper_state_t *copper,
                                      rigel_u16 ir1, rigel_u16 ir2)

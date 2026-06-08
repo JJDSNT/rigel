@@ -2,12 +2,15 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#if RIGEL_ENABLE_STDLIB_ENV
 #include <stdlib.h>
+#endif
 
 #include "debug/log.h"
 
 static int floppy_trace_enabled(void)
 {
+#if RIGEL_ENABLE_STDLIB_ENV
     static int initialized;
     static int enabled;
 
@@ -18,6 +21,9 @@ static int floppy_trace_enabled(void)
     }
 
     return enabled;
+#else
+    return 0;
+#endif
 }
 
 /* ------------------------------------------------------------------------- */

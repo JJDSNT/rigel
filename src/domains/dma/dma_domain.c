@@ -8,9 +8,9 @@
 #include <stdlib.h>
 #endif
 
+#if RIGEL_ENABLE_STDLIB_ENV
 static bool rigel_dma_trace_enabled(void)
 {
-#if RIGEL_ENABLE_STDLIB_ENV
     static int enabled = -1;
 
     if (enabled < 0) {
@@ -19,10 +19,8 @@ static bool rigel_dma_trace_enabled(void)
     }
 
     return enabled != 0;
-#else
-    return false;
-#endif
 }
+#endif
 
 static void rigel_dma_trace(const char *reason, rigel_u16 old_value,
                             rigel_u16 new_value, rigel_u16 raw_value)
