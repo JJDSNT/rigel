@@ -1,7 +1,22 @@
 #include "paula/audio.h"
 
+#include "debug/log.h"
+
 #include <string.h>
 #include <stddef.h>
+
+/* AUD0-3 timing trace: AUDxPER write, AUDxLC/LEN reload, DMA word fetch,
+ * period elapsed, AUDxDAT write, IRQ raise — all 4 channels. Bounded by a
+ * per-event-type counter (shared across all 4 channels per call site),
+ * matching the existing convention in chipset/agnus (copper_exec.c,
+ * slot_scheduler.c uses 512), since Rigel's own native/test builds default
+ * to stderr when no host log_event_fn is set. 512 is far too low here:
+ * the period-tick event alone can fire every ~200-900 CCK per channel, so
+ * it exhausts within the first fraction of a second of boot, well before
+ * any interesting timing window — unlike the narrow, late-triggered
+ * conditions copper_exec.c/slot_scheduler.c guard. Sized instead so a
+ * multi-second bring-up capture (~10M+ CCK) doesn't go dark. */
+#define AUDIO_TRACE_LIMIT 1000000u
 
 static bool audio_valid_channel(int channel)
 {
@@ -115,6 +130,20 @@ void audio_step(audio_state_t *audio, rigel_u32 cycles)
             state->period_counter = state->audper;
             sample_elapsed = true;
 
+            {
+                static unsigned trace_count = 0u;
+                if (trace_count < AUDIO_TRACE_LIMIT) {
+                    rigel_log_event_t event = {
+                        RIGEL_LOG_EVENT_AUDIO_PERIOD,
+                        "audio_period",
+                        { (rigel_u32)channel, (rigel_u32)state->audper },
+                        2u
+                    };
+                    rigel_log_event(&event);
+                    trace_count++;
+                }
+            }
+
             if (state->data_pending) {
                 state->current_sample = (int16_t)((int8_t)(state->auddat >> 8)) << 8;
                 state->data_pending = false;
@@ -183,6 +212,20 @@ void audio_write_per(audio_state_t *audio, int channel, rigel_u16 value)
     }
 
     state->audper = value != 0 ? value : 1;
+
+    {
+        static unsigned trace_count = 0u;
+        if (trace_count < AUDIO_TRACE_LIMIT) {
+            rigel_log_event_t event = {
+                RIGEL_LOG_EVENT_AUDIO_PER_WRITE,
+                "audio_per_write",
+                { (rigel_u32)channel, (rigel_u32)value, (rigel_u32)state->audper },
+                3u
+            };
+            rigel_log_event(&event);
+            trace_count++;
+        }
+    }
 }
 
 void audio_write_vol(audio_state_t *audio, int channel, rigel_u16 value)
@@ -209,6 +252,20 @@ void audio_write_dat(audio_state_t *audio, int channel, rigel_u16 value)
 
     state->auddat = value;
     state->data_pending = true;
+
+    {
+        static unsigned trace_count = 0u;
+        if (trace_count < AUDIO_TRACE_LIMIT) {
+            rigel_log_event_t event = {
+                RIGEL_LOG_EVENT_AUDIO_DAT_WRITE,
+                "audio_dat_write",
+                { (rigel_u32)channel, (rigel_u32)value },
+                2u
+            };
+            rigel_log_event(&event);
+            trace_count++;
+        }
+    }
 }
 
 int16_t audio_left(const audio_state_t *audio)
@@ -245,15 +302,60 @@ void audio_dma_step_slot(audio_state_t *audio, int channel, rigel_chip_ram_if_t 
         }
         ch->current_ptr    = ch->audlc;
         ch->current_length = ch->audlen;
+
+        {
+            static unsigned trace_count = 0u;
+            if (trace_count < AUDIO_TRACE_LIMIT) {
+                rigel_log_event_t event = {
+                    RIGEL_LOG_EVENT_AUDIO_RELOAD,
+                    "audio_reload",
+                    { (rigel_u32)channel, ch->audlc, (rigel_u32)ch->audlen },
+                    3u
+                };
+                rigel_log_event(&event);
+                trace_count++;
+            }
+        }
     }
 
     ch->dma_word       = mem.read16(mem.opaque, ch->current_ptr & ~1u);
     ch->dma_word_ready = true;
+
+    {
+        static unsigned trace_count = 0u;
+        if (trace_count < AUDIO_TRACE_LIMIT) {
+            rigel_log_event_t event = {
+                RIGEL_LOG_EVENT_AUDIO_FETCH,
+                "audio_fetch",
+                { (rigel_u32)channel, ch->current_ptr & ~1u,
+                  (rigel_u32)ch->dma_word, (rigel_u32)ch->current_length },
+                4u
+            };
+            rigel_log_event(&event);
+            trace_count++;
+        }
+    }
+
     ch->current_ptr   += 2u;
     ch->current_length--;
 
-    if (ch->current_length == 0 && audio->irq.raise != NULL) {
-        audio->irq.raise(audio->irq.opaque, irq_bits[channel]);
+    if (ch->current_length == 0) {
+        {
+            static unsigned trace_count = 0u;
+            if (trace_count < AUDIO_TRACE_LIMIT) {
+                rigel_log_event_t event = {
+                    RIGEL_LOG_EVENT_AUDIO_IRQ,
+                    "audio_irq",
+                    { (rigel_u32)channel, (rigel_u32)irq_bits[channel] },
+                    2u
+                };
+                rigel_log_event(&event);
+                trace_count++;
+            }
+        }
+        if (audio->irq.raise != NULL) {
+            audio->irq.raise(audio->irq.opaque, irq_bits[channel]);
+        }
     }
 }
 

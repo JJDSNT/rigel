@@ -15,7 +15,13 @@ typedef enum rigel_log_event_id {
     RIGEL_LOG_EVENT_COPPER_WRITE = 1,
     RIGEL_LOG_EVENT_BPL_FETCH    = 2,
     RIGEL_LOG_EVENT_SCHEDULER    = 3,
-    RIGEL_LOG_EVENT_COMPOSE      = 4
+    RIGEL_LOG_EVENT_COMPOSE      = 4,
+    RIGEL_LOG_EVENT_AUDIO_PER_WRITE = 5,
+    RIGEL_LOG_EVENT_AUDIO_PERIOD    = 6,
+    RIGEL_LOG_EVENT_AUDIO_IRQ       = 7,
+    RIGEL_LOG_EVENT_AUDIO_RELOAD    = 8,
+    RIGEL_LOG_EVENT_AUDIO_FETCH     = 9,
+    RIGEL_LOG_EVENT_AUDIO_DAT_WRITE = 10
 } rigel_log_event_id_t;
 
 typedef struct rigel_log_event {
