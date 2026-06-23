@@ -13,6 +13,23 @@
 #include "rigel/rigel_denise_types.h"
 #include "simd/rigel_simd.h"
 
+#if RIGEL_ENABLE_STDLIB_ENV
+#include <stdio.h>
+#include <stdlib.h>
+
+static bool compositor_sprite_trace_enabled(void)
+{
+    static int enabled = -1;
+
+    if (enabled < 0) {
+        const char *env = getenv("RIGEL_SPRITE_DMA_TRACE");
+        enabled = (env != NULL && env[0] != '\0' && env[0] != '0') ? 1 : 0;
+    }
+
+    return enabled != 0;
+}
+#endif
+
 static rigel_u16 rgb32_to_rgb565(rigel_u32 rgb)
 {
     rigel_u32 r = (rgb >> 16) & 0xffu;
@@ -43,11 +60,12 @@ static void compose_line(RigelDenise *denise)
      *   src_first_pixel = (hstrt - pipeline_lead) - ddfstrt_lores - pipeline_lead */
     unsigned pipeline_lead = is_hires ? 4u : 8u;
     unsigned hscale = is_hires ? 2u : 1u;
+    unsigned sprite_hscale = (denise->video.width > 512u || is_hires) ? 2u : 1u;
     unsigned ddf0 = ((unsigned)output->ddfstrt_lores + 2u * pipeline_lead) * hscale;
     rigel_u16 x_start = denise->video.visible_x_start;
     rigel_u16 x_stop  = denise->video.visible_x_stop;   /* exclusive */
     rigel_u16 w, px;
-    rigel_u32 visible_count;
+    rigel_u32 scanline_count;
 
     /* Per-pixel arrays indexed by absolute lores position [0..1023]. */
     uint8_t pf_color[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
@@ -105,26 +123,17 @@ static void compose_line(RigelDenise *denise)
         }
     }
 
-    visible_count = 0u;
-    if (x_start < RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
-        rigel_u16 clipped_stop = x_stop;
-        if (clipped_stop > RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
-            clipped_stop = RIGEL_DENISE_MAX_SCANLINE_PIXELS;
-        }
-        if (clipped_stop > x_start) {
-            visible_count = (rigel_u32)(clipped_stop - x_start);
-        }
-    }
+    scanline_count = RIGEL_DENISE_MAX_SCANLINE_PIXELS;
 
-    /* Initialise the visible window in scanline_rgba and the per-pixel arrays. */
-    if (visible_count > 0u) {
-        rigel_simd_fill_u32(&output->scanline_rgba[x_start], palette[0], visible_count);
-        rigel_simd_fill_u16(&output->scanline_rgb565[x_start], palette565[0], visible_count);
-        rigel_simd_zero_u8(&pf_color[x_start], visible_count);
-        rigel_simd_fill_u8(&pf_prio[x_start], (rigel_u8)pf1p, visible_count);
-        rigel_simd_zero_u8(&pf_active[x_start], visible_count);
-        rigel_simd_zero_u8(&spr_active[x_start], visible_count);
-    }
+    /* Initialise the full raster line.  Sprites are visible in the border, so
+     * pixels outside the DIW must still start from COLOR00 and transparent PF
+     * state instead of retaining the previous composed line. */
+    rigel_simd_fill_u32(output->scanline_rgba, palette[0], scanline_count);
+    rigel_simd_fill_u16(output->scanline_rgb565, palette565[0], scanline_count);
+    rigel_simd_zero_u8(pf_color, scanline_count);
+    rigel_simd_fill_u8(pf_prio, (rigel_u8)pf1p, scanline_count);
+    rigel_simd_zero_u8(pf_active, scanline_count);
+    rigel_simd_zero_u8(spr_active, scanline_count);
 
     if (depth > 0 && depth <= 6 && output->plane_word_count > 0) {
         if (is_ham) {
@@ -241,7 +250,7 @@ static void compose_line(RigelDenise *denise)
             hstart = denise_sprite_hstart(sp);
             for (px_idx = 0; px_idx < 16u; px_idx++) {
                 rigel_u16 amiga_x = (rigel_u16)(hstart + px_idx);
-                rigel_u16 scan_px = (rigel_u16)((hstart + px_idx) * hscale);
+                rigel_u16 scan_px = (rigel_u16)((hstart + px_idx) * sprite_hscale);
                 unsigned repeat;
                 uint8_t pix;
                 rigel_u32 color;
@@ -254,11 +263,46 @@ static void compose_line(RigelDenise *denise)
                     if (pix == 0) continue;
                     color = palette[(16u + pair * 4u + pix) & 31u];
                 }
-                for (repeat = 0; repeat < hscale; ++repeat) {
+#if RIGEL_ENABLE_STDLIB_ENV
+                if (spr == 0u && compositor_sprite_trace_enabled()) {
+                    static unsigned dbg_count = 0;
+                    if (dbg_count < 2000000) {
+                        dbg_count++;
+                        fprintf(stderr,
+                                "[SPRITE0-PIXEL] y=%u amiga_x=%u scan_px=%u pix=%u\n",
+                                (unsigned)y, (unsigned)amiga_x, (unsigned)scan_px,
+                                (unsigned)pix);
+                    }
+                }
+#endif
+                for (repeat = 0; repeat < sprite_hscale; ++repeat) {
                     rigel_u16 dst_px = (rigel_u16)(scan_px + repeat);
-                    if (dst_px < x_start)
-                        continue;
-                    if (dst_px >= x_stop || dst_px >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+#if RIGEL_ENABLE_STDLIB_ENV
+                    if (spr == 0u && compositor_sprite_trace_enabled()) {
+                        static unsigned dbg_count2 = 0;
+                        if (dbg_count2 < 2000000) {
+                            dbg_count2++;
+                            fprintf(stderr,
+                                    "[SPRITE0-WRITE] frame=%llu y=%u hstart=%u vstart=%u vstop=%u"
+                                    " dst_px=%u x_start=%u x_stop=%u"
+                                    " cropped=%d pf_color=%u pair=%u pf_prio=%u drawn=%d\n",
+                                    (unsigned long long)output->frame_counter,
+                                    (unsigned)y, (unsigned)hstart,
+                                    (unsigned)vstart, (unsigned)vstop,
+                                    (unsigned)dst_px,
+                                    (unsigned)x_start, (unsigned)x_stop,
+                                    (dst_px >= RIGEL_DENISE_MAX_SCANLINE_PIXELS) ? 1 : 0,
+                                    (dst_px < RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+                                        ? (unsigned)pf_color[dst_px] : 0u,
+                                    (unsigned)pair,
+                                    (dst_px < RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+                                        ? (unsigned)pf_prio[dst_px] : 0u,
+                                    (dst_px < RIGEL_DENISE_MAX_SCANLINE_PIXELS &&
+                                     (pf_color[dst_px] == 0 || pair + pf_prio[dst_px] < 4u)) ? 1 : 0);
+                        }
+                    }
+#endif
+                    if (dst_px >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
                         break;
                     spr_active[dst_px] |= (uint8_t)(1u << spr);
 

@@ -559,6 +559,7 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
         }
         if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos)) {
             agnus_irq_raise_vblank(ctx);
+            sprite_dma_frame_start(&ctx->chipset.agnus.sprite_dma);
             if (dmacon_copen(sched->dmacon)) {
                 rigel_copper_domain_vbl_reload(&ctx->chipset.agnus.copper);
             }

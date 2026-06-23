@@ -5,6 +5,35 @@
 #include "core/rigel_context.h"
 #include "chipset/denise/denise_state.h"
 
+static void rigel_denise_frame_x_bounds(const RigelDenise *denise,
+                                        rigel_u16 *x0,
+                                        rigel_u16 *x1)
+{
+    rigel_u16 start = denise->video.visible_x_start;
+    rigel_u16 stop = denise->video.visible_x_stop;
+
+    if (stop > (rigel_u16)RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+        stop = (rigel_u16)RIGEL_DENISE_MAX_SCANLINE_PIXELS;
+    if (start > stop)
+        start = 0u;
+
+    /*
+     * Export a monitor-like viewport, not the whole internal HPOS range.  Large
+     * DIW starts such as WB1.3 hires (x=252) otherwise expose a huge blank band
+     * before the playfield.  Keep a small left border so sprites that sit just
+     * outside the DIW, including the hardware mouse pointer at the left edge,
+     * remain visible.
+     */
+    if (start > 128u) {
+        start = (rigel_u16)(start - 32u);
+    } else {
+        start = 0u;
+    }
+
+    *x0 = start;
+    *x1 = stop;
+}
+
 bool rigel_denise_get_video_desc(const RigelContext *ctx, rigel_denise_video_desc_t *desc)
 {
     const RigelDenise *denise;
@@ -56,17 +85,18 @@ bool rigel_get_scanline(const RigelContext *ctx, rigel_u16 y, rigel_denise_scanl
 {
     const RigelDenise *denise;
     rigel_u16 x0;
+    rigel_u16 x1;
 
     if (ctx == NULL || out == NULL || y >= RIGEL_DENISE_MAX_LINES) {
         return false;
     }
 
     denise = &ctx->chipset.denise;
-    x0     = denise->video.visible_x_start;
+    rigel_denise_frame_x_bounds(denise, &x0, &x1);
 
     out->frame_counter = denise->output.frame_counter;
     out->y             = y;
-    out->width         = (rigel_u16)(denise->video.visible_x_stop - x0);
+    out->width         = (rigel_u16)(x1 - x0);
     out->pixels_rgba   = &denise->output.frame_rgba[denise->output.front_idx][y][x0];
     out->last_rgb32    = 0;
     out->visible       = (y >= denise->video.visible_y_start &&
@@ -81,6 +111,7 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
     rigel_pixel_format_t format;
     rigel_u16 y0;
     rigel_u16 x0;
+    rigel_u16 x1;
 
     if (ctx == NULL || frame == NULL) {
         return false;
@@ -89,7 +120,7 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
     denise = &ctx->chipset.denise;
     format = ctx->config.pixel_format;
     y0 = denise->video.visible_y_start;
-    x0 = denise->video.visible_x_start;
+    rigel_denise_frame_x_bounds(denise, &x0, &x1);
 
     /*
      * Guard: if visible_y_start is outside the valid raster range (e.g. because
@@ -99,7 +130,7 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
      */
     if (y0 >= (rigel_u16)RIGEL_DENISE_MAX_LINES ||
         denise->video.visible_y_stop <= y0 ||
-        denise->video.visible_x_stop <= x0) {
+        x1 <= x0) {
         frame->width       = 0u;
         frame->height      = 0u;
         frame->pitch       = 0u;
@@ -113,7 +144,7 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
         return true;
     }
 
-    frame->width       = (rigel_u32)(denise->video.visible_x_stop - x0);
+    frame->width       = (rigel_u32)(x1 - x0);
     frame->height      = (rigel_u32)(denise->video.visible_y_stop  - y0);
     frame->frame_count = denise->output.frame_counter;
     frame->format      = format;

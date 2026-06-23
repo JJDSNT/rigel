@@ -8,6 +8,8 @@ enum {
     TEST_FRAME_CYCLES = 227u * 262u,
     TEST_VISIBLE_Y_START = 26u,
     TEST_VISIBLE_WIDTH = 320u,
+    TEST_LEFT_BORDER = 0x38u,
+    TEST_EXPORTED_WIDTH = TEST_LEFT_BORDER + TEST_VISIBLE_WIDTH,
     TEST_BPL_WORDS = TEST_VISIBLE_WIDTH / 16u,
     TEST_BPL1_ADDR = 0x0000u,
     TEST_BPL2_ADDR = 0x0040u,
@@ -103,7 +105,7 @@ static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
     if (!rigel_get_frame(ctx, &frame)) {
         return 1;
     }
-    if (frame.width != TEST_VISIBLE_WIDTH || frame.height != 256u) {
+    if (frame.width != TEST_EXPORTED_WIDTH || frame.height != 256u) {
         return 1;
     }
     if (frame.pixels == NULL) {
@@ -120,8 +122,10 @@ static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
          ((rigel_u64)1u << (TEST_VISIBLE_Y_START % 64u))) == 0u) {
         return 1;
     }
-    if (pixels[0] != 0x000000ffu || pixels[72] != 0x000000ffu ||
-        pixels[73] != 0x00ffffffu || pixels[74] != 0x000000ffu) {
+    if (pixels[0] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 72u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 73u] != 0x00ffffffu ||
+        pixels[TEST_LEFT_BORDER + 74u] != 0x000000ffu) {
         return 1;
     }
 
@@ -153,11 +157,11 @@ static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
     pixels = (const rigel_u32 *)frame.pixels;
     if (pixels[0] != 0x000000ffu)
         return 1;
-    if (pixels[87] != 0x000000ffu)
+    if (pixels[TEST_LEFT_BORDER + 87u] != 0x000000ffu)
         return 1;
-    if (pixels[88] != 0x00ffffffu)
+    if (pixels[TEST_LEFT_BORDER + 88u] != 0x00ffffffu)
         return 1;
-    if (pixels[103] != 0x00ffffffu)
+    if (pixels[TEST_LEFT_BORDER + 103u] != 0x00ffffffu)
         return 1;
 
     return 0;
@@ -184,7 +188,7 @@ static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *c
     if (!rigel_get_frame(ctx, &frame))
         return 1;
     pixels = (const rigel_u32 *)frame.pixels;
-    if (pixels[88] != 0x00ffffffu)
+    if (pixels[TEST_LEFT_BORDER + 88u] != 0x00ffffffu)
         return 1;
 
     rigel_custom_write16(ctx, RIGEL_REG_DMACON, RIGEL_DMACON_BPLEN);
@@ -195,7 +199,8 @@ static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *c
     if (!rigel_get_frame(ctx, &frame))
         return 1;
     pixels = (const rigel_u32 *)frame.pixels;
-    if (pixels[88] != 0x000000ffu || pixels[89] != 0x000000ffu)
+    if (pixels[TEST_LEFT_BORDER + 88u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 89u] != 0x000000ffu)
         return 1;
 
     return 0;
@@ -226,18 +231,18 @@ static int test_two_bitplane_fetch_window(RigelContext *ctx, rigel_u16 *chip_ram
     pixels = (const rigel_u32 *)frame.pixels;
 
     /* plane0=0101..., plane1=0011... -> color indices 0,1,2,3 repeating */
-    if (pixels[72] != 0x00000000u ||
-        pixels[73] != 0x000000ffu ||
-        pixels[74] != 0x0000ff00u ||
-        pixels[75] != 0x00ff0000u ||
-        pixels[76] != 0x00000000u ||
-        pixels[77] != 0x000000ffu ||
-        pixels[78] != 0x0000ff00u ||
-        pixels[79] != 0x00ff0000u) {
+    if (pixels[TEST_LEFT_BORDER + 72u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 73u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 74u] != 0x0000ff00u ||
+        pixels[TEST_LEFT_BORDER + 75u] != 0x00ff0000u ||
+        pixels[TEST_LEFT_BORDER + 76u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 77u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 78u] != 0x0000ff00u ||
+        pixels[TEST_LEFT_BORDER + 79u] != 0x00ff0000u) {
         return 1;
     }
 
-    if (pixels[319] != 0x00ff0000u) {
+    if (pixels[TEST_LEFT_BORDER + 319u] != 0x00ff0000u) {
         return 1;
     }
 
@@ -288,10 +293,10 @@ static int test_rgb565_frame_format(rigel_u16 *chip_ram)
         if (frame.format != RIGEL_PIXEL_RGB565 ||
             frame.pitch != RIGEL_DENISE_MAX_SCANLINE_PIXELS * sizeof(rigel_u16) ||
             pixels == NULL ||
-            pixels[72] != 0x001fu ||
-            pixels[73] != 0xffffu ||
-            host_framebuffer[72] != 0x001fu ||
-            host_framebuffer[73] != 0xffffu) {
+            pixels[TEST_LEFT_BORDER + 72u] != 0x001fu ||
+            pixels[TEST_LEFT_BORDER + 73u] != 0xffffu ||
+            host_framebuffer[TEST_LEFT_BORDER + 72u] != 0x001fu ||
+            host_framebuffer[TEST_LEFT_BORDER + 73u] != 0xffffu) {
             result = 1;
         }
     }
@@ -506,7 +511,7 @@ int main(void)
     }
 
     if (video.display_width != 640 || video.display_height != 256 ||
-        video.visible_x_start != 0x81 || video.visible_x_stop != 769) {
+        video.visible_x_start != 0x102 || video.visible_x_stop != 898) {
         rigel_destroy(ctx);
         return 1;
     }
@@ -529,6 +534,11 @@ int main(void)
 
     rigel_custom_write16(ctx, 0x08e, 0x2c81);
     rigel_custom_write16(ctx, 0x090, 0x2cc1);
+
+    if (!rigel_denise_get_video_desc(ctx, &video)) {
+        rigel_destroy(ctx);
+        return 1;
+    }
 
     rigel_step(ctx, 4);
 

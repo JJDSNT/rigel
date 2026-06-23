@@ -42,7 +42,23 @@ static void copy_visible_line_to_target(const RigelDenise *denise)
     }
 
     x0 = denise->video.visible_x_start;
+    if (x0 > denise->video.visible_x_stop)
+        x0 = 0u;
+    if (x0 > 128u)
+        x0 = (rigel_u16)(x0 - 32u);
+    else
+        x0 = 0u;
+
     dst = (rigel_u8 *)target->pixels + row * target->pitch;
+    width = (denise->video.visible_x_stop > x0)
+        ? (rigel_u32)(denise->video.visible_x_stop - x0)
+        : 0u;
+    if (width > RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
+        width = RIGEL_DENISE_MAX_SCANLINE_PIXELS;
+    }
+    if (width > target->width) {
+        width = target->width;
+    }
 
     if (target->format == RIGEL_PIXEL_RGB565) {
         if (target->little_endian) {

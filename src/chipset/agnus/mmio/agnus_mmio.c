@@ -25,6 +25,11 @@ bool rigel_agnus_mmio_has_reg(rigel_u32 addr)
         return true;
     }
 
+    /* SPR0PTH-SPR7PTL: 0x120-0x13E (even addresses) */
+    if (addr >= AGNUS_SPR0PTH && addr <= AGNUS_SPR7PTL && (addr & 1u) == 0u) {
+        return true;
+    }
+
     if (addr == AGNUS_BPLMOD1 || addr == AGNUS_BPLMOD2 || addr == AGNUS_BEAMCON0) {
         return true;
     }

@@ -12,8 +12,10 @@
 #define SPRITE_DMA_CHANNELS 8
 
 typedef struct sprite_dma_channel {
+    rigel_u32 base_ptr;     /* SPRxPTH/SPRxPTL — frame reload pointer    */
     rigel_u32 ptr;          /* SPRxPTH/SPRxPTL — current fetch pointer   */
     bool      armed;        /* control words fetched; vstart/vstop valid  */
+    bool      terminated;   /* zero control pair seen; idle until reload  */
     bool      fetch_ctrl;   /* A-slot decided: fetching ctrl (not data)   */
     rigel_u16 vstart;       /* cached from last SPRxPOS fetch             */
     rigel_u16 vstop;        /* cached from last SPRxCTL fetch             */
@@ -27,6 +29,7 @@ typedef struct sprite_dma_state {
 void sprite_dma_reset(sprite_dma_state_t *s);
 void sprite_dma_set_ptr_hi(sprite_dma_state_t *s, unsigned sp, rigel_u16 val);
 void sprite_dma_set_ptr_lo(sprite_dma_state_t *s, unsigned sp, rigel_u16 val);
+void sprite_dma_frame_start(sprite_dma_state_t *s);
 
 /* Process one DMA slot (A or B) for sprite channel `sp`.
  * is_b: false = A-slot (latch first word), true = B-slot (latch + deliver).
