@@ -51,6 +51,8 @@ static void compose_line(RigelDenise *denise)
     bool is_hires = (denise->regs.bplcon0 & 0x8000u) != 0u;
     bool is_ehb  = !is_ham && !is_dual && depth == 6u && !(bplcon2 & 0x0040u);
     unsigned scroll  = denise->regs.bplcon1 & 0x0Fu;
+    unsigned scroll_pf1 = denise->regs.bplcon1 & 0x0Fu;
+    unsigned scroll_pf2 = (denise->regs.bplcon1 >> 4) & 0x0Fu;
     unsigned pf1p    = bplcon2 & 0x7u;
     unsigned pf2p    = (bplcon2 >> 3) & 0x7u;
     /* Absolute lores position of word 0 pixel 0.
@@ -73,7 +75,9 @@ static void compose_line(RigelDenise *denise)
     uint8_t pf_active[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
     uint8_t spr_active[RIGEL_DENISE_MAX_SCANLINE_PIXELS];
 
-    if (!output->visible_scanline || output->scanline_width == 0) return;
+    /* Sprites render independently of the DIW; don't early-out based on
+     * visible_scanline — the bitplane block below is guarded separately. */
+    if (output->scanline_width == 0) return;
 
     {
         static unsigned trace_count = 0u;
@@ -135,7 +139,7 @@ static void compose_line(RigelDenise *denise)
     rigel_simd_zero_u8(pf_active, scanline_count);
     rigel_simd_zero_u8(spr_active, scanline_count);
 
-    if (depth > 0 && depth <= 6 && output->plane_word_count > 0) {
+    if (output->visible_scanline && depth > 0 && depth <= 6 && output->plane_word_count > 0) {
         if (is_ham) {
             /* HAM6: each pixel depends on the previous; state advances even
              * for pixels outside the visible window (scroll, right clip). */
@@ -169,42 +173,104 @@ static void compose_line(RigelDenise *denise)
                     block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
                 planar_to_chunky(block_words, depth, pixels_chunky);
                 for (px = 0; px < 16; px++) {
-                    int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
                     dualpf_result_t dpf;
-                    bool use_pf2;
-                    uint8_t ci;
-                    if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
-                        continue;
                     dpf = dualpf_decode(pixels_chunky[px]);
-                    use_pf2 = dpf.pf2_index && (!dpf.pf1_index || pf1p <= pf2p);
-                    ci = use_pf2 ? dpf.pf2_index : dpf.pf1_index;
-                    pf_color[(unsigned)screen_x]  = ci;
-                    pf_prio[(unsigned)screen_x]   = (uint8_t)(use_pf2 ? pf2p : pf1p);
-                    pf_active[(unsigned)screen_x] =
-                        (uint8_t)((dpf.pf1_index ? 1u : 0u) | (dpf.pf2_index ? 2u : 0u));
-                    if (ci) {
-                        output->scanline_rgba[(unsigned)screen_x] = palette[ci];
-                        output->scanline_rgb565[(unsigned)screen_x] = palette565[ci];
+
+                    if (dpf.pf1_index) {
+                        int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll_pf1;
+                        if (screen_x >= 0 &&
+                            (unsigned)screen_x < RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
+                            unsigned dst = (unsigned)screen_x;
+                            if (pf_active[dst] == 0u ||
+                                ((pf_active[dst] & 2u) != 0u && pf1p > pf_prio[dst])) {
+                                pf_color[dst] = dpf.pf1_index;
+                                pf_prio[dst] = (uint8_t)pf1p;
+                                output->scanline_rgba[dst] = palette[dpf.pf1_index];
+                                output->scanline_rgb565[dst] = palette565[dpf.pf1_index];
+                            }
+                            pf_active[dst] |= 1u;
+                        }
+                    }
+
+                    if (dpf.pf2_index) {
+                        int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll_pf2;
+                        if (screen_x >= 0 &&
+                            (unsigned)screen_x < RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
+                            unsigned dst = (unsigned)screen_x;
+                            if (pf_active[dst] == 0u ||
+                                ((pf_active[dst] & 1u) != 0u && pf2p >= pf_prio[dst])) {
+                                pf_color[dst] = dpf.pf2_index;
+                                pf_prio[dst] = (uint8_t)pf2p;
+                                output->scanline_rgba[dst] = palette[dpf.pf2_index];
+                                output->scanline_rgb565[dst] = palette565[dpf.pf2_index];
+                            }
+                            pf_active[dst] |= 2u;
+                        }
                     }
                 }
             }
         } else {
             /* Normal single playfield (includes EHB with 6 planes). */
-            for (w = 0; w < output->plane_word_count; w++) {
-                rigel_u16 block_words[6];
-                uint8_t   pixels_chunky[16];
-                unsigned  p;
-                for (p = 0; p < 6; p++)
-                    block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
-                planar_to_chunky(block_words, depth, pixels_chunky);
-                for (px = 0; px < 16; px++) {
-                    int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
-                    uint8_t ci;
-                    if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
-                        continue;
-                    ci = is_ehb
-                        ? (pixels_chunky[px] & 0x3Fu)
-                        : (pixels_chunky[px] & 0x1Fu);
+            if (scroll_pf1 == scroll_pf2) {
+                for (w = 0; w < output->plane_word_count; w++) {
+                    rigel_u16 block_words[6];
+                    uint8_t   pixels_chunky[16];
+                    unsigned  p;
+                    for (p = 0; p < 6; p++)
+                        block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
+                    planar_to_chunky(block_words, depth, pixels_chunky);
+                    for (px = 0; px < 16; px++) {
+                        int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
+                        uint8_t ci;
+                        if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+                            continue;
+                        ci = is_ehb
+                            ? (pixels_chunky[px] & 0x3Fu)
+                            : (pixels_chunky[px] & 0x1Fu);
+                        pf_color[(unsigned)screen_x]  = ci;
+                        pf_active[(unsigned)screen_x] = (ci != 0) ? 1u : 0u;
+                        if (is_ehb) {
+                            rigel_u32 color = ehb_resolve_color(ci, palette);
+                            output->scanline_rgba[(unsigned)screen_x] = color;
+                            output->scanline_rgb565[(unsigned)screen_x] = rgb32_to_rgb565(color);
+                        } else {
+                            output->scanline_rgba[(unsigned)screen_x] = palette[ci];
+                            output->scanline_rgb565[(unsigned)screen_x] = palette565[ci];
+                        }
+                    }
+                }
+            } else {
+                unsigned span = output->plane_word_count * 16u;
+                int min_x = (int)ddf0 - 15;
+                int max_x = (int)(ddf0 + span);
+                int screen_x;
+
+                if (min_x < 0)
+                    min_x = 0;
+                if (max_x > (int)RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+                    max_x = (int)RIGEL_DENISE_MAX_SCANLINE_PIXELS;
+
+                for (screen_x = min_x; screen_x < max_x; ++screen_x) {
+                    uint8_t ci = 0u;
+                    unsigned p;
+
+                    for (p = 0u; p < depth && p < 6u; ++p) {
+                        unsigned plane_scroll = ((p & 1u) == 0u) ? scroll_pf1 : scroll_pf2;
+                        int src_x = screen_x + (int)plane_scroll - (int)ddf0;
+                        unsigned widx;
+                        unsigned bit;
+
+                        if (src_x < 0 || src_x >= (int)span)
+                            continue;
+
+                        widx = (unsigned)src_x / 16u;
+                        bit = (unsigned)src_x & 15u;
+                        if ((output->plane_words[p][widx] >> (15u - bit)) & 1u) {
+                            ci |= (uint8_t)(1u << p);
+                        }
+                    }
+
+                    ci = is_ehb ? (ci & 0x3Fu) : (ci & 0x1Fu);
                     pf_color[(unsigned)screen_x]  = ci;
                     pf_active[(unsigned)screen_x] = (ci != 0) ? 1u : 0u;
                     if (is_ehb) {

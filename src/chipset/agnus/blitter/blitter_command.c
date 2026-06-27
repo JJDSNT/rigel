@@ -72,6 +72,10 @@ void blitter_build_command(BlitterState *b)
 
     cmd->line_start_bit =
         (uint8_t)((r->bltcon0 >> 12) & 0x0Fu);
+    cmd->line_single_dot =
+        (r->bltcon1 & 0x0002u) != 0;
+    cmd->line_initial_sign =
+        (r->bltcon1 & 0x0040u) != 0;
 
     cmd->mode = decode_mode(r->bltcon1);
 

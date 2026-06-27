@@ -55,6 +55,11 @@ static void fill_two_bitplane_words(rigel_u16 *chip_ram, rigel_u16 plane1, rigel
     }
 }
 
+static void clear_two_bitplane_words(rigel_u16 *chip_ram)
+{
+    fill_two_bitplane_words(chip_ram, 0x0000u, 0x0000u);
+}
+
 static void setup_lores_single_bitplane(RigelContext *ctx, rigel_u16 ddfstrt, rigel_u16 ddfstop)
 {
     rigel_custom_write16(ctx, 0x08e, 0x1a38u);
@@ -81,6 +86,12 @@ static void setup_lores_two_bitplanes(RigelContext *ctx, rigel_u16 ddfstrt, rige
     rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0x2302u);
     rigel_custom_write16(ctx, TEST_REG_BPLCON1, 0x0000u);
     rigel_custom_write16(ctx, TEST_REG_BPLCON2, 0x0000u);
+}
+
+static void setup_lores_dualpf_two_bitplanes(RigelContext *ctx, rigel_u16 ddfstrt, rigel_u16 ddfstop)
+{
+    setup_lores_two_bitplanes(ctx, ddfstrt, ddfstop);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0x2400u);
 }
 
 static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
@@ -167,6 +178,77 @@ static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
     return 0;
 }
 
+static int test_singlepf_bplcon1_scroll(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    rigel_frame_t frame;
+    const rigel_u32 *pixels;
+
+    rigel_reset(ctx);
+    memset(chip_ram, 0, 256u * sizeof(chip_ram[0]));
+    chip_ram[TEST_BPL1_ADDR >> 1] = 0x8000u;
+    setup_lores_single_bitplane(ctx, 0x0038u, 0x00d0u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x0000u);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x0fffu);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON1, 0x0003u);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+    pixels = (const rigel_u32 *)frame.pixels;
+
+    if (pixels[TEST_LEFT_BORDER + 68u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 69u] != 0x00ffffffu ||
+        pixels[TEST_LEFT_BORDER + 70u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 72u] != 0x00000000u) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int test_singlepf_bplcon1_even_plane_scroll(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    rigel_frame_t frame;
+    const rigel_u32 *pixels;
+
+    rigel_reset(ctx);
+    clear_two_bitplane_words(chip_ram);
+    chip_ram[TEST_BPL1_ADDR >> 1] = 0x8000u;
+    chip_ram[TEST_BPL2_ADDR >> 1] = 0x8000u;
+    setup_lores_two_bitplanes(ctx, 0x0038u, 0x00d0u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x0000u);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x000fu);
+    rigel_custom_write16(ctx, TEST_REG_COLOR02, 0x00f0u);
+    rigel_custom_write16(ctx, TEST_REG_COLOR03, 0x0fffu);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON1, 0x0020u);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+    pixels = (const rigel_u32 *)frame.pixels;
+
+    if (pixels[TEST_LEFT_BORDER + 70u] != 0x0000ff00u ||
+        pixels[TEST_LEFT_BORDER + 71u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 72u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 73u] != 0x00000000u) {
+        return 1;
+    }
+
+    return 0;
+}
+
 static int test_bitplane_dma_disable_stops_reuse(RigelContext *ctx, rigel_u16 *chip_ram)
 {
     rigel_frame_t frame;
@@ -243,6 +325,68 @@ static int test_two_bitplane_fetch_window(RigelContext *ctx, rigel_u16 *chip_ram
     }
 
     if (pixels[TEST_LEFT_BORDER + 319u] != 0x00ff0000u) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int test_dualpf_bplcon1_independent_scroll(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    rigel_frame_t frame;
+    const rigel_u32 *pixels;
+
+    rigel_reset(ctx);
+    clear_two_bitplane_words(chip_ram);
+    chip_ram[TEST_BPL1_ADDR >> 1] = 0x8000u;
+    chip_ram[TEST_BPL2_ADDR >> 1] = 0x8000u;
+    setup_lores_dualpf_two_bitplanes(ctx, 0x0038u, 0x00d0u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x0000u);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x000fu);
+    rigel_custom_write16(ctx, 0x192u, 0x0f00u); /* COLOR09 */
+    rigel_custom_write16(ctx, TEST_REG_BPLCON1, 0x0010u);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+    pixels = (const rigel_u32 *)frame.pixels;
+
+    if (pixels[TEST_LEFT_BORDER + 71u] != 0x00ff0000u ||
+        pixels[TEST_LEFT_BORDER + 72u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 73u] != 0x00000000u) {
+        return 1;
+    }
+
+    rigel_reset(ctx);
+    clear_two_bitplane_words(chip_ram);
+    chip_ram[TEST_BPL1_ADDR >> 1] = 0x8000u;
+    chip_ram[TEST_BPL2_ADDR >> 1] = 0x8000u;
+    setup_lores_dualpf_two_bitplanes(ctx, 0x0038u, 0x00d0u);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x0000u);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x000fu);
+    rigel_custom_write16(ctx, 0x192u, 0x0f00u); /* COLOR09 */
+    rigel_custom_write16(ctx, TEST_REG_BPLCON1, 0x0002u);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+    pixels = (const rigel_u32 *)frame.pixels;
+
+    if (pixels[TEST_LEFT_BORDER + 70u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 71u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 72u] != 0x00ff0000u) {
         return 1;
     }
 
@@ -596,6 +740,22 @@ int main(void)
     }
 
     {
+        int rc = test_singlepf_bplcon1_scroll(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_singlepf_bplcon1_even_plane_scroll(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
         int rc = test_bitplane_dma_disable_stops_reuse(ctx, chip_ram);
         if (rc != 0) {
             rigel_destroy(ctx);
@@ -605,6 +765,14 @@ int main(void)
 
     {
         int rc = test_two_bitplane_fetch_window(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_dualpf_bplcon1_independent_scroll(ctx, chip_ram);
         if (rc != 0) {
             rigel_destroy(ctx);
             return 1;

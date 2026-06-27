@@ -27,6 +27,56 @@
 #include <stdlib.h>
 #endif
 
+#if RIGEL_ENABLE_STDLIB_ENV
+static bool video_probe_enabled(void)
+{
+    static int enabled = -1;
+
+    if (enabled < 0) {
+        const char *env = getenv("RIGEL_VIDEO_PROBE");
+        enabled = (env != NULL && env[0] != '\0' && env[0] != '0') ? 1 : 0;
+    }
+
+    return enabled != 0;
+}
+
+static rigel_u32 video_probe_env_u32(const char *name, rigel_u32 fallback)
+{
+    const char *env = getenv(name);
+
+    if (env == NULL || env[0] == '\0') {
+        return fallback;
+    }
+
+    return (rigel_u32)strtoul(env, NULL, 0);
+}
+
+static bool video_probe_match(rigel_u32 frame, rigel_u16 vpos)
+{
+    static int initialized = 0;
+    static rigel_u32 target_frame;
+    static rigel_u32 vfrom;
+    static rigel_u32 vto;
+
+    if (!video_probe_enabled()) {
+        return false;
+    }
+
+    if (!initialized) {
+        target_frame = video_probe_env_u32("RIGEL_VIDEO_PROBE_FRAME", 0xffffffffu);
+        vfrom = video_probe_env_u32("RIGEL_VIDEO_PROBE_VFROM", 0u);
+        vto = video_probe_env_u32("RIGEL_VIDEO_PROBE_VTO", 0xffffffffu);
+        initialized = 1;
+    }
+
+    if (target_frame != 0xffffffffu && frame != target_frame) {
+        return false;
+    }
+
+    return (rigel_u32)vpos >= vfrom && (rigel_u32)vpos <= vto;
+}
+#endif
+
 /* =========================================================================
  * Internal: slot dispatch
  *
@@ -101,27 +151,66 @@ static void dispatch_slot(agnus_slot_owner_t owner,
             RigelAgnus *agnus = &ctx->chipset.agnus;
             rigel_denise_output_state_t *dout = &ctx->chipset.denise.output;
             unsigned depth = (unsigned)agnus->scheduler.depth;
-            unsigned plane = agnus->scheduler.fetch_plane_index;
-            rigel_u16 widx  = dout->plane_word_count;
+            rigel_u16 logical = (hpos < AGNUS_SLOTS_PER_LINE)
+                ? agnus->scheduler.bitplane_slot_index[hpos]
+                : 0xffffu;
+            unsigned plane;
+            rigel_u16 widx;
+
+            if (logical == 0xffffu) {
+                logical = agnus->scheduler.fetch_plane_index;
+            }
+
+            plane = (depth > 0u) ? ((unsigned)logical % depth) : 0u;
+            widx = (depth > 0u) ? (rigel_u16)((unsigned)logical / depth) : 0u;
 
             if (depth > 0 && depth <= 6 && plane < depth &&
                 widx < RIGEL_DENISE_MAX_PLANE_WORDS) {
-                bitplane_fetch_step(&agnus->fetch, &agnus->bplpt, plane,
-                                    rigel_context_chip_ram(ctx));
+                rigel_chip_ram_if_t mem = rigel_context_chip_ram(ctx);
+                rigel_u32 addr;
+
+                if (!agnus->scheduler.bitplane_line_base_valid) {
+                    unsigned p;
+                    for (p = 0u; p < BITPLANE_COUNT; ++p) {
+                        agnus->scheduler.bitplane_line_base[p] =
+                            agnus->bplpt.bplpt[p] & 0x001ffffeu;
+                    }
+                    agnus->scheduler.bitplane_line_base_valid = true;
+                }
+
+                addr = (agnus->scheduler.bitplane_line_base[plane] +
+                        (rigel_u32)widx * 2u) & 0x001ffffeu;
+                agnus->fetch.data[plane] =
+                    (mem.read16 != NULL) ? mem.read16(mem.opaque, addr) : 0u;
                 dout->plane_words[plane][widx] = agnus->fetch.data[plane];
                 agnus->scheduler.bitplane_dma_this_line = true;
-                if (ctx->chipset.denise.regs.diwstrt == 0x0581u ||
+                if ((rigel_u16)(widx + 1u) > dout->plane_word_count)
+                    dout->plane_word_count = (rigel_u16)(widx + 1u);
+                if ((rigel_u16)(widx + 1u) > agnus->scheduler.bitplane_words_this_line)
+                    agnus->scheduler.bitplane_words_this_line = (rigel_u16)(widx + 1u);
+                if (
+#if RIGEL_ENABLE_STDLIB_ENV
+                    video_probe_match((rigel_u32)(ctx->chipset.denise.output.frame_counter & 0xffffffffu),
+                                      agnus->beam.vpos) ||
+#endif
+                    ctx->chipset.denise.regs.diwstrt == 0x0581u ||
                     ctx->chipset.denise.regs.diwstrt == 0x2c81u) {
                     static unsigned trace_count = 0u;
                     static unsigned nonzero_trace_count = 0u;
-                    rigel_u32 addr = agnus->bplpt.bplpt[plane];
+                    bool trace_probe =
+#if RIGEL_ENABLE_STDLIB_ENV
+                        video_probe_match((rigel_u32)(ctx->chipset.denise.output.frame_counter & 0xffffffffu),
+                                          agnus->beam.vpos);
+#else
+                        false;
+#endif
                     bool trace_sample = trace_count < 120u;
                     bool trace_nonzero = agnus->fetch.data[plane] != 0u &&
                                          nonzero_trace_count < 240u;
                     bool trace_line_start = hpos == agnus->scheduler.ddfstrt &&
                                             (agnus->beam.vpos & 7u) == 0u &&
                                             trace_count < 260u;
-                    if (trace_sample || trace_nonzero || trace_line_start) {
+                    if (trace_probe || trace_sample || trace_nonzero || trace_line_start) {
                         rigel_log_event_t event = {
                             RIGEL_LOG_EVENT_BPL_FETCH,
                             "bpl_fetch",
@@ -145,18 +234,13 @@ static void dispatch_slot(agnus_slot_owner_t owner,
                             15u
                         };
                         rigel_log_event(&event);
-                        if (trace_nonzero)
+                        if (!trace_probe && trace_nonzero)
                             nonzero_trace_count++;
-                        if (trace_sample || trace_line_start)
+                        if (!trace_probe && (trace_sample || trace_line_start))
                             trace_count++;
                     }
                 }
-                plane = (unsigned)(plane + 1u);
-                if (plane >= depth) {
-                    plane = 0;
-                    dout->plane_word_count++;
-                }
-                agnus->scheduler.fetch_plane_index = (rigel_u16)plane;
+                agnus->scheduler.fetch_plane_index = (rigel_u16)(logical + 1u);
             }
         }
         break;
@@ -210,6 +294,16 @@ static void fill_slot(agnus_slot_scheduler_t *sched,
 {
     if (hpos < AGNUS_SLOTS_PER_LINE)
         sched->table[hpos] = owner;
+}
+
+static void fill_bitplane_slot(agnus_slot_scheduler_t *sched,
+                               rigel_u16 hpos,
+                               rigel_u16 logical_index)
+{
+    if (hpos < AGNUS_SLOTS_PER_LINE) {
+        sched->table[hpos] = AGNUS_SLOT_BITPLANE;
+        sched->bitplane_slot_index[hpos] = logical_index;
+    }
 }
 
 static rigel_u16 bitplane_words_per_plane(const agnus_slot_scheduler_t *sched)
@@ -273,6 +367,8 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
     /* Default: every slot is CPU-accessible */
     for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++)
         sched->table[i] = AGNUS_SLOT_CPU;
+    for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++)
+        sched->bitplane_slot_index[i] = 0xffffu;
 
     /* Refresh — always, regardless of DMACON or line type */
     for (i = 0; i < AGNUS_SLOTS_PER_LINE; i++) {
@@ -328,33 +424,28 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
             for (h = bpl_start;
                  h < AGNUS_SLOTS_PER_LINE && bitplane_slots < target_slots;
                  h = (rigel_u16)(h + 1u)) {
-                fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
+                fill_bitplane_slot(sched, h, bitplane_slots);
                 bitplane_slots++;
             }
         } else {
-            rigel_u16 target_slots =
-                (rigel_u16)(bitplane_words_per_plane(sched) *
-                            (rigel_u16)(sched->depth & 0x7u));
+            rigel_u16 words = bitplane_words_per_plane(sched);
+            rigel_u16 depth = (rigel_u16)(sched->depth & 0x7u);
+            rigel_u16 word;
+            rigel_u16 plane;
 
-            for (h = bpl_start;
-                 h < AGNUS_SLOTS_PER_LINE && bitplane_slots < target_slots;
-                 h = (rigel_u16)(h + 2u)) {
-                fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
-                bitplane_slots++;
-            }
             /*
-             * OCS 5-/6-plane lores overflow: target_slots * 2 CCK can exceed
-             * the line length (e.g. 5 planes * 20 words * 2 = 200 CCK from
-             * pos 56 → end at 254 > 227).  Real OCS hardware wraps the
-             * remaining fetches into the free CCK slots at the START of the
-             * same line (before DDFSTRT).  Approximate this by continuing the
-             * stride-2 sequence from h=0 until all slots are scheduled.
+             * Lores bitplane DMA consumes one slot per active plane inside
+             * each 16-pixel fetch group.  A 6-plane screen therefore uses six
+             * adjacent slots every 8 CCK, not a single stride-2 stream.  The
+             * logical index is still word-major so Denise receives complete
+             * planar words in display order.
              */
-            if (bitplane_slots < target_slots) {
-                for (h = 0u;
-                     h < bpl_start && bitplane_slots < target_slots;
-                     h = (rigel_u16)(h + 2u)) {
-                    fill_slot(sched, h, AGNUS_SLOT_BITPLANE);
+            for (word = 0u; word < words; ++word) {
+                for (plane = 0u; plane < depth; ++plane) {
+                    h = (rigel_u16)(bpl_start + word * 8u + plane);
+                    if (h < AGNUS_SLOTS_PER_LINE) {
+                        fill_bitplane_slot(sched, h, bitplane_slots);
+                    }
                     bitplane_slots++;
                 }
             }
@@ -419,6 +510,8 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
     sched->blitter_active    = false;
     sched->fetch_plane_index = 0;
     sched->bitplane_dma_this_line = false;
+    sched->bitplane_words_this_line = 0;
+    sched->bitplane_line_base_valid = false;
     sched->hires             = false;
     sched->vstrt             = AGNUS_VBL_LINE_END + 1u; /* default: allow all non-VBL lines */
 
@@ -459,7 +552,11 @@ void agnus_slot_scheduler_set_ddf(agnus_slot_scheduler_t *sched,
 
 void agnus_slot_scheduler_set_depth(agnus_slot_scheduler_t *sched, rigel_u16 depth)
 {
-    sched->depth = depth & 0x7u;
+    depth &= 0x7u;
+    if (sched->depth != depth) {
+        sched->depth = depth;
+        sched->table_dirty = true;
+    }
 }
 
 void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
@@ -552,10 +649,21 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
             if (ctx && sched->bitplane_dma_this_line) {
                 rigel_i16 bpl1mod = (rigel_i16)rigel_context_read_reg(ctx, AGNUS_BPLMOD1);
                 rigel_i16 bpl2mod = (rigel_i16)rigel_context_read_reg(ctx, AGNUS_BPLMOD2);
+                if (sched->bitplane_line_base_valid) {
+                    rigel_u32 advance = (rigel_u32)sched->bitplane_words_this_line * 2u;
+                    unsigned p;
+
+                    for (p = 0u; p < (unsigned)sched->depth && p < BITPLANE_COUNT; ++p) {
+                        ctx->chipset.agnus.bplpt.bplpt[p] =
+                            (sched->bitplane_line_base[p] + advance) & 0x001ffffeu;
+                    }
+                }
                 bplpt_apply_modulo(&ctx->chipset.agnus.bplpt,
                                    (unsigned)sched->depth, bpl1mod, bpl2mod);
             }
             sched->bitplane_dma_this_line = false;
+            sched->bitplane_words_this_line = 0;
+            sched->bitplane_line_base_valid = false;
         }
         if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos)) {
             agnus_irq_raise_vblank(ctx);

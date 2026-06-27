@@ -272,14 +272,13 @@ static bool execute_line_mode(
     const BlitCommand *cmd = &b->cmd;
     BlitterResult *result = &b->result;
     int16_t error = (int16_t)(cmd->apt & 0xFFFFu);
-    int start_pixel = (int)cmd->line_start_bit;
+    uint8_t x_shift = cmd->line_start_bit & 0x0Fu;
+    uint8_t one_dot_count = 0;
     int pattern_shift = (int)cmd->bshift;
     uint16_t pattern = cmd->bdat;
-    uint32_t plane_addr = cmd->cpt & BLITTER_CHIP_ADDR_MASK;
-    uint32_t last_addr = plane_addr;
-    int plane_mod = (int)cmd->cmod;
-    int d = 0;
+    uint32_t cpt = cmd->cpt & BLITTER_CHIP_ADDR_MASK;
     bool zero = true;
+    bool sign = cmd->line_initial_sign;
     uint16_t last_cdat = cmd->cdat;
 
     if (cmd->height_lines == 0) {
@@ -301,92 +300,95 @@ static bool execute_line_mode(
     }
 
     for (uint16_t i = 0; i < cmd->height_lines; ++i) {
-        int offset;
-        uint32_t addr = plane_addr;
-        uint16_t pixel;
-        uint16_t bitmask;
+        uint16_t ahold;
+        uint16_t bhold;
+        uint16_t cval;
         uint16_t dval;
+        bool write_pixel;
 
-        switch (cmd->line_octant)
-        {
-        case 0:
-            offset = d + start_pixel;
-            addr = plane_addr + (uint32_t)(offset >> 3) + (uint32_t)(i * plane_mod);
-            bitmask = (uint16_t)(0x8000u >> (offset & 15));
-            break;
+        cval = cmd->use_c ? chip_read16(&mem, cpt) : cmd->cdat;
+        last_cdat = cval;
 
-        case 1:
-            offset = d + start_pixel;
-            addr = plane_addr + (uint32_t)(offset >> 3) - (uint32_t)(i * plane_mod);
-            bitmask = (uint16_t)(0x8000u >> (offset & 15));
-            break;
+        ahold = (uint16_t)((cmd->adat & cmd->afwm) >> x_shift);
+        bhold = (pattern & 1u) ? 0xFFFFu : 0x0000u;
+        dval = blitter_logic(cmd->minterm, ahold, bhold, cval);
+        write_pixel = !cmd->line_single_dot || one_dot_count == 0u;
 
-        case 2:
-            offset = d + (15 - start_pixel);
-            addr = (plane_addr + 1u) - (uint32_t)(offset >> 3) + (uint32_t)(i * plane_mod);
-            bitmask = (uint16_t)(0x0001u << (offset & 15));
-            break;
-
-        case 3:
-            offset = d + start_pixel;
-            addr = plane_addr + (uint32_t)(offset >> 3) - (uint32_t)(i * plane_mod);
-            bitmask = (uint16_t)(0x8000u >> (offset & 15));
-            break;
-
-        case 4:
-            offset = (int)i + start_pixel;
-            addr = plane_addr + (uint32_t)(offset >> 3) + (uint32_t)(d * plane_mod);
-            bitmask = (uint16_t)(0x8000u >> (offset & 15));
-            break;
-
-        case 5:
-            offset = (int)i + (15 - start_pixel);
-            addr = (plane_addr + 1u) - (uint32_t)(offset >> 3) + (uint32_t)(d * plane_mod);
-            bitmask = (uint16_t)(0x0001u << (offset & 15));
-            break;
-
-        case 6:
-            offset = (int)i + start_pixel;
-            addr = plane_addr + (uint32_t)(offset >> 3) - (uint32_t)(d * plane_mod);
-            bitmask = (uint16_t)(0x8000u >> (offset & 15));
-            break;
-
-        case 7:
-        default:
-            offset = (int)i + (15 - start_pixel);
-            addr = (plane_addr + 1u) - (uint32_t)(offset >> 3) - (uint32_t)(d * plane_mod);
-            bitmask = (uint16_t)(0x0001u << (offset & 15));
-            break;
-        }
-
-        pixel = chip_read16(&mem, addr);
-        last_cdat = pixel;
-        dval = blitter_logic(cmd->minterm, bitmask, pattern, pixel);
-        chip_write16(&mem, addr, dval);
+        if (cmd->use_c && write_pixel)
+            chip_write16(&mem, cpt, dval);
 
         if (dval != 0) {
             zero = false;
         }
 
         result->final_ddat = dval;
-        last_addr = addr;
+        one_dot_count++;
 
-        if (error > 0) {
-            error = (int16_t)(error + cmd->amod);
-
-            if (cmd->line_octant == 3)
-                d -= 1;
+        if (cmd->use_a) {
+            if (sign)
+                error = (int16_t)(error + cmd->bmod);
             else
-                d += 1;
-        } else {
-            error = (int16_t)(error + cmd->bmod);
+                error = (int16_t)(error + cmd->amod);
         }
+
+        if (!sign) {
+            if (cmd->line_octant & 0x04u) {
+                if (cmd->line_octant & 0x02u)
+                    cpt = (uint32_t)((int32_t)cpt - (int32_t)cmd->cmod) &
+                          BLITTER_CHIP_ADDR_MASK;
+                else
+                    cpt = (uint32_t)((int32_t)cpt + (int32_t)cmd->cmod) &
+                          BLITTER_CHIP_ADDR_MASK;
+                one_dot_count = 0;
+            } else if (cmd->line_octant & 0x02u) {
+                if (x_shift == 0u) {
+                    x_shift = 15u;
+                    cpt = (cpt - 2u) & BLITTER_CHIP_ADDR_MASK;
+                } else {
+                    x_shift--;
+                }
+            } else {
+                x_shift++;
+                if (x_shift == 16u) {
+                    x_shift = 0;
+                    cpt = (cpt + 2u) & BLITTER_CHIP_ADDR_MASK;
+                }
+            }
+        }
+
+        if (cmd->line_octant & 0x04u) {
+            if (cmd->line_octant & 0x01u) {
+                if (x_shift == 0u) {
+                    x_shift = 15u;
+                    cpt = (cpt - 2u) & BLITTER_CHIP_ADDR_MASK;
+                } else {
+                    x_shift--;
+                }
+            } else {
+                x_shift++;
+                if (x_shift == 16u) {
+                    x_shift = 0;
+                    cpt = (cpt + 2u) & BLITTER_CHIP_ADDR_MASK;
+                }
+            }
+        } else if (cmd->line_octant & 0x01u) {
+            cpt = (uint32_t)((int32_t)cpt - (int32_t)cmd->cmod) &
+                  BLITTER_CHIP_ADDR_MASK;
+            one_dot_count = 0;
+        } else {
+            cpt = (uint32_t)((int32_t)cpt + (int32_t)cmd->cmod) &
+                  BLITTER_CHIP_ADDR_MASK;
+            one_dot_count = 0;
+        }
+
+        sign = error < 0;
+        pattern = (uint16_t)((pattern << 1) | (pattern >> 15));
     }
 
     result->final_apt = (cmd->apt & 0xFFFF0000u) | (uint16_t)error;
     result->final_bpt = cmd->bpt;
-    result->final_cpt = last_addr;
-    result->final_dpt = last_addr;
+    result->final_cpt = cpt;
+    result->final_dpt = cpt;
 
     result->final_adat = cmd->adat;
     result->final_bdat = cmd->bdat;
@@ -404,6 +406,9 @@ static bool execute_copy_mode(
     BlitterResult *result = &b->result;
     BlitterCopyState state;
     int increment = cmd->descending ? -2 : 2;
+    uint32_t pending_dpt = 0u;
+    uint16_t pending_ddat = 0u;
+    bool pending_d = false;
 
     /*
      * TODO: Revisit copy-path semantics as a first-class model:
@@ -419,7 +424,7 @@ static bool execute_copy_mode(
         state.fill_carry = cmd->fill_carry_in ? 1u : 0u;
 
         for (uint32_t x = 0; x < cmd->width_words; ++x) {
-            uint16_t adat =
+            uint16_t raw_adat =
                 blitter_fetch_word(
                     &mem,
                     cmd->use_a,
@@ -428,6 +433,7 @@ static bool execute_copy_mode(
                     cmd->adat,
                     &state.last_adat
                 );
+            uint16_t adat = blitter_apply_a_masks(cmd, raw_adat, x);
 
             uint16_t bdat =
                 blitter_fetch_word(
@@ -468,10 +474,13 @@ static bool execute_copy_mode(
             uint16_t C = cdat;
             uint16_t D;
 
-            A = blitter_apply_a_masks(cmd, A, x);
-
             state.previous_a = adat;
             state.previous_b = bdat;
+
+            if (pending_d) {
+                chip_write16(&mem, pending_dpt, pending_ddat);
+                pending_d = false;
+            }
 
             D = blitter_logic(cmd->minterm, A, B, C);
             D = blitter_apply_fill(cmd, D, &state.fill_carry);
@@ -481,7 +490,9 @@ static bool execute_copy_mode(
             }
 
             if (cmd->use_d) {
-                chip_write16(&mem, state.dpt, D);
+                pending_dpt = state.dpt;
+                pending_ddat = D;
+                pending_d = true;
                 state.dpt += increment;
             }
 
@@ -489,6 +500,10 @@ static bool execute_copy_mode(
         }
 
         blitter_copy_advance_line(&state, cmd);
+    }
+
+    if (pending_d) {
+        chip_write16(&mem, pending_dpt, pending_ddat);
     }
 
     blitter_copy_publish_result(&state, result);

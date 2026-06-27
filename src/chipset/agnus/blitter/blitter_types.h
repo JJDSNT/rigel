@@ -56,14 +56,14 @@ typedef enum BlitterExecState {
 typedef struct BlitterLineState {
     int16_t  error;
     uint16_t pattern;
-    uint32_t plane_addr;
-    uint32_t last_addr;
-    int      plane_delta;
-    int      offset_delta;
+    uint32_t cpt;
     uint16_t step_index;
+    uint8_t  x_shift;
+    uint8_t  one_dot_count;
     uint16_t last_cdat;
     uint16_t last_ddat;
     bool     zero;
+    bool     sign;
     bool     initialized;
 } BlitterLineState;
 
@@ -135,6 +135,8 @@ typedef struct BlitCommand {
 
     uint8_t line_octant;
     uint8_t line_start_bit;
+    bool line_single_dot;
+    bool line_initial_sign;
 
     BlitterMode mode;
     BlitterFillMode fill_mode;

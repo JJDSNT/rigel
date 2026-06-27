@@ -114,8 +114,9 @@ int main(void)
         return 1;
     }
 
-    rigel_custom_write16(ctx, AGNUS_BLTCON0, 0x00f0); /* minterm: D = A bitmask */
+    rigel_custom_write16(ctx, AGNUS_BLTCON0, 0x02f0); /* line mode writes through C/D DMA */
     rigel_custom_write16(ctx, AGNUS_BLTCON1, 0x0001); /* line mode, octant 0 */
+    rigel_custom_write16(ctx, AGNUS_BLTADAT, 0x8000);
     rigel_custom_write16(ctx, AGNUS_BLTBDAT, 0xffff);
     rigel_custom_write16(ctx, AGNUS_BLTCPTH, 0x0000);
     rigel_custom_write16(ctx, AGNUS_BLTCPTL, 0x0000);

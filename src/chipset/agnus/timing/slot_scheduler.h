@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "rigel/rigel_types.h"
 #include "agnus/agnus_config.h"
+#include "agnus/bitplanes/bitplane_pointers.h"
 #include "agnus/dma/dmacon.h"
 #include "agnus/dma/refresh_dma.h"
 
@@ -108,6 +109,7 @@ typedef struct agnus_slot_scheduler {
     /* Static slot table — rebuilt when DMACON changes or line type changes.
      * One entry per CCK position. Indexed by hpos (0 .. AGNUS_SLOTS_PER_LINE-1). */
     agnus_slot_owner_t table[AGNUS_SLOTS_PER_LINE];
+    rigel_u16 bitplane_slot_index[AGNUS_SLOTS_PER_LINE];
 
     /* Current position within the scanline */
     rigel_u16 hpos;
@@ -132,6 +134,9 @@ typedef struct agnus_slot_scheduler {
     /* Bitplane fetch cycling: which plane to fetch on the next BITPLANE slot */
     rigel_u16 fetch_plane_index;
     bool      bitplane_dma_this_line;
+    rigel_u16 bitplane_words_this_line;
+    rigel_u32 bitplane_line_base[BITPLANE_COUNT];
+    bool      bitplane_line_base_valid;
 
     /* Hires mode (BPLCON0 bit 15): doubles bitplane fetch rate.
      * Must be kept in sync with BPLCON0 via agnus_slot_scheduler_set_hires(). */

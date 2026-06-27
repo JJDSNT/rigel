@@ -37,6 +37,77 @@ static uint16_t line_rotate_pattern(uint16_t pattern, uint8_t shift)
     return (uint16_t)((pattern >> shift) | (pattern << (16u - shift)));
 }
 
+static void line_incx(BlitterLineState *state)
+{
+    state->x_shift++;
+    if (state->x_shift == 16u) {
+        state->x_shift = 0;
+        state->cpt = (state->cpt + 2u) & BLITTER_CHIP_ADDR_MASK;
+    }
+}
+
+static void line_decx(BlitterLineState *state)
+{
+    if (state->x_shift == 0u) {
+        state->x_shift = 15u;
+        state->cpt = (state->cpt - 2u) & BLITTER_CHIP_ADDR_MASK;
+    } else {
+        state->x_shift--;
+    }
+}
+
+static void line_incy(BlitterLineState *state, int16_t mod)
+{
+    state->cpt = (uint32_t)((int32_t)state->cpt + (int32_t)mod) &
+                 BLITTER_CHIP_ADDR_MASK;
+    state->one_dot_count = 0;
+}
+
+static void line_decy(BlitterLineState *state, int16_t mod)
+{
+    state->cpt = (uint32_t)((int32_t)state->cpt - (int32_t)mod) &
+                 BLITTER_CHIP_ADDR_MASK;
+    state->one_dot_count = 0;
+}
+
+static void line_advance(BlitterLineState *state, const BlitCommand *cmd)
+{
+    if (cmd->use_a) {
+        if (state->sign)
+            state->error = (int16_t)(state->error + cmd->bmod);
+        else
+            state->error = (int16_t)(state->error + cmd->amod);
+    }
+
+    if (!state->sign) {
+        if (cmd->line_octant & 0x04u) {
+            if (cmd->line_octant & 0x02u)
+                line_decy(state, cmd->cmod);
+            else
+                line_incy(state, cmd->cmod);
+        } else {
+            if (cmd->line_octant & 0x02u)
+                line_decx(state);
+            else
+                line_incx(state);
+        }
+    }
+
+    if (cmd->line_octant & 0x04u) {
+        if (cmd->line_octant & 0x01u)
+            line_decx(state);
+        else
+            line_incx(state);
+    } else {
+        if (cmd->line_octant & 0x01u)
+            line_decy(state, cmd->cmod);
+        else
+            line_incy(state, cmd->cmod);
+    }
+
+    state->sign = state->error < 0;
+}
+
 static void line_state_init(BlitterState *b)
 {
     BlitterLineState *state = &b->line_state;
@@ -46,14 +117,14 @@ static void line_state_init(BlitterState *b)
 
     state->error       = (int16_t)(cmd->apt & 0xFFFFu);
     state->pattern     = line_rotate_pattern(cmd->bdat, cmd->bshift);
-    state->plane_addr  = cmd->cpt & BLITTER_CHIP_ADDR_MASK;
-    state->last_addr   = state->plane_addr;
-    state->plane_delta = (int)cmd->cmod;
-    state->offset_delta = 0;
+    state->cpt         = cmd->cpt & BLITTER_CHIP_ADDR_MASK;
     state->step_index  = 0;
+    state->x_shift     = cmd->line_start_bit & 0x0Fu;
+    state->one_dot_count = 0;
     state->last_cdat   = cmd->cdat;
     state->last_ddat   = 0;
     state->zero        = true;
+    state->sign        = cmd->line_initial_sign;
     state->initialized = true;
 }
 
@@ -64,8 +135,8 @@ static void line_publish_partial_result(BlitterState *b)
 
     b->result.final_apt  = (cmd->apt & 0xFFFF0000u) | (uint16_t)state->error;
     b->result.final_bpt  = cmd->bpt;
-    b->result.final_cpt  = state->last_addr;
-    b->result.final_dpt  = state->last_addr;
+    b->result.final_cpt  = state->cpt;
+    b->result.final_dpt  = state->cpt;
     b->result.final_adat = cmd->adat;
     b->result.final_bdat = cmd->bdat;
     b->result.final_cdat = state->last_cdat;
@@ -77,12 +148,11 @@ void blitter_line_step(BlitterState *b, BlitterMemory mem, BlitterIrqSink irq)
 {
     const BlitCommand *cmd;
     BlitterLineState *state;
-    int start_pixel;
-    int offset;
-    uint32_t addr;
-    uint16_t bitmask;
-    uint16_t pixel;
+    uint16_t ahold;
+    uint16_t bhold;
+    uint16_t cval;
     uint16_t dval;
+    bool write_pixel;
 
     (void)irq;
 
@@ -94,88 +164,25 @@ void blitter_line_step(BlitterState *b, BlitterMemory mem, BlitterIrqSink irq)
 
     if (state->step_index >= cmd->height_lines) return;
 
-    start_pixel = (int)cmd->line_start_bit;
-    addr = state->plane_addr;
+    cval = cmd->use_c ? line_chip_read16(&mem, state->cpt) : cmd->cdat;
+    state->last_cdat = cval;
 
-    switch (cmd->line_octant) {
-    case 0:
-        offset = state->offset_delta + start_pixel;
-        addr = state->plane_addr +
-               (uint32_t)(offset >> 3) +
-               (uint32_t)(state->step_index * (unsigned)state->plane_delta);
-        bitmask = (uint16_t)(0x8000u >> (offset & 15));
-        break;
-    case 1:
-        offset = state->offset_delta + start_pixel;
-        addr = state->plane_addr +
-               (uint32_t)(offset >> 3) -
-               (uint32_t)(state->step_index * (unsigned)state->plane_delta);
-        bitmask = (uint16_t)(0x8000u >> (offset & 15));
-        break;
-    case 2:
-        offset = state->offset_delta + (15 - start_pixel);
-        addr = (state->plane_addr + 1u) -
-               (uint32_t)(offset >> 3) +
-               (uint32_t)(state->step_index * (unsigned)state->plane_delta);
-        bitmask = (uint16_t)(0x0001u << (offset & 15));
-        break;
-    case 3:
-        offset = state->offset_delta + start_pixel;
-        addr = state->plane_addr +
-               (uint32_t)(offset >> 3) -
-               (uint32_t)(state->step_index * (unsigned)state->plane_delta);
-        bitmask = (uint16_t)(0x8000u >> (offset & 15));
-        break;
-    case 4:
-        offset = (int)state->step_index + start_pixel;
-        addr = state->plane_addr +
-               (uint32_t)(offset >> 3) +
-               (uint32_t)(state->offset_delta * state->plane_delta);
-        bitmask = (uint16_t)(0x8000u >> (offset & 15));
-        break;
-    case 5:
-        offset = (int)state->step_index + (15 - start_pixel);
-        addr = (state->plane_addr + 1u) -
-               (uint32_t)(offset >> 3) +
-               (uint32_t)(state->offset_delta * state->plane_delta);
-        bitmask = (uint16_t)(0x0001u << (offset & 15));
-        break;
-    case 6:
-        offset = (int)state->step_index + start_pixel;
-        addr = state->plane_addr +
-               (uint32_t)(offset >> 3) -
-               (uint32_t)(state->offset_delta * state->plane_delta);
-        bitmask = (uint16_t)(0x8000u >> (offset & 15));
-        break;
-    case 7:
-    default:
-        offset = (int)state->step_index + (15 - start_pixel);
-        addr = (state->plane_addr + 1u) -
-               (uint32_t)(offset >> 3) -
-               (uint32_t)(state->offset_delta * state->plane_delta);
-        bitmask = (uint16_t)(0x0001u << (offset & 15));
-        break;
-    }
+    ahold = (uint16_t)((cmd->adat & cmd->afwm) >> state->x_shift);
+    bhold = (state->pattern & 1u) ? 0xFFFFu : 0x0000u;
+    dval = line_blitter_logic(cmd->minterm, ahold, bhold, cval);
+    write_pixel = !cmd->line_single_dot || state->one_dot_count == 0u;
 
-    pixel = line_chip_read16(&mem, addr);
-    state->last_cdat = pixel;
-    dval = line_blitter_logic(cmd->minterm, bitmask, state->pattern, pixel);
-    line_chip_write16(&mem, addr, dval);
+    if (cmd->use_c && write_pixel)
+        line_chip_write16(&mem, state->cpt, dval);
 
     if (dval != 0) state->zero = false;
     state->last_ddat = dval;
-    state->last_addr = addr;
     state->step_index++;
+    state->one_dot_count++;
 
-    if (state->error > 0) {
-        state->error = (int16_t)(state->error + cmd->amod);
-        if (cmd->line_octant == 3)
-            state->offset_delta -= 1;
-        else
-            state->offset_delta += 1;
-    } else {
-        state->error = (int16_t)(state->error + cmd->bmod);
-    }
+    line_advance(state, cmd);
+    state->pattern = (uint16_t)((state->pattern << 1) |
+                                (state->pattern >> 15));
 
     line_publish_partial_result(b);
 }

@@ -25,6 +25,56 @@ static bool copper_dmacon_trace_enabled(void)
 #endif
 }
 
+#if RIGEL_ENABLE_STDLIB_ENV
+static bool video_probe_enabled(void)
+{
+    static int enabled = -1;
+
+    if (enabled < 0) {
+        const char *env = getenv("RIGEL_VIDEO_PROBE");
+        enabled = (env != NULL && env[0] != '\0' && env[0] != '0') ? 1 : 0;
+    }
+
+    return enabled != 0;
+}
+
+static rigel_u32 video_probe_env_u32(const char *name, rigel_u32 fallback)
+{
+    const char *env = getenv(name);
+
+    if (env == NULL || env[0] == '\0') {
+        return fallback;
+    }
+
+    return (rigel_u32)strtoul(env, NULL, 0);
+}
+
+static bool video_probe_match(rigel_u32 frame, rigel_u16 vpos)
+{
+    static int initialized = 0;
+    static rigel_u32 target_frame;
+    static rigel_u32 vfrom;
+    static rigel_u32 vto;
+
+    if (!video_probe_enabled()) {
+        return false;
+    }
+
+    if (!initialized) {
+        target_frame = video_probe_env_u32("RIGEL_VIDEO_PROBE_FRAME", 0xffffffffu);
+        vfrom = video_probe_env_u32("RIGEL_VIDEO_PROBE_VFROM", 0u);
+        vto = video_probe_env_u32("RIGEL_VIDEO_PROBE_VTO", 0xffffffffu);
+        initialized = 1;
+    }
+
+    if (target_frame != 0xffffffffu && frame != target_frame) {
+        return false;
+    }
+
+    return (rigel_u32)vpos >= vfrom && (rigel_u32)vpos <= vto;
+}
+#endif
+
 /* copper_exec_move: IR1 = register address (bits 8:1, bit 0 must be 0)
  *                   IR2 = 16-bit data value to write.
  * Respects COPCON CDANG: when clear, writes below 0x80 are blocked; when set,
@@ -65,7 +115,21 @@ void copper_exec_move(RigelContext *ctx, rigel_u16 ir1, rigel_u16 ir2)
         reg == 0x108u || reg == 0x10au ||
         (reg >= 0x180u && reg <= 0x19eu)) {
         static unsigned trace_count = 0u;
-        if (trace_count < 512u) {
+        bool trace_probe =
+#if RIGEL_ENABLE_STDLIB_ENV
+            video_probe_match((rigel_u32)(ctx->chipset.agnus.beam.frame_count & 0xffffffffu),
+                              ctx->chipset.agnus.beam.vpos);
+#else
+            false;
+#endif
+        bool trace_legacy =
+#if RIGEL_ENABLE_STDLIB_ENV
+            !video_probe_enabled() && trace_count < 512u;
+#else
+            trace_count < 512u;
+#endif
+        if (trace_probe ||
+            trace_legacy) {
             rigel_log_event_t event = {
                 RIGEL_LOG_EVENT_COPPER_WRITE,
                 "copper_write",
@@ -81,7 +145,9 @@ void copper_exec_move(RigelContext *ctx, rigel_u16 ir1, rigel_u16 ir2)
                 7u
             };
             rigel_log_event(&event);
-            trace_count++;
+            if (!trace_probe) {
+                trace_count++;
+            }
         }
     }
     custom_regs_write16(ctx, reg, ir2);
