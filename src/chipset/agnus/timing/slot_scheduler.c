@@ -24,10 +24,27 @@
 #include "debug/log.h"
 
 #if RIGEL_ENABLE_STDLIB_ENV
+#include <stdio.h>
 #include <stdlib.h>
 #endif
 
 #if RIGEL_ENABLE_STDLIB_ENV
+static rigel_u64 sprite_frame_trace_target(void)
+{
+    static int initialized;
+    static rigel_u64 target;
+
+    if (!initialized) {
+        const char *env = getenv("RIGEL_SPRITE_FRAME_TRACE");
+        initialized = 1;
+        if (env != NULL && env[0] != '\0' && env[0] != '0') {
+            target = (rigel_u64)strtoull(env, NULL, 0);
+        }
+    }
+
+    return target;
+}
+
 static bool video_probe_enabled(void)
 {
     static int enabled = -1;
@@ -138,6 +155,29 @@ static void dispatch_slot(agnus_slot_owner_t owner,
                 rigel_context_chip_ram(ctx),
                 &w0, &w1, &is_ctrl);
             if (ready) {
+#if RIGEL_ENABLE_STDLIB_ENV
+                rigel_u64 trace_frame = sprite_frame_trace_target();
+                if (trace_frame != 0u &&
+                    sp >= 1u && sp <= 5u &&
+                    ctx->chipset.agnus.beam.vpos == 124u) {
+                    const sprite_dma_channel_t *ch =
+                        &ctx->chipset.agnus.sprite_dma.sp[sp];
+                    fprintf(stderr,
+                            "[SPRITE-FRAME-DMA] frame=%llu sp=%u vpos=%u "
+                            "ptr=%06x ctrl=%u w0=%04x w1=%04x "
+                            "armed=%u vstart=%u vstop=%u\n",
+                            (unsigned long long)ctx->chipset.denise.output.frame_counter,
+                            (unsigned)sp,
+                            (unsigned)ctx->chipset.agnus.beam.vpos,
+                            (unsigned)ch->ptr,
+                            is_ctrl ? 1u : 0u,
+                            (unsigned)w0,
+                            (unsigned)w1,
+                            ch->armed ? 1u : 0u,
+                            (unsigned)ch->vstart,
+                            (unsigned)ch->vstop);
+                }
+#endif
                 if (is_ctrl)
                     denise_sprite_receive_ctrl(&ctx->chipset.denise.sprites, sp, w0, w1);
                 else
@@ -175,7 +215,17 @@ static void dispatch_slot(agnus_slot_owner_t owner,
                         agnus->scheduler.bitplane_line_base[p] =
                             agnus->bplpt.bplpt[p] & 0x001ffffeu;
                     }
+                    agnus->scheduler.bitplane_line_depth = (rigel_u16)depth;
                     agnus->scheduler.bitplane_line_base_valid = true;
+                }
+                if (!ctx->chipset.denise.output.line_bplcon_valid) {
+                    ctx->chipset.denise.output.line_bplcon0 =
+                        ctx->chipset.denise.regs.bplcon0;
+                    ctx->chipset.denise.output.line_bplcon1 =
+                        ctx->chipset.denise.regs.bplcon1;
+                    ctx->chipset.denise.output.line_bplcon2 =
+                        ctx->chipset.denise.regs.bplcon2;
+                    ctx->chipset.denise.output.line_bplcon_valid = true;
                 }
 
                 addr = (agnus->scheduler.bitplane_line_base[plane] +
@@ -511,6 +561,7 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
     sched->fetch_plane_index = 0;
     sched->bitplane_dma_this_line = false;
     sched->bitplane_words_this_line = 0;
+    sched->bitplane_line_depth = 0;
     sched->bitplane_line_base_valid = false;
     sched->hires             = false;
     sched->vstrt             = AGNUS_VBL_LINE_END + 1u; /* default: allow all non-VBL lines */
@@ -653,21 +704,23 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
                     rigel_u32 advance = (rigel_u32)sched->bitplane_words_this_line * 2u;
                     unsigned p;
 
-                    for (p = 0u; p < (unsigned)sched->depth && p < BITPLANE_COUNT; ++p) {
+                    for (p = 0u; p < (unsigned)sched->bitplane_line_depth && p < BITPLANE_COUNT; ++p) {
                         ctx->chipset.agnus.bplpt.bplpt[p] =
                             (sched->bitplane_line_base[p] + advance) & 0x001ffffeu;
                     }
                 }
                 bplpt_apply_modulo(&ctx->chipset.agnus.bplpt,
-                                   (unsigned)sched->depth, bpl1mod, bpl2mod);
+                                   (unsigned)sched->bitplane_line_depth, bpl1mod, bpl2mod);
             }
             sched->bitplane_dma_this_line = false;
             sched->bitplane_words_this_line = 0;
+            sched->bitplane_line_depth = 0;
             sched->bitplane_line_base_valid = false;
         }
         if (ctx && agnus_is_vertb_position(beam->hpos, beam->vpos)) {
             agnus_irq_raise_vblank(ctx);
             sprite_dma_frame_start(&ctx->chipset.agnus.sprite_dma);
+            denise_sprites_reset(&ctx->chipset.denise.sprites);
             if (dmacon_copen(sched->dmacon)) {
                 rigel_copper_domain_vbl_reload(&ctx->chipset.agnus.copper);
             }

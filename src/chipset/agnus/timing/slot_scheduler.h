@@ -135,6 +135,7 @@ typedef struct agnus_slot_scheduler {
     rigel_u16 fetch_plane_index;
     bool      bitplane_dma_this_line;
     rigel_u16 bitplane_words_this_line;
+    rigel_u16 bitplane_line_depth;
     rigel_u32 bitplane_line_base[BITPLANE_COUNT];
     bool      bitplane_line_base_valid;
 

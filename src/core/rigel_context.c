@@ -82,7 +82,10 @@ static rigel_u16 rigel_context_chip_ram_read16(void *opaque, rigel_u32 addr)
             const char *e = getenv("RIGEL_BPL_FETCH_PROBE");
             p_enabled = (e != NULL && e[0] != '\0' && e[0] != '0') ? 1 : 0;
         }
-        if (p_enabled && p_count < 16u && addr >= 0xC0000u && addr < 0xD0000u) {
+        if (p_enabled && p_count < 64u &&
+            ((addr >= 0x003ab8u && addr < 0x003b40u) ||
+             (addr >= 0x008ab8u && addr < 0x008b40u) ||
+             (addr >= 0x0c0000u && addr < 0x0d0000u))) {
             rigel_u16 r = ctx->config.chip_ram.read16(ctx->config.chip_ram.opaque, mapped);
             printf("[BPL-CTX-PROBE] addr=%06x mapped=%06x inner_op=%p inner_fn=%p result=%04x null=%d\n",
                    (unsigned)addr, (unsigned)mapped,

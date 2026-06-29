@@ -65,6 +65,10 @@ typedef struct rigel_denise_output_state {
     /* Bitplane line buffer — words fetched per plane for the current scanline */
     rigel_u16 plane_words[6][RIGEL_DENISE_MAX_PLANE_WORDS];
     rigel_u16 plane_word_count;
+    rigel_u16 line_bplcon0;
+    rigel_u16 line_bplcon1;
+    rigel_u16 line_bplcon2;
+    bool line_bplcon_valid;
     /* DDF start in lores pixel units (= CCKs); set by Agnus on DDFSTRT writes.
      * Used by compositor to place bitplane words at absolute scanline positions. */
     rigel_u16 ddfstrt_lores;

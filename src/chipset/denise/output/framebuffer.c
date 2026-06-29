@@ -45,7 +45,7 @@ static void copy_visible_line_to_target(const RigelDenise *denise)
     if (x0 > denise->video.visible_x_stop)
         x0 = 0u;
     if (x0 > 128u)
-        x0 = (rigel_u16)(x0 - 32u);
+        x0 = (rigel_u16)(x0 - 128u);
     else
         x0 = 0u;
 
@@ -93,6 +93,7 @@ void rigel_denise_framebuffer_reset(rigel_denise_output_state_t *output)
     output->front_idx = 0;
     (void)memset(output->plane_words, 0, sizeof(output->plane_words));
     output->plane_word_count = 0;
+    output->line_bplcon_valid = false;
     output->ddfstrt_lores = 0;
     output->visible_scanline = false;
     output->scanline_dirty = false;
@@ -170,6 +171,7 @@ void rigel_denise_framebuffer_sync_from_beam(RigelDenise *denise, const beam_sta
         }
         (void)memset(output->plane_words, 0, sizeof(output->plane_words));
         output->plane_word_count = 0;
+        output->line_bplcon_valid = false;
     }
 
     /* At frame boundary: snapshot metadata, then make the back buffer visible.

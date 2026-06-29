@@ -19,12 +19,12 @@ dualpf_result_t dualpf_decode(uint8_t plane_bits)
 
 uint8_t dualpf_priority_resolve(const dualpf_result_t *pf, uint16_t bplcon2)
 {
-    unsigned pf1p = bplcon2 & 0x7u;
-    unsigned pf2p = (bplcon2 >> 3) & 0x7u;
-    /* When both playfields are opaque, the one with the higher PFxP wins.
-     * On a tie, PF2 wins (hardware default). */
+    bool pf2_priority = (bplcon2 & 0x0040u) != 0u;
+
+    /* BPLCON2 bit 6 selects PF2 over PF1.  The PF1P/PF2P fields are sprite
+     * priority thresholds; they do not decide playfield-vs-playfield order. */
     if (pf->pf2_index && pf->pf1_index)
-        return (pf1p > pf2p) ? pf->pf1_index : pf->pf2_index;
+        return pf2_priority ? pf->pf2_index : pf->pf1_index;
     if (pf->pf2_index) return pf->pf2_index;
     if (pf->pf1_index) return pf->pf1_index;
     return 0;

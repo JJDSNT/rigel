@@ -59,19 +59,13 @@ int main(void)
     win = dualpf_priority_resolve(&r, 0x0000u);
     assert(win == 12);
 
-    /* both opaque, PF1P > PF2P → PF1 wins */
+    /* both opaque, PF2PRI clear → PF1 wins.  PF1P/PF2P only affect sprites. */
     r.pf1_index = 3; r.pf2_index = 12;
-    win = dualpf_priority_resolve(&r, 0x0018u);  /* PF1P=3<<0=3? no: PF1P bits[2:0] */
-    /* bplcon2: PF1P = bits[2:0]=4, PF2P = bits[5:3]=0 → PF1 > PF2 → PF1 wins */
-    win = dualpf_priority_resolve(&r, 0x0004u);
+    win = dualpf_priority_resolve(&r, 0x0020u);
     assert(win == 3);
 
-    /* both opaque, PF1P < PF2P → PF2 wins */
-    win = dualpf_priority_resolve(&r, 0x0020u);  /* PF2P=4, PF1P=0 → PF2 wins */
-    assert(win == 12);
-
-    /* both opaque, tie (PF1P == PF2P) → PF2 wins (hardware default) */
-    win = dualpf_priority_resolve(&r, 0x0000u);
+    /* both opaque, PF2PRI set → PF2 wins. */
+    win = dualpf_priority_resolve(&r, 0x0040u);
     assert(win == 12);
 
     printf("test_dualpf: PASS\n");

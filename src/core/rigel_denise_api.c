@@ -25,7 +25,7 @@ static void rigel_denise_frame_x_bounds(const RigelDenise *denise,
      * remain visible.
      */
     if (start > 128u) {
-        start = (rigel_u16)(start - 32u);
+        start = (rigel_u16)(start - 128u);
     } else {
         start = 0u;
     }
@@ -110,6 +110,7 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
     const RigelDenise *denise;
     rigel_pixel_format_t format;
     rigel_u16 y0;
+    rigel_u16 y1;
     rigel_u16 x0;
     rigel_u16 x1;
 
@@ -119,8 +120,22 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
 
     denise = &ctx->chipset.denise;
     format = ctx->config.pixel_format;
-    y0 = denise->video.visible_y_start;
     rigel_denise_frame_x_bounds(denise, &x0, &x1);
+
+    y0 = denise->video.visible_y_start;
+    y1 = denise->video.visible_y_stop;
+    if ((rigel_u16)(y1 - y0) < 64u && y0 < 64u) {
+        if (y1 < 256u) {
+            y1 = 256u;
+        }
+    } else {
+        if (y0 > 64u) {
+            y0 = 44u;
+        }
+        if (y1 < 244u) {
+            y1 = 244u;
+        }
+    }
 
     /*
      * Guard: if visible_y_start is outside the valid raster range (e.g. because
@@ -129,7 +144,7 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
      * visible_y_stop - y0 would wrap to a huge uint32.  Return an empty frame.
      */
     if (y0 >= (rigel_u16)RIGEL_DENISE_MAX_LINES ||
-        denise->video.visible_y_stop <= y0 ||
+        y1 <= y0 ||
         x1 <= x0) {
         frame->width       = 0u;
         frame->height      = 0u;
@@ -145,7 +160,7 @@ bool rigel_get_frame(const RigelContext *ctx, rigel_frame_t *frame)
     }
 
     frame->width       = (rigel_u32)(x1 - x0);
-    frame->height      = (rigel_u32)(denise->video.visible_y_stop  - y0);
+    frame->height      = (rigel_u32)(y1 - y0);
     frame->frame_count = denise->output.frame_counter;
     frame->format      = format;
     if (format == RIGEL_PIXEL_RGB565) {

@@ -39,22 +39,45 @@ static rigel_u16 rgb32_to_rgb565(rigel_u32 rgb)
     return (rigel_u16)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
 }
 
+static void clear_scanline_to_border(RigelDenise *denise)
+{
+    rigel_denise_output_state_t *output = &denise->output;
+    rigel_u32 scanline_count = RIGEL_DENISE_MAX_SCANLINE_PIXELS;
+    rigel_u16 y = output->beam_vpos;
+
+    rigel_simd_fill_u32(output->scanline_rgba, denise->palette.rgb32[0], scanline_count);
+    rigel_simd_fill_u16(output->scanline_rgb565, denise->palette.rgb565[0], scanline_count);
+    output->scanline_dirty = true;
+    if (y < RIGEL_DENISE_MAX_LINES) {
+        output->pending_dirty[y / 64u] |= (rigel_u64)1u << (y % 64u);
+    }
+}
+
 static void compose_line(RigelDenise *denise)
 {
     rigel_denise_output_state_t *output = &denise->output;
     const rigel_u32 *palette = denise->palette.rgb32;
     const rigel_u16 *palette565 = denise->palette.rgb565;
-    unsigned depth    = (denise->regs.bplcon0 >> 12) & 0x7u;
-    rigel_u16 bplcon2 = denise->regs.bplcon2;
-    bool is_ham  = (denise->regs.bplcon0 & 0x0800u) != 0u;
-    bool is_dual = (denise->regs.bplcon0 & 0x0400u) != 0u;
-    bool is_hires = (denise->regs.bplcon0 & 0x8000u) != 0u;
+    rigel_u16 line_bplcon0 = output->line_bplcon_valid
+        ? output->line_bplcon0
+        : denise->regs.bplcon0;
+    rigel_u16 line_bplcon1 = output->line_bplcon_valid
+        ? output->line_bplcon1
+        : denise->regs.bplcon1;
+    rigel_u16 bplcon2 = output->line_bplcon_valid
+        ? output->line_bplcon2
+        : denise->regs.bplcon2;
+    unsigned depth    = (line_bplcon0 >> 12) & 0x7u;
+    bool is_ham  = (line_bplcon0 & 0x0800u) != 0u;
+    bool is_dual = (line_bplcon0 & 0x0400u) != 0u;
+    bool is_hires = (line_bplcon0 & 0x8000u) != 0u;
     bool is_ehb  = !is_ham && !is_dual && depth == 6u && !(bplcon2 & 0x0040u);
-    unsigned scroll  = denise->regs.bplcon1 & 0x0Fu;
-    unsigned scroll_pf1 = denise->regs.bplcon1 & 0x0Fu;
-    unsigned scroll_pf2 = (denise->regs.bplcon1 >> 4) & 0x0Fu;
+    unsigned scroll  = line_bplcon1 & 0x0Fu;
+    unsigned scroll_pf1 = line_bplcon1 & 0x0Fu;
+    unsigned scroll_pf2 = (line_bplcon1 >> 4) & 0x0Fu;
     unsigned pf1p    = bplcon2 & 0x7u;
     unsigned pf2p    = (bplcon2 >> 3) & 0x7u;
+    bool pf2_over_pf1 = (bplcon2 & 0x0040u) != 0u;
     /* Absolute lores position of word 0 pixel 0.
      * ddfstrt_lores is the raw HPOS (DDFSTRT*2).  Add 2*pipeline_lead to
      * account for the Amiga shift-register pre-load: lores=8px, hires=4px.
@@ -112,7 +135,7 @@ static void compose_line(RigelDenise *denise)
                     depth,
                     output->plane_word_count,
                     nonzero,
-                    denise->regs.bplcon0,
+                    line_bplcon0,
                     output->ddfstrt_lores,
                     x_start,
                     x_stop,
@@ -154,7 +177,9 @@ static void compose_line(RigelDenise *denise)
                 for (px = 0; px < 16; px++) {
                     int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
                     prev_rgb = ham6_decode_pixel(pixels_chunky[px], prev_rgb, palette);
-                    if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+                    if (screen_x < (int)x_start ||
+                        screen_x >= (int)x_stop ||
+                        (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
                         continue;
                     output->scanline_rgba[(unsigned)screen_x] = prev_rgb;
                     output->scanline_rgb565[(unsigned)screen_x] = rgb32_to_rgb565(prev_rgb);
@@ -178,11 +203,12 @@ static void compose_line(RigelDenise *denise)
 
                     if (dpf.pf1_index) {
                         int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll_pf1;
-                        if (screen_x >= 0 &&
+                        if (screen_x >= (int)x_start &&
+                            screen_x < (int)x_stop &&
                             (unsigned)screen_x < RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
                             unsigned dst = (unsigned)screen_x;
                             if (pf_active[dst] == 0u ||
-                                ((pf_active[dst] & 2u) != 0u && pf1p > pf_prio[dst])) {
+                                ((pf_active[dst] & 2u) != 0u && !pf2_over_pf1)) {
                                 pf_color[dst] = dpf.pf1_index;
                                 pf_prio[dst] = (uint8_t)pf1p;
                                 output->scanline_rgba[dst] = palette[dpf.pf1_index];
@@ -194,11 +220,12 @@ static void compose_line(RigelDenise *denise)
 
                     if (dpf.pf2_index) {
                         int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll_pf2;
-                        if (screen_x >= 0 &&
+                        if (screen_x >= (int)x_start &&
+                            screen_x < (int)x_stop &&
                             (unsigned)screen_x < RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
                             unsigned dst = (unsigned)screen_x;
                             if (pf_active[dst] == 0u ||
-                                ((pf_active[dst] & 1u) != 0u && pf2p >= pf_prio[dst])) {
+                                ((pf_active[dst] & 1u) != 0u && pf2_over_pf1)) {
                                 pf_color[dst] = dpf.pf2_index;
                                 pf_prio[dst] = (uint8_t)pf2p;
                                 output->scanline_rgba[dst] = palette[dpf.pf2_index];
@@ -222,7 +249,9 @@ static void compose_line(RigelDenise *denise)
                     for (px = 0; px < 16; px++) {
                         int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
                         uint8_t ci;
-                        if (screen_x < 0 || (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
+                        if (screen_x < (int)x_start ||
+                            screen_x >= (int)x_stop ||
+                            (unsigned)screen_x >= RIGEL_DENISE_MAX_SCANLINE_PIXELS)
                             continue;
                         ci = is_ehb
                             ? (pixels_chunky[px] & 0x3Fu)
@@ -245,6 +274,10 @@ static void compose_line(RigelDenise *denise)
                 int max_x = (int)(ddf0 + span);
                 int screen_x;
 
+                if (min_x < (int)x_start)
+                    min_x = (int)x_start;
+                if (max_x > (int)x_stop)
+                    max_x = (int)x_stop;
                 if (min_x < 0)
                     min_x = 0;
                 if (max_x > (int)RIGEL_DENISE_MAX_SCANLINE_PIXELS)
@@ -430,6 +463,8 @@ void rigel_denise_compositor_tick(RigelDenise *denise, const beam_state_t *beam,
 
     if (line_changed && was_visible) {
         compose_line(denise);
+    } else if (line_changed) {
+        clear_scanline_to_border(denise);
     }
 
     rigel_denise_framebuffer_sync_from_beam(denise, beam);
