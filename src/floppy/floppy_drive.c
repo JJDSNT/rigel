@@ -40,7 +40,7 @@ void floppy_init(FloppyDrive *d)
     d->track0 = 1;
 
     d->disk_inserted = 0;
-    d->disk_changed = 1; /* power-on: change latch set (no disk) */
+    d->disk_changed = 0; /* not connected: no change pending */
     d->write_protected = 1;
 
     d->step_latch = 1;

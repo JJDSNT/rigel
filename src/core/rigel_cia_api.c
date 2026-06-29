@@ -56,22 +56,32 @@ static void cia_b_prb_update_floppy(RigelContext *ctx)
 
     /*
      * Update CIA-A PRA ext inputs (bits 2-5) with drive status.
-     * Read-modify-write preserves fire button bits (6-7) set elsewhere.
      * CIA-A PRA: bit2=/CHNG, bit3=/WPROT, bit4=/TRK0, bit5=/DSKRDY (active low).
+     *
+     * /DSKCHG (bit 2) is open-drain: each connected drive asserts it independently
+     * of selection — software can read disk-change state without selecting a drive.
+     * Bits 3-5 require the drive to be selected (motor/head state only driven when selected).
      */
     pra = cia_port_a_value(cia_a);
     pra |= 0x3Cu; /* default all floppy lines high (inactive) */
 
+    /* OR /DSKCHG from all drives — not gated by selection */
+    idmode = 0;
     if (selected_count == 1) {
         idmode = !mtr && (active->id_count < 32);
-        if (idmode) {
-            /* During drive ID scan, /CHNG outputs the ID shift register bit */
-            if (!floppy_get_idbit(active))
-                pra &= ~0x04u;  /* bit 2: /CHNG */
-        } else {
-            if (!floppy_get_dskchg(active, active->motor))
+    }
+    if (idmode) {
+        /* Drive ID scan: /CHNG outputs the ID shift register bit (overrides disk state) */
+        if (!floppy_get_idbit(active))
+            pra &= ~0x04u;
+    } else {
+        for (i = 0; i < 4; i++) {
+            if (!floppy_get_dskchg(&ctx->chipset.floppy[i], 0))
                 pra &= ~0x04u;  /* bit 2: /CHNG active low (0 = change sensed) */
         }
+    }
+
+    if (selected_count == 1) {
         if (!floppy_get_wpro(active))
             pra &= ~0x08u;  /* bit 3: /WPROT active low */
         if (floppy_get_track0(active))
