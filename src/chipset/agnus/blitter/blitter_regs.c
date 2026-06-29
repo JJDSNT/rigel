@@ -26,6 +26,9 @@ enum {
 
     REG_BLTSIZE = 0x058,
 
+    REG_BLTSIZV = 0x05C,  /* ECS: latch vertical size (does not trigger) */
+    REG_BLTSIZH = 0x05E,  /* ECS: set horizontal size and trigger        */
+
     REG_BLTAMOD = 0x064,
     REG_BLTBMOD = 0x062,
     REG_BLTCMOD = 0x060,
@@ -248,6 +251,21 @@ void blitter_write_reg16(
 
             return;
         }
+
+        case REG_BLTSIZV:
+            b->regs.bltsizv = value & 0x7FFFu;
+            if (b->regs.bltsizv == 0) {
+                b->regs.bltsizv = 32768;
+            }
+            return;
+
+        case REG_BLTSIZH:
+            b->regs.bltsizh = value & 0x07FFu;
+            if (b->regs.bltsizh == 0) {
+                b->regs.bltsizh = 2048;
+            }
+            blitter_begin_command(b);
+            return;
 
         default:
             return;
