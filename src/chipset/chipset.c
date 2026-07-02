@@ -28,7 +28,13 @@ void rigel_chipset_reset(RigelChipset *chipset)
     chipset->cycles = 0;
     chipset->cia_eclock_rem = 0;
     for (i = 0; i < RIGEL_FLOPPY_DRIVE_COUNT; ++i) {
+        /* Only DF0 exists by default; a drive with media inserted stays
+         * connected across reset (inserting media connects the drive). */
+        int keep = chipset->floppy[i].connected &&
+                   chipset->floppy[i].disk_inserted;
         floppy_reset(&chipset->floppy[i]);
+        floppy_set_connected(&chipset->floppy[i],
+                             keep || i == RIGEL_FLOPPY_DRIVE_DF0);
     }
     rtc_reset(&chipset->rtc);
     rigel_agnus_reset(&chipset->agnus);

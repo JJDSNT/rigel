@@ -32,6 +32,7 @@ static int floppy_trace_enabled(void)
 
 void floppy_init(FloppyDrive *d)
 {
+    d->connected = 0;
     d->motor = 0;
     d->cylinder = 0;
     d->side = 0;
@@ -66,6 +67,7 @@ void floppy_reset(FloppyDrive *d)
 {
     const uint8_t *adf;
     uint32_t adf_size;
+    int connected;
 
     if (d == NULL) {
         return;
@@ -73,10 +75,27 @@ void floppy_reset(FloppyDrive *d)
 
     adf = d->adf;
     adf_size = d->adf_size;
+    connected = d->connected;
     floppy_init(d);
+    d->connected = connected;
 
     if (adf != NULL && adf_size != 0) {
         floppy_insert(d, adf, adf_size);
+    }
+}
+
+/* ------------------------------------------------------------------------- */
+
+void floppy_set_connected(FloppyDrive *d, int connected)
+{
+    if (d == NULL) {
+        return;
+    }
+
+    d->connected = connected ? 1 : 0;
+    if (!d->connected) {
+        d->motor = 0;
+        d->ready = 0;
     }
 }
 
@@ -86,6 +105,7 @@ void floppy_reset(FloppyDrive *d)
 
 void floppy_insert(FloppyDrive *d, const uint8_t *adf, uint32_t adf_size)
 {
+    d->connected = 1;
     d->adf = adf;
     d->adf_size = adf_size;
 
@@ -121,6 +141,13 @@ void floppy_eject(FloppyDrive *d)
 
 void floppy_step(FloppyDrive *d, const FloppySignals *sig)
 {
+    if (!d->connected)
+    {
+        d->motor = 0;
+        d->ready = 0;
+        return;
+    }
+
     if (!sig->selected)
     {
         /*
@@ -256,7 +283,7 @@ void floppy_step(FloppyDrive *d, const FloppySignals *sig)
 
 int floppy_has_media(const FloppyDrive *d)
 {
-    return d->disk_inserted && d->adf != 0 && d->adf_size > 0;
+    return d->connected && d->disk_inserted && d->adf != 0 && d->adf_size > 0;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -301,6 +328,8 @@ uint32_t floppy_read_linear(FloppyDrive *d, uint8_t *dst, uint32_t bytes)
 
 int floppy_get_ready(const FloppyDrive *d)
 {
+    if (!d->connected)
+        return 0;
     return d->ready;
 }
 
@@ -308,6 +337,8 @@ int floppy_get_ready(const FloppyDrive *d)
 
 int floppy_get_track0(const FloppyDrive *d)
 {
+    if (!d->connected)
+        return 0;
     return d->track0;
 }
 
@@ -316,6 +347,9 @@ int floppy_get_track0(const FloppyDrive *d)
 int floppy_get_dskchg(const FloppyDrive *d, int motor_on)
 {
     (void)motor_on;
+
+    if (!d->connected)
+        return 1;
 
     /*
      * /DSKCHG is active LOW.
@@ -336,6 +370,9 @@ int floppy_get_wpro(const FloppyDrive *d)
      * LOW  = inserted disk is write-protected
      * HIGH = writable / no disk
      */
+    if (!d->connected)
+        return 1;
+
     if (!floppy_has_media(d))
         return 1;
 
@@ -344,5 +381,7 @@ int floppy_get_wpro(const FloppyDrive *d)
 
 int floppy_get_idbit(const FloppyDrive *d)
 {
+    if (!d->connected)
+        return 1;
     return (int)((d->id_data >> (31u - (d->id_count & 31u))) & 1u);
 }

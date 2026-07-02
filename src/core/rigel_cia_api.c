@@ -36,8 +36,8 @@ static void cia_b_prb_update_floppy(RigelContext *ctx)
     sig.step      = !(prb & 0x01u);         /* bit 0: /STEP active-low */
 
     for (i = 0; i < 4; i++) {
-        sig.selected = sel[i];
-        sig.motor    = sel[i] ? mtr : 0;
+        sig.selected = ctx->chipset.floppy[i].connected ? sel[i] : 0;
+        sig.motor    = sig.selected ? mtr : 0;
         floppy_step(&ctx->chipset.floppy[i], &sig);
     }
 
@@ -45,7 +45,7 @@ static void cia_b_prb_update_floppy(RigelContext *ctx)
     active = &ctx->chipset.floppy[0];
     selected_count = 0;
     for (i = 0; i < 4; i++) {
-        if (sel[i]) {
+        if (sel[i] && ctx->chipset.floppy[i].connected) {
             if (selected_count == 0) {
                 active = &ctx->chipset.floppy[i];
             }
@@ -76,7 +76,8 @@ static void cia_b_prb_update_floppy(RigelContext *ctx)
             pra &= ~0x04u;
     } else {
         for (i = 0; i < 4; i++) {
-            if (!floppy_get_dskchg(&ctx->chipset.floppy[i], 0))
+            if (ctx->chipset.floppy[i].connected &&
+                !floppy_get_dskchg(&ctx->chipset.floppy[i], 0))
                 pra &= ~0x04u;  /* bit 2: /CHNG active low (0 = change sensed) */
         }
     }

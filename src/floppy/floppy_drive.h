@@ -45,6 +45,7 @@ typedef struct
  */
 typedef struct
 {
+    int connected;
 
     int motor;
     int cylinder;
@@ -93,6 +94,7 @@ typedef struct
 
 void floppy_init(FloppyDrive *d);
 void floppy_reset(FloppyDrive *d);
+void floppy_set_connected(FloppyDrive *d, int connected);
 
 void floppy_insert(FloppyDrive *d, const uint8_t *adf, uint32_t adf_size);
 void floppy_eject(FloppyDrive *d);

@@ -530,7 +530,7 @@ bool rigel_floppy_get_status(
     sel_bit = (rigel_u8)(0x08u << (rigel_u8)drive);
 
     status->has_media = floppy_has_media(target) != 0;
-    status->selected = (prb & sel_bit) == 0u;
+    status->selected = target->connected != 0 && (prb & sel_bit) == 0u;
     status->motor_on = target->motor != 0;
     status->ready = target->ready != 0;
     status->track0 = target->track0 != 0;
