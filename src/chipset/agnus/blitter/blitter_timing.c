@@ -21,12 +21,12 @@ void blitter_publish_result(BlitterState *b)
     b->regs.bltddat = b->result.final_ddat;
 
     /*
-     * A completed operation consumes its latched size.
-     * Keeping the raw BLTSIZE write is useful for MMIO reads,
-     * but the expanded internal dimensions are no longer active.
+     * BLTSIZV/BLTSIZH are latches on real hardware and survive a completed
+     * blit.  KS2.0 relies on this: it programs BLTSIZV once and re-triggers
+     * subsequent same-height blits by writing only BLTSIZH.  Clearing them
+     * here made those follow-up blits execute with height 0 (no writes),
+     * which dropped the boot-screen text on bitplanes 2/3.
      */
-    b->regs.bltsizh = 0;
-    b->regs.bltsizv = 0;
 }
 
 uint32_t blitter_estimate_cycles(const BlitCommand *cmd)

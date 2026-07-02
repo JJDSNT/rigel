@@ -8,6 +8,7 @@ enum {
 
     REG_BLTCON0 = 0x040,
     REG_BLTCON1 = 0x042,
+    REG_BLTCON0L = 0x05A,
 
     REG_BLTAFWM = 0x044,
     REG_BLTALWM = 0x046,
@@ -150,6 +151,12 @@ void blitter_write_reg16(
 
         case REG_BLTCON1:
             b->regs.bltcon1 = value;
+            return;
+
+        case REG_BLTCON0L:
+            /* ECS: writes only the minterm byte, USE/shift bits preserved */
+            b->regs.bltcon0 =
+                (uint16_t)((b->regs.bltcon0 & 0xFF00u) | (value & 0x00FFu));
             return;
 
         case REG_BLTAFWM:
