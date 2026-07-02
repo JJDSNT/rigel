@@ -40,18 +40,33 @@ void rigel_denise_display_window_update(RigelDenise *denise)
         return;
     }
 
+    if (denise->regs.diwstrt == 0xffffu &&
+        denise->video.width != 0u &&
+        denise->video.height != 0u) {
+        return;
+    }
+
     ocs_diw = !(denise->chip_rev == AGNUS_REV_ECS && denise->regs.diwhigh != 0u);
 
     if (!ocs_diw) {
         rigel_u16 start_hi = (rigel_u16)(denise->regs.diwhigh & 0x00FFu);
         rigel_u16 stop_hi  = (rigel_u16)((denise->regs.diwhigh >> 8) & 0x00FFu);
 
+        /*
+         * ECS DIWHIGH ($1E4) layout per byte:
+         *   bits 0-2  V8-V10, bit 5 H8 (bits 3-4 are SHRES sub-pixel H0-H1).
+         * The low byte extends DIWSTRT, the high byte extends DIWSTOP.
+         * KS2.x programs DIWHIGH=$2000 (= stop H8) with DIWSTOP=$f4ad:
+         * hstop 0x1AD, vstop stays 244 — the vertical window is NOT
+         * extended (an earlier "extended vstop" reading here exposed the
+         * back page below the real window).
+         */
         hstrt = (rigel_u16)((denise->regs.diwstrt & 0x00FFu) |
-                            (((start_hi >> 3) & 0x7u) << 8));
+                            (((start_hi >> 5) & 0x1u) << 8));
         vstrt = (rigel_u16)(((denise->regs.diwstrt >> 8) & 0x00FFu) |
                             ((start_hi & 0x7u) << 8));
         hstop = (rigel_u16)((denise->regs.diwstop & 0x00FFu) |
-                            (((stop_hi >> 3) & 0x7u) << 8));
+                            (((stop_hi >> 5) & 0x1u) << 8));
         vstop = (rigel_u16)(((denise->regs.diwstop >> 8) & 0x00FFu) |
                             ((stop_hi & 0x7u) << 8));
     } else {
@@ -105,9 +120,10 @@ void rigel_denise_display_window_update(RigelDenise *denise)
      * Preserve the previous valid window state so the display keeps showing
      * the last good frame rather than flickering through invalid geometry.
      */
-    if (vstrt >= (rigel_u16)RIGEL_DENISE_MAX_LINES ||
-        vstop > (rigel_u16)RIGEL_DENISE_MAX_LINES)
+    if (vstrt >= (rigel_u16)RIGEL_DENISE_MAX_LINES)
         return;
+    if (vstop > (rigel_u16)RIGEL_DENISE_MAX_LINES)
+        vstop = (rigel_u16)RIGEL_DENISE_MAX_LINES;
 
     hires = (denise->regs.bplcon0 & 0x8000u) != 0u;
     hscale = hires ? 2u : 1u;

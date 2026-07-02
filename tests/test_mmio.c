@@ -104,7 +104,8 @@ int main(void)
 
     rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWSTRT, 0x2c81u);
     rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWSTOP, 0x2cc1u);
-    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWHIGH, 0x0900u);
+    /* V8 (bit 8) + STOP H8 (bit 13) — H8 lives at bit 13 per ECS DIWHIGH */
+    rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWHIGH, 0x2100u);
     if (!rigel_denise_get_video_desc(ecs_ctx, &video) ||
         video.visible_x_start != 0x0081u ||
         video.visible_x_stop != 0x01c1u ||
@@ -120,8 +121,10 @@ int main(void)
     rigel_custom_write16(ecs_ctx, RIGEL_REG_BPLCON0, 0x9000u);
     rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWHIGH, 0x2000u);
     if (!rigel_denise_get_video_desc(ecs_ctx, &video) ||
-        video.visible_x_start != 0x0081u ||
-        video.visible_x_stop != 0x0301u ||
+        video.visible_x_start != 0x0102u ||
+        video.visible_x_stop != 0x0382u ||
+        video.visible_y_start != 0x002cu ||
+        video.visible_y_stop != 0x012cu ||
         video.display_width != 640u ||
         video.display_height != 256u) {
         rigel_destroy(ecs_ctx);
@@ -133,9 +136,10 @@ int main(void)
     rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWHIGH, 0x0000u);
     rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWSTRT, 0x0181u);
     rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWSTOP, 0x0281u);
+    /* BPU=0 keeps the previous (hires DIWHIGH) geometry latched */
     if (!rigel_denise_get_video_desc(ecs_ctx, &video) ||
-        video.visible_x_start != 0x0081u ||
-        video.visible_x_stop != 0x0301u ||
+        video.visible_x_start != 0x0102u ||
+        video.visible_x_stop != 0x0382u ||
         video.display_width != 640u ||
         video.display_height != 256u) {
         rigel_destroy(ecs_ctx);
@@ -148,8 +152,8 @@ int main(void)
     rigel_custom_write16(ecs_ctx, RIGEL_REG_DIWHIGH, 0x2100u);
     rigel_custom_write16(ecs_ctx, RIGEL_REG_BPLCON0, 0xc205u);
     if (!rigel_denise_get_video_desc(ecs_ctx, &video) ||
-        video.visible_x_start != 0x0081u ||
-        video.visible_x_stop != 0x0301u ||
+        video.visible_x_start != 0x0102u ||
+        video.visible_x_stop != 0x0382u ||
         video.display_width != 640u ||
         video.display_height != 256u) {
         rigel_destroy(ecs_ctx);
