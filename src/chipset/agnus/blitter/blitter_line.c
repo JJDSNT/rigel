@@ -7,11 +7,15 @@ static uint16_t line_chip_read16(const BlitterMemory *mem, uint32_t addr)
     return (mem->read16 != NULL) ? mem->read16(mem->opaque, addr) : 0u;
 }
 
+void rigel_blt_w_trace(uint32_t addr, uint16_t value);
+
 static void line_chip_write16(const BlitterMemory *mem, uint32_t addr, uint16_t value)
 {
     addr &= BLITTER_CHIP_ADDR_MASK;
-    if (mem->write16 != NULL)
+    if (mem->write16 != NULL) {
+        rigel_blt_w_trace(addr, value);
         mem->write16(mem->opaque, addr, value);
+    }
 }
 
 static uint16_t line_blitter_logic(uint8_t minterm, uint16_t A, uint16_t B, uint16_t C)

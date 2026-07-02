@@ -92,6 +92,110 @@ static bool video_probe_match(rigel_u32 frame, rigel_u16 vpos)
 
     return (rigel_u32)vpos >= vfrom && (rigel_u32)vpos <= vto;
 }
+
+static rigel_u32 env_u32_default(const char *name, rigel_u32 fallback)
+{
+    const char *env = getenv(name);
+
+    if (env == NULL || env[0] == '\0') {
+        return fallback;
+    }
+
+    return (rigel_u32)strtoul(env, NULL, 0);
+}
+
+static bool bpl_fetch_trace_match(rigel_u32 frame,
+                                  rigel_u16 vpos,
+                                  rigel_u32 addr,
+                                  rigel_u32 *limit_out)
+{
+    static int initialized = 0;
+    static int enabled = 0;
+    static rigel_u32 lo = 0;
+    static rigel_u32 hi = 0;
+    static rigel_u32 frame_filter = 0xffffffffu;
+    static rigel_u32 min_frame = 0u;
+    static rigel_u32 vfrom = 0u;
+    static rigel_u32 vto = 0xffffffffu;
+    static rigel_u32 limit = 256u;
+
+    if (!initialized) {
+        const char *range = getenv("RIGEL_BPL_FETCH_TRACE_RANGE");
+        initialized = 1;
+        if (range != NULL && range[0] != '\0' &&
+            !(range[0] == '0' && range[1] == '\0')) {
+            char *endptr = NULL;
+            unsigned long parsed_lo = strtoul(range, &endptr, 0);
+            if (endptr != NULL && *endptr == ':') {
+                unsigned long parsed_hi = strtoul(endptr + 1, &endptr, 0);
+                if (endptr != NULL && *endptr == '\0' && parsed_hi >= parsed_lo) {
+                    lo = (rigel_u32)parsed_lo & 0x001ffffeu;
+                    hi = (rigel_u32)parsed_hi & 0x001ffffeu;
+                    enabled = 1;
+                }
+            }
+            frame_filter = env_u32_default("RIGEL_BPL_FETCH_TRACE_FRAME", 0xffffffffu);
+            min_frame = env_u32_default("RIGEL_BPL_FETCH_TRACE_MIN_FRAME", 0u);
+            vfrom = env_u32_default("RIGEL_BPL_FETCH_TRACE_VFROM", 0u);
+            vto = env_u32_default("RIGEL_BPL_FETCH_TRACE_VTO", 0xffffffffu);
+            limit = env_u32_default("RIGEL_BPL_FETCH_TRACE_LIMIT", 256u);
+            fprintf(stderr,
+                    "[BPL-FETCH-TRACE-CONFIG] enabled=%d range=%06x:%06x "
+                    "frame=%08x min_frame=%u v=%u:%u limit=%u\n",
+                    enabled, (unsigned)lo, (unsigned)hi,
+                    (unsigned)frame_filter, (unsigned)min_frame,
+                    (unsigned)vfrom, (unsigned)vto,
+                    (unsigned)limit);
+        }
+    }
+
+    if (limit_out != NULL) {
+        *limit_out = limit;
+    }
+    if (!enabled) {
+        return false;
+    }
+    if (frame_filter != 0xffffffffu && frame != frame_filter) {
+        return false;
+    }
+    if (frame < min_frame) {
+        return false;
+    }
+    if ((rigel_u32)vpos < vfrom || (rigel_u32)vpos > vto) {
+        return false;
+    }
+
+    addr &= 0x001ffffeu;
+    return addr >= lo && addr <= hi;
+}
+
+static bool bpl_table_trace_enabled(void)
+{
+    static int initialized = 0;
+    static int enabled = 0;
+
+    if (!initialized) {
+        const char *env = getenv("RIGEL_BPL_TABLE_TRACE");
+        initialized = 1;
+        enabled = (env != NULL && env[0] != '\0' && env[0] != '0') ? 1 : 0;
+    }
+
+    return enabled != 0;
+}
+
+static bool bpl_dispatch_trace_enabled(void)
+{
+    static int initialized = 0;
+    static int enabled = 0;
+
+    if (!initialized) {
+        const char *env = getenv("RIGEL_BPL_DISPATCH_TRACE");
+        initialized = 1;
+        enabled = (env != NULL && env[0] != '\0' && env[0] != '0') ? 1 : 0;
+    }
+
+    return enabled != 0;
+}
 #endif
 
 /* =========================================================================
@@ -204,6 +308,29 @@ static void dispatch_slot(agnus_slot_owner_t owner,
             plane = (depth > 0u) ? ((unsigned)logical % depth) : 0u;
             widx = (depth > 0u) ? (rigel_u16)((unsigned)logical / depth) : 0u;
 
+#if RIGEL_ENABLE_STDLIB_ENV
+            if (bpl_dispatch_trace_enabled()) {
+                static rigel_u32 trace_count = 0u;
+                if (trace_count < 256u) {
+                    fprintf(stderr,
+                            "[BPL-DISPATCH-TRACE] frame=%u v=%u h=%u "
+                            "depth=%u logical=%04x plane=%u widx=%u "
+                            "dmacon=%04x bplpt=%06x/%06x\n",
+                            (unsigned)(ctx->chipset.denise.output.frame_counter & 0xffffffffu),
+                            (unsigned)agnus->beam.vpos,
+                            (unsigned)hpos,
+                            (unsigned)depth,
+                            (unsigned)logical,
+                            (unsigned)plane,
+                            (unsigned)widx,
+                            (unsigned)agnus->scheduler.dmacon,
+                            (unsigned)(agnus->bplpt.bplpt[0] & 0x00ffffffu),
+                            (unsigned)(agnus->bplpt.bplpt[1] & 0x00ffffffu));
+                    trace_count++;
+                }
+            }
+#endif
+
             if (depth > 0 && depth <= 6 && plane < depth &&
                 widx < RIGEL_DENISE_MAX_PLANE_WORDS) {
                 rigel_chip_ram_if_t mem = rigel_context_chip_ram(ctx);
@@ -232,6 +359,44 @@ static void dispatch_slot(agnus_slot_owner_t owner,
                         (rigel_u32)widx * 2u) & 0x001ffffeu;
                 agnus->fetch.data[plane] =
                     (mem.read16 != NULL) ? mem.read16(mem.opaque, addr) : 0u;
+#if RIGEL_ENABLE_STDLIB_ENV
+                {
+                    static rigel_u32 bpl_fetch_trace_count = 0u;
+                    rigel_u32 bpl_fetch_trace_limit = 0u;
+                    rigel_u32 frame32 =
+                        (rigel_u32)(ctx->chipset.denise.output.frame_counter & 0xffffffffu);
+                    if (bpl_fetch_trace_match(frame32, agnus->beam.vpos, addr,
+                                              &bpl_fetch_trace_limit) &&
+                        bpl_fetch_trace_count < bpl_fetch_trace_limit) {
+                        fprintf(stderr,
+                                "[BPL-FETCH-TRACE] frame=%u v=%u h=%u "
+                                "plane=%u widx=%u addr=%06x data=%04x "
+                                "line_base=%06x depth=%u dmacon=%04x "
+                                "ddf=%04x:%04x diw=%04x:%04x "
+                                "bplcon=%04x/%04x/%04x mod=%04x/%04x\n",
+                                (unsigned)frame32,
+                                (unsigned)agnus->beam.vpos,
+                                (unsigned)hpos,
+                                (unsigned)plane,
+                                (unsigned)widx,
+                                (unsigned)(addr & 0x00ffffffu),
+                                (unsigned)agnus->fetch.data[plane],
+                                (unsigned)(agnus->scheduler.bitplane_line_base[plane] & 0x00ffffffu),
+                                (unsigned)depth,
+                                (unsigned)agnus->scheduler.dmacon,
+                                (unsigned)agnus->scheduler.ddfstrt,
+                                (unsigned)agnus->scheduler.ddfstop,
+                                (unsigned)ctx->chipset.denise.regs.diwstrt,
+                                (unsigned)ctx->chipset.denise.regs.diwstop,
+                                (unsigned)ctx->chipset.denise.regs.bplcon0,
+                                (unsigned)ctx->chipset.denise.regs.bplcon1,
+                                (unsigned)ctx->chipset.denise.regs.bplcon2,
+                                (unsigned)rigel_context_read_reg(ctx, AGNUS_BPLMOD1),
+                                (unsigned)rigel_context_read_reg(ctx, AGNUS_BPLMOD2));
+                        bpl_fetch_trace_count++;
+                    }
+                }
+#endif
                 dout->plane_words[plane][widx] = agnus->fetch.data[plane];
                 agnus->scheduler.bitplane_dma_this_line = true;
                 if ((rigel_u16)(widx + 1u) > dout->plane_word_count)
@@ -501,6 +666,27 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
             }
         }
     }
+
+#if RIGEL_ENABLE_STDLIB_ENV
+    if (bpl_table_trace_enabled() && bitplane_slots > 0u) {
+        static rigel_u32 trace_count = 0u;
+        if (trace_count < 256u) {
+            fprintf(stderr,
+                    "[BPL-TABLE-TRACE] v=%u slots=%u dmacon=%04x depth=%u "
+                    "hires=%u ddf=%04x:%04x vstrt=%u vbl=%u\n",
+                    (unsigned)vpos,
+                    (unsigned)bitplane_slots,
+                    (unsigned)sched->dmacon,
+                    (unsigned)(sched->depth & 0x7u),
+                    sched->hires ? 1u : 0u,
+                    (unsigned)sched->ddfstrt,
+                    (unsigned)sched->ddfstop,
+                    (unsigned)sched->vstrt,
+                    vbl ? 1u : 0u);
+            trace_count++;
+        }
+    }
+#endif
 
     /* Non-CPU slots not assigned above become FREE (copper/blitter eligible).
      * Copper and blitter dynamic assignment is handled in agnus_slot_scheduler_step(). */

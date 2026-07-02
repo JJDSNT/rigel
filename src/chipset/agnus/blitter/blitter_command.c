@@ -1,5 +1,7 @@
 #include "blitter.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static BlitterMode decode_mode(uint16_t bltcon1)
@@ -80,4 +82,23 @@ void blitter_build_command(BlitterState *b)
     cmd->mode = decode_mode(r->bltcon1);
 
     b->command_valid = true;
+
+    {
+        /* Env-gated: RIGEL_BLT_CMD_TRACE=1 logs every blit command;
+         * pairs with RIGEL_BLT_W_TRACE_RANGE to attribute writes. */
+        static int trace = -1;
+        if (trace < 0) {
+            const char *env = getenv("RIGEL_BLT_CMD_TRACE");
+            trace = (env && *env && *env != '0') ? 1 : 0;
+        }
+        if (trace)
+            printf("[BLT-CMD] con0=%04x con1=%04x A=%06x B=%06x C=%06x D=%06x"
+                   " mods=%d/%d/%d/%d size=%ux%u adat=%04x fwm=%04x lwm=%04x\n",
+                   r->bltcon0, r->bltcon1,
+                   (unsigned)cmd->apt, (unsigned)cmd->bpt,
+                   (unsigned)cmd->cpt, (unsigned)cmd->dpt,
+                   cmd->amod, cmd->bmod, cmd->cmod, cmd->dmod,
+                   cmd->width_words, cmd->height_lines,
+                   r->bltadat, r->bltafwm, r->bltalwm);
+    }
 }

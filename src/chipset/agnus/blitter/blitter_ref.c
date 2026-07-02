@@ -1,6 +1,36 @@
 #include "blitter.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+/* Env-gated diagnostic: RIGEL_BLT_W_TRACE_RANGE=lo:hi logs every blitter
+ * memory write landing in [lo,hi] (chip addr), to attribute buffer clears/
+ * overwrites that CPU-side watchpoints cannot see. */
+static int s_blt_w_trace_init = 0;
+static uint32_t s_blt_w_lo = 0, s_blt_w_hi = 0;
+static int s_blt_w_enabled = 0;
+
+void rigel_blt_w_trace(uint32_t addr, uint16_t value);
+void rigel_blt_w_trace(uint32_t addr, uint16_t value)
+{
+    if (!s_blt_w_trace_init) {
+        const char *spec = getenv("RIGEL_BLT_W_TRACE_RANGE");
+        s_blt_w_trace_init = 1;
+        if (spec && *spec) {
+            char *end = NULL;
+            unsigned long lo = strtoul(spec, &end, 0);
+            if (end && *end == ':') {
+                unsigned long hi = strtoul(end + 1, NULL, 0);
+                s_blt_w_lo = (uint32_t)lo;
+                s_blt_w_hi = (uint32_t)hi;
+                s_blt_w_enabled = 1;
+            }
+        }
+    }
+    if (s_blt_w_enabled && addr >= s_blt_w_lo && addr <= s_blt_w_hi)
+        printf("[BLT-W] addr=%06x val=%04x\n", (unsigned)addr, value);
+}
 
 static inline uint16_t chip_read16(
     const BlitterMemory *mem,
@@ -26,6 +56,7 @@ static inline void chip_write16(
         return;
     }
 
+    rigel_blt_w_trace(addr, value);
     mem->write16(mem->opaque, addr, value);
 }
 
