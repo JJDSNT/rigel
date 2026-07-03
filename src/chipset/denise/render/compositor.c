@@ -79,14 +79,15 @@ static void compose_line(RigelDenise *denise)
     unsigned pf2p    = (bplcon2 >> 3) & 0x7u;
     bool pf2_over_pf1 = (bplcon2 & 0x0040u) != 0u;
     /* Absolute lores position of word 0 pixel 0.
-     * ddfstrt_lores is the raw HPOS (DDFSTRT*2).  Add 2*pipeline_lead to
-     * account for the Amiga shift-register pre-load: lores=8px, hires=4px.
-     * This matches the legacy src_first_pixel=1 formula:
-     *   src_first_pixel = (hstrt - pipeline_lead) - ddfstrt_lores - pipeline_lead */
-    unsigned pipeline_lead = is_hires ? 4u : 8u;
+     * ddfstrt_lores is the raw HPOS (DDFSTRT*2).  The fetch→shifter pipeline
+     * delays first output by 8.5 CCK in lores and 4.5 CCK in hires (HRM:
+     * DDFSTRT = DIWSTRT_H/2 - 8.5 lores / - 4.5 hires for flush alignment),
+     * i.e. 17 or 9 lores HPOS units after DDFSTRT.  BPLCON1 delays shift the
+     * playfield further right, in lores-pixel steps. */
+    unsigned pipeline_lead = is_hires ? 9u : 17u;
     unsigned hscale = is_hires ? 2u : 1u;
     unsigned sprite_hscale = (denise->video.width > 512u || is_hires) ? 2u : 1u;
-    unsigned ddf0 = ((unsigned)output->ddfstrt_lores + 2u * pipeline_lead) * hscale;
+    unsigned ddf0 = ((unsigned)output->ddfstrt_lores + pipeline_lead) * hscale;
     rigel_u16 x_start = denise->video.visible_x_start;
     rigel_u16 x_stop  = denise->video.visible_x_stop;   /* exclusive */
     unsigned display_words = (denise->video.width + 15u) / 16u;
@@ -151,6 +152,50 @@ static void compose_line(RigelDenise *denise)
         }
     }
 
+#if RIGEL_ENABLE_STDLIB_ENV
+    {
+        const char *ct = getenv("RIGEL_COMPOSE_TRACE_FRAME");
+        if (ct != NULL &&
+            (rigel_u32)strtoul(ct, NULL, 0) ==
+                (rigel_u32)(output->frame_counter & 0xffffffffu) &&
+            output->plane_word_count > 0u) {
+            unsigned first_nz = 0xffffu, last_nz = 0u, p2, wi2;
+            for (wi2 = 0u; wi2 < output->plane_word_count; ++wi2) {
+                for (p2 = 0u; p2 < depth && p2 < 6u; ++p2) {
+                    if (output->plane_words[p2][wi2] != 0u) {
+                        if (wi2 < first_nz) first_nz = wi2;
+                        if (wi2 > last_nz) last_nz = wi2;
+                        break;
+                    }
+                }
+            }
+            {
+                const char *cy = getenv("RIGEL_COMPOSE_TRACE_Y");
+                if (cy != NULL &&
+                    (unsigned)strtoul(cy, NULL, 0) == output->beam_vpos) {
+                    for (p2 = 0u; p2 < depth && p2 < 6u; ++p2) {
+                        fprintf(stderr, "[WORDS] y=%u p=%u:",
+                                (unsigned)output->beam_vpos, p2);
+                        for (wi2 = 0u; wi2 < output->plane_word_count; ++wi2)
+                            fprintf(stderr, " %04x", output->plane_words[p2][wi2]);
+                        fprintf(stderr, "\n");
+                    }
+                }
+            }
+            fprintf(stderr,
+                    "[COMPOSE] y=%u ddf0=%u xs=%u xe=%u scroll=%u/%u wc=%u "
+                    "dispw=%u nz=%u..%u con0=%04x con1=%04x hires=%d\n",
+                    (unsigned)output->beam_vpos, ddf0,
+                    (unsigned)x_start, (unsigned)x_stop,
+                    scroll_pf1, scroll_pf2,
+                    (unsigned)output->plane_word_count, display_words,
+                    first_nz, last_nz,
+                    (unsigned)line_bplcon0, (unsigned)line_bplcon1,
+                    is_hires ? 1 : 0);
+        }
+    }
+#endif
+
     scanline_count = RIGEL_DENISE_MAX_SCANLINE_PIXELS;
 
     /* Initialise the full raster line.  Sprites are visible in the border, so
@@ -176,7 +221,7 @@ static void compose_line(RigelDenise *denise)
                     block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
                 planar_to_chunky(block_words, depth, pixels_chunky);
                 for (px = 0; px < 16; px++) {
-                    int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
+                    int screen_x = (int)(ddf0 + w * 16u + px + scroll * hscale);
                     prev_rgb = ham6_decode_pixel(pixels_chunky[px], prev_rgb, palette);
                     if (screen_x < (int)x_start ||
                         screen_x >= (int)x_stop ||
@@ -203,7 +248,7 @@ static void compose_line(RigelDenise *denise)
                     dpf = dualpf_decode(pixels_chunky[px]);
 
                     if (dpf.pf1_index) {
-                        int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll_pf1;
+                        int screen_x = (int)(ddf0 + w * 16u + px + scroll_pf1 * hscale);
                         if (screen_x >= (int)x_start &&
                             screen_x < (int)x_stop &&
                             (unsigned)screen_x < RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
@@ -220,7 +265,7 @@ static void compose_line(RigelDenise *denise)
                     }
 
                     if (dpf.pf2_index) {
-                        int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll_pf2;
+                        int screen_x = (int)(ddf0 + w * 16u + px + scroll_pf2 * hscale);
                         if (screen_x >= (int)x_start &&
                             screen_x < (int)x_stop &&
                             (unsigned)screen_x < RIGEL_DENISE_MAX_SCANLINE_PIXELS) {
@@ -244,13 +289,11 @@ static void compose_line(RigelDenise *denise)
                     rigel_u16 block_words[6];
                     uint8_t   pixels_chunky[16];
                     unsigned  p;
-                    if (w >= display_words)
-                        continue;
                     for (p = 0; p < 6; p++)
                         block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
                     planar_to_chunky(block_words, depth, pixels_chunky);
                     for (px = 0; px < 16; px++) {
-                        int screen_x = (int)(ddf0 + w * 16u + px) - (int)scroll;
+                        int screen_x = (int)(ddf0 + w * 16u + px + scroll * hscale);
                         uint8_t ci;
                         if (screen_x < (int)x_start ||
                             screen_x >= (int)x_stop ||
@@ -273,8 +316,8 @@ static void compose_line(RigelDenise *denise)
                 }
             } else {
                 unsigned span = output->plane_word_count * 16u;
-                int min_x = (int)ddf0 - 15;
-                int max_x = (int)(ddf0 + span);
+                int min_x = (int)ddf0;
+                int max_x = (int)(ddf0 + span + 15u * hscale);
                 int screen_x;
 
                 if (min_x < (int)x_start)
@@ -292,7 +335,7 @@ static void compose_line(RigelDenise *denise)
 
                     for (p = 0u; p < depth && p < 6u; ++p) {
                         unsigned plane_scroll = ((p & 1u) == 0u) ? scroll_pf1 : scroll_pf2;
-                        int src_x = screen_x + (int)plane_scroll - (int)ddf0;
+                        int src_x = screen_x - (int)(plane_scroll * hscale) - (int)ddf0;
                         unsigned widx;
                         unsigned bit;
 

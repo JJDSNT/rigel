@@ -2,6 +2,7 @@
 #include "agnus/copper/copper_exec.h"
 #include "core/rigel_context.h"
 
+#include <stdio.h>
 #include <string.h>
 
 enum {
@@ -154,9 +155,9 @@ static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
         return 1;
     }
     if (pixels[0] != 0x000000ffu ||
-        pixels[TEST_LEFT_BORDER + 72u] != 0x000000ffu ||
-        pixels[TEST_LEFT_BORDER + 73u] != 0x00ffffffu ||
-        pixels[TEST_LEFT_BORDER + 74u] != 0x000000ffu) {
+        pixels[TEST_LEFT_BORDER + 73u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 74u] != 0x00ffffffu ||
+        pixels[TEST_LEFT_BORDER + 75u] != 0x000000ffu) {
         return 1;
     }
 
@@ -188,11 +189,11 @@ static int test_ddfstrt_alignment(RigelContext *ctx, rigel_u16 *chip_ram)
     pixels = (const rigel_u32 *)frame.pixels;
     if (pixels[0] != 0x000000ffu)
         return 1;
-    if (pixels[TEST_LEFT_BORDER + 87u] != 0x000000ffu)
+    if (pixels[TEST_LEFT_BORDER + 88u] != 0x000000ffu)
         return 1;
-    if (pixels[TEST_LEFT_BORDER + 88u] != 0x00ffffffu)
+    if (pixels[TEST_LEFT_BORDER + 89u] != 0x00ffffffu)
         return 1;
-    if (pixels[TEST_LEFT_BORDER + 103u] != 0x00ffffffu)
+    if (pixels[TEST_LEFT_BORDER + 104u] != 0x00ffffffu)
         return 1;
 
     return 0;
@@ -222,10 +223,10 @@ static int test_singlepf_bplcon1_scroll(RigelContext *ctx, rigel_u16 *chip_ram)
         return 1;
     pixels = (const rigel_u32 *)frame.pixels;
 
-    if (pixels[TEST_LEFT_BORDER + 68u] != 0x00000000u ||
-        pixels[TEST_LEFT_BORDER + 69u] != 0x00ffffffu ||
-        pixels[TEST_LEFT_BORDER + 70u] != 0x00000000u ||
-        pixels[TEST_LEFT_BORDER + 72u] != 0x00000000u) {
+    if (pixels[TEST_LEFT_BORDER + 75u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 76u] != 0x00ffffffu ||
+        pixels[TEST_LEFT_BORDER + 77u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 79u] != 0x00000000u) {
         return 1;
     }
 
@@ -259,10 +260,10 @@ static int test_singlepf_bplcon1_even_plane_scroll(RigelContext *ctx, rigel_u16 
         return 1;
     pixels = (const rigel_u32 *)frame.pixels;
 
-    if (pixels[TEST_LEFT_BORDER + 70u] != 0x0000ff00u ||
-        pixels[TEST_LEFT_BORDER + 71u] != 0x00000000u ||
-        pixels[TEST_LEFT_BORDER + 72u] != 0x000000ffu ||
-        pixels[TEST_LEFT_BORDER + 73u] != 0x00000000u) {
+    if (pixels[TEST_LEFT_BORDER + 73u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 74u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 75u] != 0x0000ff00u ||
+        pixels[TEST_LEFT_BORDER + 76u] != 0x00000000u) {
         return 1;
     }
 
@@ -375,18 +376,18 @@ static int test_two_bitplane_fetch_window(RigelContext *ctx, rigel_u16 *chip_ram
     pixels = (const rigel_u32 *)frame.pixels;
 
     /* plane0=0101..., plane1=0011... -> color indices 0,1,2,3 repeating */
-    if (pixels[TEST_LEFT_BORDER + 72u] != 0x00000000u ||
-        pixels[TEST_LEFT_BORDER + 73u] != 0x000000ffu ||
-        pixels[TEST_LEFT_BORDER + 74u] != 0x0000ff00u ||
-        pixels[TEST_LEFT_BORDER + 75u] != 0x00ff0000u ||
-        pixels[TEST_LEFT_BORDER + 76u] != 0x00000000u ||
-        pixels[TEST_LEFT_BORDER + 77u] != 0x000000ffu ||
-        pixels[TEST_LEFT_BORDER + 78u] != 0x0000ff00u ||
-        pixels[TEST_LEFT_BORDER + 79u] != 0x00ff0000u) {
+    if (pixels[TEST_LEFT_BORDER + 73u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 74u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 75u] != 0x0000ff00u ||
+        pixels[TEST_LEFT_BORDER + 76u] != 0x00ff0000u ||
+        pixels[TEST_LEFT_BORDER + 77u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 78u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 79u] != 0x0000ff00u ||
+        pixels[TEST_LEFT_BORDER + 80u] != 0x00ff0000u) {
         return 1;
     }
 
-    if (pixels[TEST_LEFT_BORDER + 319u] != 0x00ff0000u) {
+    if (pixels[TEST_LEFT_BORDER + 319u] != 0x0000ff00u) {
         return 1;
     }
 
@@ -419,9 +420,9 @@ static int test_dualpf_bplcon1_independent_scroll(RigelContext *ctx, rigel_u16 *
         return 1;
     pixels = (const rigel_u32 *)frame.pixels;
 
-    if (pixels[TEST_LEFT_BORDER + 71u] != 0x00ff0000u ||
-        pixels[TEST_LEFT_BORDER + 72u] != 0x000000ffu ||
-        pixels[TEST_LEFT_BORDER + 73u] != 0x00000000u) {
+    if (pixels[TEST_LEFT_BORDER + 72u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 73u] != 0x000000ffu ||
+        pixels[TEST_LEFT_BORDER + 74u] != 0x00ff0000u) {
         return 1;
     }
 
@@ -446,9 +447,9 @@ static int test_dualpf_bplcon1_independent_scroll(RigelContext *ctx, rigel_u16 *
         return 1;
     pixels = (const rigel_u32 *)frame.pixels;
 
-    if (pixels[TEST_LEFT_BORDER + 70u] != 0x000000ffu ||
-        pixels[TEST_LEFT_BORDER + 71u] != 0x00000000u ||
-        pixels[TEST_LEFT_BORDER + 72u] != 0x00ff0000u) {
+    if (pixels[TEST_LEFT_BORDER + 73u] != 0x00ff0000u ||
+        pixels[TEST_LEFT_BORDER + 74u] != 0x00000000u ||
+        pixels[TEST_LEFT_BORDER + 75u] != 0x000000ffu) {
         return 1;
     }
 
@@ -499,10 +500,10 @@ static int test_rgb565_frame_format(rigel_u16 *chip_ram)
         if (frame.format != RIGEL_PIXEL_RGB565 ||
             frame.pitch != RIGEL_DENISE_MAX_SCANLINE_PIXELS * sizeof(rigel_u16) ||
             pixels == NULL ||
-            pixels[TEST_LEFT_BORDER + 72u] != 0x001fu ||
-            pixels[TEST_LEFT_BORDER + 73u] != 0xffffu ||
-            host_framebuffer[TEST_LEFT_BORDER + 72u] != 0x001fu ||
-            host_framebuffer[TEST_LEFT_BORDER + 73u] != 0xffffu) {
+            pixels[TEST_LEFT_BORDER + 73u] != 0x001fu ||
+            pixels[TEST_LEFT_BORDER + 74u] != 0xffffu ||
+            host_framebuffer[TEST_LEFT_BORDER + 73u] != 0x001fu ||
+            host_framebuffer[TEST_LEFT_BORDER + 74u] != 0xffffu) {
             result = 1;
         }
     }
@@ -788,6 +789,7 @@ int main(void)
     {
         int rc = test_visual_bitplane_frame(ctx, chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_visual_bitplane_frame\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -796,6 +798,7 @@ int main(void)
     {
         int rc = test_ddfstrt_alignment(ctx, chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_ddfstrt_alignment\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -804,6 +807,7 @@ int main(void)
     {
         int rc = test_singlepf_bplcon1_scroll(ctx, chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_singlepf_bplcon1_scroll\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -812,6 +816,7 @@ int main(void)
     {
         int rc = test_singlepf_bplcon1_even_plane_scroll(ctx, chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_singlepf_bplcon1_even_plane_scroll\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -820,6 +825,7 @@ int main(void)
     {
         int rc = test_hires_prefetch_words_are_not_displayed(ctx, chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_hires_prefetch_words_are_not_displayed\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -828,6 +834,7 @@ int main(void)
     {
         int rc = test_bitplane_dma_disable_stops_reuse(ctx, chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_bitplane_dma_disable_stops_reuse\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -836,6 +843,7 @@ int main(void)
     {
         int rc = test_two_bitplane_fetch_window(ctx, chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_two_bitplane_fetch_window\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -844,6 +852,7 @@ int main(void)
     {
         int rc = test_dualpf_bplcon1_independent_scroll(ctx, chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_dualpf_bplcon1_independent_scroll\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -852,6 +861,7 @@ int main(void)
     {
         int rc = test_rgb565_frame_format(chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_rgb565_frame_format\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -860,6 +870,7 @@ int main(void)
     {
         int rc = test_rgb565_write_target_edges(chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_rgb565_write_target_edges\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -868,6 +879,7 @@ int main(void)
     {
         int rc = test_frame_metadata_flags(chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_frame_metadata_flags\n");
             rigel_destroy(ctx);
             return 1;
         }
@@ -876,6 +888,7 @@ int main(void)
     {
         int rc = test_interlace_frame_flags(chip_ram);
         if (rc != 0) {
+            fprintf(stderr, "FAILED: test_interlace_frame_flags\n");
             rigel_destroy(ctx);
             return 1;
         }
