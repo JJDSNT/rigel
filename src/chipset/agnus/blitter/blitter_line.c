@@ -145,6 +145,7 @@ static void line_publish_partial_result(BlitterState *b)
     b->result.final_bdat = cmd->bdat;
     b->result.final_cdat = state->last_cdat;
     b->result.final_ddat = state->last_ddat;
+    b->result.final_bhold = cmd->bhold;
     b->result.zero       = state->zero;
 }
 

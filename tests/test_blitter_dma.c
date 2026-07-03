@@ -200,5 +200,88 @@ int main(void)
         rigel_destroy(ctx);
     }
 
+    {
+        TestChipRam carry_ram = { 0 };
+        rigel_config_t carry_cfg = { 0 };
+
+        carry_cfg.chip_ram.opaque = &carry_ram;
+        carry_cfg.chip_ram.read16 = test_chip_ram_read16;
+        carry_cfg.chip_ram.write16 = test_chip_ram_write16;
+
+        carry_ram.words[0] = 0x0001u;
+        carry_ram.words[1] = 0x0000u;
+        carry_ram.words[2] = 0x0000u;
+        carry_ram.words[3] = 0x0000u;
+
+        ctx = rigel_create(&carry_cfg);
+        if (ctx == NULL) {
+            return 1;
+        }
+
+        rigel_custom_write16(
+            ctx,
+            RIGEL_REG_DMACON,
+            RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BLTEN
+        );
+
+        rigel_custom_write16(ctx, AGNUS_BLTCON0, 0x19f0u);
+        rigel_custom_write16(ctx, AGNUS_BLTCON1, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTAFWM, 0xffffu);
+        rigel_custom_write16(ctx, AGNUS_BLTALWM, 0xffffu);
+        rigel_custom_write16(ctx, AGNUS_BLTAMOD, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTDMOD, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTAPTH, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTAPTL, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTDPTH, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTDPTL, 0x0008u);
+        rigel_custom_write16(ctx, AGNUS_BLTSIZE, 0x0081u); /* 1 word x 2 lines */
+
+        rigel_agnus_step(ctx, 16u);
+
+        if (carry_ram.words[4] != 0x0000u || carry_ram.words[5] != 0x8000u) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+
+        rigel_destroy(ctx);
+    }
+
+    {
+        TestChipRam hold_ram = { 0 };
+        rigel_config_t hold_cfg = { 0 };
+
+        hold_cfg.chip_ram.opaque = &hold_ram;
+        hold_cfg.chip_ram.read16 = test_chip_ram_read16;
+        hold_cfg.chip_ram.write16 = test_chip_ram_write16;
+
+        ctx = rigel_create(&hold_cfg);
+        if (ctx == NULL) {
+            return 1;
+        }
+
+        rigel_custom_write16(
+            ctx,
+            RIGEL_REG_DMACON,
+            RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BLTEN
+        );
+
+        rigel_custom_write16(ctx, AGNUS_BLTCON1, 0x1000u);
+        rigel_custom_write16(ctx, AGNUS_BLTBDAT, 0xffffu);
+        rigel_custom_write16(ctx, AGNUS_BLTBDAT, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTCON0, 0x01ccu); /* D = held B */
+        rigel_custom_write16(ctx, AGNUS_BLTDPTH, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTDPTL, 0x0000u);
+        rigel_custom_write16(ctx, AGNUS_BLTSIZE, 0x0041u);
+
+        rigel_agnus_step(ctx, 8u);
+
+        if (hold_ram.words[0] != 0x8000u) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+
+        rigel_destroy(ctx);
+    }
+
     return 0;
 }

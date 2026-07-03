@@ -52,6 +52,22 @@ static inline uint32_t make_ptr(
     return (old_value & 0xFFFF0000u) | (uint32_t)(value & 0xFFFEu);
 }
 
+static inline uint16_t make_b_hold(const BlitterRegs *r, uint16_t value)
+{
+    uint8_t shift = (uint8_t)((r->bltcon1 >> 12) & 0x0Fu);
+
+    if (shift == 0) {
+        return value;
+    }
+
+    if ((r->bltcon1 & 0x0002u) != 0u) {
+        return (uint16_t)((((uint32_t)value << 16) | r->bltbdat) >>
+                          (16u - shift));
+    }
+
+    return (uint16_t)((((uint32_t)r->bltbdat << 16) | value) >> shift);
+}
+
 void blitter_init(BlitterState *b)
 {
     memset(b, 0, sizeof(*b));
@@ -188,6 +204,7 @@ void blitter_write_reg16(
             return;
 
         case REG_BLTBDAT:
+            b->regs.bltbhold = make_b_hold(&b->regs, value);
             b->regs.bltbdat = value;
             return;
 

@@ -85,6 +85,7 @@ typedef struct BlitterRegs {
     uint16_t bltbdat;
     uint16_t bltcdat;
     uint16_t bltddat;
+    uint16_t bltbhold;
 
     uint16_t bltafwm;
     uint16_t bltalwm;
@@ -114,6 +115,7 @@ typedef struct BlitCommand {
     uint16_t adat;
     uint16_t bdat;
     uint16_t cdat;
+    uint16_t bhold;
 
     uint16_t afwm;
     uint16_t alwm;
@@ -152,6 +154,7 @@ typedef struct BlitterResult {
     uint16_t final_bdat;
     uint16_t final_cdat;
     uint16_t final_ddat;
+    uint16_t final_bhold;
 
     bool zero;
 } BlitterResult;

@@ -18,6 +18,7 @@ bool rigel_blitter_domain_owns_reg(rigel_u32 addr)
     case 0x054:
     case 0x056:
     case 0x058:
+    case 0x05A:  /* ECS BLTCON0L */
     case 0x05C:  /* ECS BLTSIZV */
     case 0x05E:  /* ECS BLTSIZH */
     case 0x060:

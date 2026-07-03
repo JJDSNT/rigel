@@ -19,6 +19,7 @@ void blitter_publish_result(BlitterState *b)
     b->regs.bltbdat = b->result.final_bdat;
     b->regs.bltcdat = b->result.final_cdat;
     b->regs.bltddat = b->result.final_ddat;
+    b->regs.bltbhold = b->result.final_bhold;
 
     /*
      * BLTSIZV/BLTSIZH are latches on real hardware and survive a completed

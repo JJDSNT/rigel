@@ -237,6 +237,7 @@ typedef struct BlitterCopyState {
     uint32_t dpt;
     uint16_t previous_a;
     uint16_t previous_b;
+    uint16_t bhold;
     uint16_t last_adat;
     uint16_t last_bdat;
     uint16_t last_cdat;
@@ -258,6 +259,7 @@ static void blitter_copy_state_init(
     state->last_adat = cmd->adat;
     state->last_bdat = cmd->bdat;
     state->last_cdat = cmd->cdat;
+    state->bhold = cmd->bhold;
     state->fill_carry = cmd->fill_carry_in ? 1u : 0u;
     state->zero = true;
 }
@@ -293,6 +295,7 @@ static void blitter_copy_publish_result(
     result->final_bdat = state->last_bdat;
     result->final_cdat = state->last_cdat;
     result->final_ddat = state->last_ddat;
+    result->final_bhold = state->bhold;
     result->zero = state->zero;
 }
 
@@ -321,6 +324,7 @@ static bool execute_line_mode(
         result->final_bdat = cmd->bdat;
         result->final_cdat = cmd->cdat;
         result->final_ddat = 0;
+        result->final_bhold = cmd->bhold;
         result->zero = true;
         return true;
     }
@@ -424,6 +428,7 @@ static bool execute_line_mode(
     result->final_adat = cmd->adat;
     result->final_bdat = cmd->bdat;
     result->final_cdat = last_cdat;
+    result->final_bhold = cmd->bhold;
     result->zero = zero;
 
     return true;
@@ -450,8 +455,6 @@ static bool execute_copy_mode(
     blitter_copy_state_init(&state, cmd);
 
     for (uint32_t y = 0; y < cmd->height_lines; ++y) {
-        state.previous_a = 0;
-        state.previous_b = 0;
         state.fill_carry = cmd->fill_carry_in ? 1u : 0u;
 
         for (uint32_t x = 0; x < cmd->width_words; ++x) {
@@ -494,19 +497,23 @@ static bool execute_copy_mode(
                     cmd->ashift
                 );
 
-            uint16_t B =
-                blitter_apply_shift(
-                    cmd->descending,
-                    state.previous_b,
-                    bdat,
-                    cmd->bshift
-                );
+            uint16_t B = state.bhold;
 
             uint16_t C = cdat;
             uint16_t D;
 
             state.previous_a = adat;
-            state.previous_b = bdat;
+            if (cmd->use_b) {
+                state.bhold =
+                    blitter_apply_shift(
+                        cmd->descending,
+                        state.previous_b,
+                        bdat,
+                        cmd->bshift
+                    );
+                state.previous_b = bdat;
+                B = state.bhold;
+            }
 
             if (pending_d) {
                 chip_write16(&mem, pending_dpt, pending_ddat);

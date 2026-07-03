@@ -47,6 +47,7 @@ void blitter_build_command(BlitterState *b)
     cmd->adat = r->bltadat;
     cmd->bdat = r->bltbdat;
     cmd->cdat = r->bltcdat;
+    cmd->bhold = r->bltbhold;
 
     cmd->afwm = r->bltafwm;
     cmd->alwm = r->bltalwm;

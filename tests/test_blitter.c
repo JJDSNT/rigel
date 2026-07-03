@@ -18,6 +18,12 @@ int main(void)
         return 1;
     }
 
+    rigel_custom_write16(ctx, 0x05au, 0x003cu);
+    if (rigel_custom_read16(ctx, AGNUS_BLTCON0) != 0x0f3c) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
     if (rigel_custom_read16(ctx, AGNUS_BLTADAT) != 0x1234) {
         rigel_destroy(ctx);
         return 1;
