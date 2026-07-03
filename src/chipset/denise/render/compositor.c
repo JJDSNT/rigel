@@ -89,6 +89,7 @@ static void compose_line(RigelDenise *denise)
     unsigned ddf0 = ((unsigned)output->ddfstrt_lores + 2u * pipeline_lead) * hscale;
     rigel_u16 x_start = denise->video.visible_x_start;
     rigel_u16 x_stop  = denise->video.visible_x_stop;   /* exclusive */
+    unsigned display_words = (denise->video.width + 15u) / 16u;
     rigel_u16 w, px;
     rigel_u32 scanline_count;
 
@@ -243,6 +244,8 @@ static void compose_line(RigelDenise *denise)
                     rigel_u16 block_words[6];
                     uint8_t   pixels_chunky[16];
                     unsigned  p;
+                    if (w >= display_words)
+                        continue;
                     for (p = 0; p < 6; p++)
                         block_words[p] = (p < depth) ? output->plane_words[p][w] : 0u;
                     planar_to_chunky(block_words, depth, pixels_chunky);

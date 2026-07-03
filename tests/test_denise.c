@@ -8,11 +8,15 @@ enum {
     TEST_FRAME_CYCLES = 227u * 262u,
     TEST_VISIBLE_Y_START = 26u,
     TEST_VISIBLE_WIDTH = 320u,
-    TEST_LEFT_BORDER = 0x38u,
+    TEST_HIRES_VISIBLE_WIDTH = 640u,
+    TEST_LEFT_BORDER = 32u,
     TEST_EXPORTED_WIDTH = TEST_LEFT_BORDER + TEST_VISIBLE_WIDTH,
+    TEST_HIRES_EXPORTED_WIDTH = TEST_LEFT_BORDER + TEST_HIRES_VISIBLE_WIDTH,
     TEST_BPL_WORDS = TEST_VISIBLE_WIDTH / 16u,
+    TEST_HIRES_BPL_WORDS = TEST_HIRES_VISIBLE_WIDTH / 16u,
     TEST_BPL1_ADDR = 0x0000u,
     TEST_BPL2_ADDR = 0x0040u,
+    TEST_HIRES_BPL2_ADDR = 0x0100u,
     TEST_REG_BPLCON0 = 0x100u,
     TEST_REG_BPLCON1 = 0x102u,
     TEST_REG_BPLCON2 = 0x104u,
@@ -92,6 +96,22 @@ static void setup_lores_dualpf_two_bitplanes(RigelContext *ctx, rigel_u16 ddfstr
 {
     setup_lores_two_bitplanes(ctx, ddfstrt, ddfstop);
     rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0x2400u);
+}
+
+static void setup_hires_wb13_two_bitplanes(RigelContext *ctx)
+{
+    rigel_custom_write16(ctx, RIGEL_REG_DIWHIGH, 0x2100u);
+    rigel_custom_write16(ctx, RIGEL_REG_DIWSTRT, 0x2b7eu);
+    rigel_custom_write16(ctx, RIGEL_REG_DIWSTOP, 0x2bbeu);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTRT, 0x0038u);
+    rigel_custom_write16(ctx, RIGEL_REG_DDFSTOP, 0x00d8u);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL1PTH, TEST_BPL1_PTR_HI);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL1PTL, TEST_BPL1_PTR_LO);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL2PTH, (TEST_HIRES_BPL2_ADDR >> 16) & 0xffffu);
+    rigel_custom_write16(ctx, RIGEL_REG_BPL2PTL, TEST_HIRES_BPL2_ADDR & 0xffffu);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON0, 0xa302u);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON1, 0x0055u);
+    rigel_custom_write16(ctx, TEST_REG_BPLCON2, 0x0024u);
 }
 
 static int test_visual_bitplane_frame(RigelContext *ctx, rigel_u16 *chip_ram)
@@ -244,6 +264,48 @@ static int test_singlepf_bplcon1_even_plane_scroll(RigelContext *ctx, rigel_u16 
         pixels[TEST_LEFT_BORDER + 72u] != 0x000000ffu ||
         pixels[TEST_LEFT_BORDER + 73u] != 0x00000000u) {
         return 1;
+    }
+
+    return 0;
+}
+
+static int test_hires_prefetch_words_are_not_displayed(RigelContext *ctx, rigel_u16 *chip_ram)
+{
+    rigel_frame_t frame;
+    const rigel_u32 *pixels;
+    unsigned i;
+    unsigned y = TEST_VISIBLE_Y_START;
+    unsigned sentinel_x0 = TEST_LEFT_BORDER + 543u;
+    unsigned sentinel_x1 = TEST_LEFT_BORDER + 574u;
+
+    rigel_reset(ctx);
+    memset(chip_ram, 0, 256u * sizeof(chip_ram[0]));
+    for (i = 0; i < TEST_HIRES_BPL_WORDS; ++i) {
+        chip_ram[(TEST_BPL1_ADDR >> 1) + i] = 0x0000u;
+        chip_ram[(TEST_HIRES_BPL2_ADDR >> 1) + i] = 0x0000u;
+    }
+    chip_ram[(TEST_BPL1_ADDR >> 1) + TEST_HIRES_BPL_WORDS] = 0xffffu;
+    chip_ram[(TEST_BPL1_ADDR >> 1) + TEST_HIRES_BPL_WORDS + 1u] = 0xffffu;
+    setup_hires_wb13_two_bitplanes(ctx);
+    rigel_custom_write16(ctx, RIGEL_REG_COLOR00, 0x0000u);
+    rigel_custom_write16(ctx, TEST_REG_COLOR01, 0x0fffu);
+    rigel_custom_write16(
+        ctx,
+        RIGEL_REG_DMACON,
+        RIGEL_SETCLR | RIGEL_DMACON_DMAEN | RIGEL_DMACON_BPLEN
+    );
+
+    if ((rigel_step(ctx, (rigel_cycle_t)TEST_FRAME_CYCLES).events & RIGEL_EVENT_FRAME_READY) == 0)
+        return 1;
+    if (!rigel_get_frame(ctx, &frame))
+        return 1;
+    if (frame.width != TEST_HIRES_EXPORTED_WIDTH || frame.height != 256u)
+        return 1;
+    pixels = (const rigel_u32 *)frame.pixels;
+
+    for (i = sentinel_x0; i <= sentinel_x1; ++i) {
+        if (pixels[y * frame.width + i] != 0x00000000u)
+            return 1;
     }
 
     return 0;
@@ -749,6 +811,14 @@ int main(void)
 
     {
         int rc = test_singlepf_bplcon1_even_plane_scroll(ctx, chip_ram);
+        if (rc != 0) {
+            rigel_destroy(ctx);
+            return 1;
+        }
+    }
+
+    {
+        int rc = test_hires_prefetch_words_are_not_displayed(ctx, chip_ram);
         if (rc != 0) {
             rigel_destroy(ctx);
             return 1;

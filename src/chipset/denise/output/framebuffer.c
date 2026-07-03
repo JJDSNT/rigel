@@ -44,8 +44,8 @@ static void copy_visible_line_to_target(const RigelDenise *denise)
     x0 = denise->video.visible_x_start;
     if (x0 > denise->video.visible_x_stop)
         x0 = 0u;
-    if (x0 > 128u)
-        x0 = (rigel_u16)(x0 - 128u);
+    if (x0 > 32u)
+        x0 = (rigel_u16)(x0 - 32u);
     else
         x0 = 0u;
 

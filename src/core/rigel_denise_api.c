@@ -24,8 +24,8 @@ static void rigel_denise_frame_x_bounds(const RigelDenise *denise,
      * outside the DIW, including the hardware mouse pointer at the left edge,
      * remain visible.
      */
-    if (start > 128u) {
-        start = (rigel_u16)(start - 128u);
+    if (start > 32u) {
+        start = (rigel_u16)(start - 32u);
     } else {
         start = 0u;
     }
