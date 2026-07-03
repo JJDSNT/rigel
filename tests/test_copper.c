@@ -26,13 +26,13 @@ int main(void)
     dma_set_dmacon(&dma, 0x0280u);
     /* WAIT at vpos=0, hpos=10, full masks */
     rigel_copper_domain_set_wait(&copper, 0, 10, 0xFF, 0xFE);
-    rigel_copper_domain_step(&copper, &beam, &dma);
+    rigel_copper_domain_step(&copper, &beam, &dma, false);
     if (copper.triggered) {
         return 1;
     }
 
     beam_step(&beam, 10);
-    rigel_copper_domain_step(&copper, &beam, &dma);
+    rigel_copper_domain_step(&copper, &beam, &dma, false);
     if (!copper.triggered || copper.waiting || copper.program_counter != 0x00012344u) {
         return 1;
     }
@@ -45,8 +45,25 @@ int main(void)
     rigel_copper_domain_set_wait(&copper, 0x80, 0, 0x7F, 0xFE);
     beam_reset(&beam);
     beam_step(&beam, 227);   /* advance to vpos=1 */
-    rigel_copper_domain_step(&copper, &beam, &dma);
+    rigel_copper_domain_step(&copper, &beam, &dma, false);
     if (!copper.triggered || copper.waiting) {
+        return 1;
+    }
+
+    /* WAIT with BFD=0 (wait_blitter): does not trigger while the blitter is
+     * busy, triggers once it is idle. */
+    copper_reset(&copper);
+    dma_set_dmacon(&dma, 0x0280u);
+    rigel_copper_domain_set_wait(&copper, 0, 10, 0xFF, 0xFE);
+    copper.wait_blitter = true;
+    beam_reset(&beam);
+    beam_step(&beam, 10);
+    rigel_copper_domain_step(&copper, &beam, &dma, true);
+    if (copper.triggered || !copper.waiting) {
+        return 1;
+    }
+    rigel_copper_domain_step(&copper, &beam, &dma, false);
+    if (!copper.triggered || copper.waiting || copper.wait_blitter) {
         return 1;
     }
 
