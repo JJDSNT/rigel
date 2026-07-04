@@ -90,7 +90,9 @@ static void compose_line(RigelDenise *denise)
     unsigned ddf0 = ((unsigned)output->ddfstrt_lores + pipeline_lead) * hscale;
     rigel_u16 x_start = denise->video.visible_x_start;
     rigel_u16 x_stop  = denise->video.visible_x_stop;   /* exclusive */
+#if RIGEL_ENABLE_STDLIB_ENV
     unsigned display_words = (denise->video.width + 15u) / 16u;
+#endif
     rigel_u16 w, px;
     rigel_u32 scanline_count;
 

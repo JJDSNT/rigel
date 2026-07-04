@@ -1,19 +1,25 @@
 #include "blitter.h"
 
+#include <string.h>
+
+#if RIGEL_ENABLE_STDLIB_ENV
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#endif
 
 /* Env-gated diagnostic: RIGEL_BLT_W_TRACE_RANGE=lo:hi logs every blitter
  * memory write landing in [lo,hi] (chip addr), to attribute buffer clears/
  * overwrites that CPU-side watchpoints cannot see. */
+#if RIGEL_ENABLE_STDLIB_ENV
 static int s_blt_w_trace_init = 0;
 static uint32_t s_blt_w_lo = 0, s_blt_w_hi = 0;
 static int s_blt_w_enabled = 0;
+#endif
 
 void rigel_blt_w_trace(uint32_t addr, uint16_t value);
 void rigel_blt_w_trace(uint32_t addr, uint16_t value)
 {
+#if RIGEL_ENABLE_STDLIB_ENV
     if (!s_blt_w_trace_init) {
         const char *spec = getenv("RIGEL_BLT_W_TRACE_RANGE");
         s_blt_w_trace_init = 1;
@@ -30,6 +36,10 @@ void rigel_blt_w_trace(uint32_t addr, uint16_t value)
     }
     if (s_blt_w_enabled && addr >= s_blt_w_lo && addr <= s_blt_w_hi)
         printf("[BLT-W] addr=%06x val=%04x\n", (unsigned)addr, value);
+#else
+    (void)addr;
+    (void)value;
+#endif
 }
 
 static inline uint16_t chip_read16(
