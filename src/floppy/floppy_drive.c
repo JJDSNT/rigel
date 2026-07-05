@@ -41,7 +41,10 @@ void floppy_init(FloppyDrive *d)
     d->track0 = 1;
 
     d->disk_inserted = 0;
-    d->disk_changed = 0; /* not connected: no change pending */
+    /* The mechanical change latch is only cleared by stepping with media
+     * present. An empty drive therefore powers up with /CHNG asserted LOW
+     * (change pending) — same as real hardware and vAmiga. */
+    d->disk_changed = 1;
     d->write_protected = 1;
 
     d->step_latch = 1;
