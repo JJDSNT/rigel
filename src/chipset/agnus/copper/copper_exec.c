@@ -110,8 +110,23 @@ void copper_exec_move(RigelContext *ctx, rigel_u16 ir1, rigel_u16 ir2)
         rigel_log_info(msg);
 #endif
     }
-    if (reg == 0x096u || reg == 0x100u ||
-        (reg >= 0x0e0u && reg <= 0x0f6u) ||
+    if (reg == 0x096u || reg == 0x100u) {
+        rigel_log_event_t event = {
+            RIGEL_LOG_EVENT_COPPER_WRITE,
+            "copper_write",
+            {
+                reg,
+                ir2,
+                ctx->chipset.agnus.copper.program_counter & 0x00ffffffu,
+                ctx->chipset.agnus.beam.hpos,
+                ctx->chipset.agnus.beam.vpos,
+                (rigel_u32)(ctx->chipset.agnus.beam.frame_count & 0xffffffffu),
+                (rigel_u32)(ctx->chipset.agnus.beam.frame_count >> 32)
+            },
+            7u
+        };
+        rigel_log_event(&event);
+    } else if ((reg >= 0x0e0u && reg <= 0x0f6u) ||
         reg == 0x108u || reg == 0x10au ||
         (reg >= 0x180u && reg <= 0x19eu)) {
         static unsigned trace_count = 0u;
