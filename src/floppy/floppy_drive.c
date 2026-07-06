@@ -50,15 +50,18 @@ void floppy_init(FloppyDrive *d)
     d->step_latch = 1;
 
     /*
-     * Drive ID model follows Omega/vAmiga-style behavior:
+     * Drive ID model (AHRM; vAmiga Drive::getDriveId):
      *
-     * - The drive ID is shifted through /DSKCHG, not /DKRDY.
-     * - A standard Amiga 3.5" DD drive has no explicit ID chip.
-     * - Therefore the line is pulled HIGH during ID reads.
-     *
-     * 0xFFFFFFFF means every ID bit reads as 1.
+     * - The ID shift register is read out on /DSKRDY: a 1 bit drives the
+     *   line LOW (active), a 0 bit leaves it HIGH (inactive).
+     * - The internal DF0 drive has no ID shifter, so /DSKRDY stays HIGH
+     *   for the whole scan and Kickstart decodes ID 0x00000000. KS 2.0+
+     *   depends on this: an ID of 0xFFFFFFFF on DF0 reads as an external
+     *   drive and the boot ROM re-runs the ID scan forever (KS20 hang).
+     * - External drives would answer 0xFFFFFFFF (3.5" DD) or
+     *   0xAAAAAAAA (3.5" HD).
      */
-    d->id_data = 0xFFFFFFFFu;
+    d->id_data = 0x00000000u;
     d->id_count = 0;
 
     d->adf = 0;
@@ -384,7 +387,8 @@ int floppy_get_wpro(const FloppyDrive *d)
 
 int floppy_get_idbit(const FloppyDrive *d)
 {
+    /* No drive: nothing pulls /DSKRDY low, the scan reads all zeros. */
     if (!d->connected)
-        return 1;
+        return 0;
     return (int)((d->id_data >> (31u - (d->id_count & 31u))) & 1u);
 }
