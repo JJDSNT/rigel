@@ -10,6 +10,7 @@ int main(void)
     rigel_u32 frame_cycles;
     rigel_u64 frame_us;
     rigel_cycle_t deadline;
+    rigel_cycle_t observable_deadline;
 
     if (ctx == NULL) {
         return 1;
@@ -55,6 +56,14 @@ int main(void)
     );
     deadline = rigel_get_next_deadline(ctx);
     if (deadline != rigel_get_time(ctx) + 1u) {
+        rigel_destroy(ctx);
+        return 1;
+    }
+
+    /* The slot-exact deadline is one CCK away, but the host-observable API is
+     * allowed to cross internal DMA slots processed inside rigel_step(). */
+    observable_deadline = rigel_get_next_observable_deadline(ctx);
+    if (observable_deadline <= rigel_get_time(ctx)) {
         rigel_destroy(ctx);
         return 1;
     }

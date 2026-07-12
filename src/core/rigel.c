@@ -252,7 +252,8 @@ rigel_cycle_t rigel_get_time(const RigelContext *ctx)
     return ctx->chipset.cycles;
 }
 
-rigel_cycle_t rigel_get_next_deadline(const RigelContext *ctx)
+static rigel_cycle_t rigel_get_deadline(const RigelContext *ctx,
+                                        bool include_internal_slot)
 {
     agnus_deadlines_t d;
     rigel_u16 line_end;
@@ -282,12 +283,24 @@ rigel_cycle_t rigel_get_next_deadline(const RigelContext *ctx)
 
     d.audio = audio_cycles_to_next_event(&ctx->chipset.paula.audio);
     d.disk  = disk_cycles_to_next_event(&ctx->chipset.paula.disk);
-    d.slot  = agnus_slot_scheduler_next_event(
-        &ctx->chipset.agnus.scheduler,
-        ctx->chipset.agnus.beam.line_clocks
-    );
+    if (include_internal_slot) {
+        d.slot = agnus_slot_scheduler_next_event(
+            &ctx->chipset.agnus.scheduler,
+            ctx->chipset.agnus.beam.line_clocks
+        );
+    }
 
     return ctx->chipset.cycles + agnus_deadlines_min(&d);
+}
+
+rigel_cycle_t rigel_get_next_deadline(const RigelContext *ctx)
+{
+    return rigel_get_deadline(ctx, true);
+}
+
+rigel_cycle_t rigel_get_next_observable_deadline(const RigelContext *ctx)
+{
+    return rigel_get_deadline(ctx, false);
 }
 
 rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles)

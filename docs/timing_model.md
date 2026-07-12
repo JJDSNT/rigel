@@ -21,6 +21,7 @@ Events are positions in the slot sequence, not raw cycle durations.
 ```c
 rigel_cycle_t       rigel_get_time(const RigelContext *ctx);
 rigel_cycle_t       rigel_get_next_deadline(const RigelContext *ctx);
+rigel_cycle_t       rigel_get_next_observable_deadline(const RigelContext *ctx);
 rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles);
 rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time);
 ```
@@ -28,6 +29,12 @@ rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_tim
 `rigel_get_next_deadline()` answers: "how far can I advance without missing a
 mandatory synchronisation point?" This lets the host run the CPU exactly up to
 the next relevant event without an arbitrary fixed step.
+
+`rigel_get_next_observable_deadline()` excludes internal DMA-slot boundaries.
+Use it when the host only needs externally visible events and calls
+`rigel_step()` for the interval; the internal slot scheduler still processes
+every CCK. Hosts that arbitrate the chip bus slot-by-slot must continue using
+`rigel_get_next_deadline()` and `rigel_get_next_bus_change()`.
 
 `rigel_step_result_t` carries the current time and an event bitmask:
 

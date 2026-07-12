@@ -16,6 +16,9 @@ rigel_u64         rigel_cycles_to_us(rigel_cycle_t cycles, rigel_u32 clock_hz);
 rigel_cycle_t     rigel_us_to_cycles(rigel_u64 microseconds, rigel_u32 clock_hz);
 rigel_cycle_t       rigel_get_time(const RigelContext *ctx);
 rigel_cycle_t       rigel_get_next_deadline(const RigelContext *ctx);
+/* Next host-observable event. Unlike rigel_get_next_deadline(), this excludes
+ * internal DMA-slot boundaries that rigel_step() already processes itself. */
+rigel_cycle_t       rigel_get_next_observable_deadline(const RigelContext *ctx);
 rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles);
 rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time);
 
