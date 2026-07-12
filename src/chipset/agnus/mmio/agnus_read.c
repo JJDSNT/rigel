@@ -10,7 +10,7 @@
 #include "domains/dma/dma_domain.h"
 #include "rigel/rigel_custom.h"
 
-static rigel_u16 agnus_vposr_chip_id(const RigelAgnus *agnus)
+rigel_u16 agnus_vposr_chip_id(const RigelAgnus *agnus)
 {
     bool pal;
 

@@ -48,6 +48,23 @@ typedef struct rigel_step_result {
 Notified events: `IRQ_CHANGED`, `BLIT_DONE`, `VBLANK`, `HBLANK`, `FRAME_READY`,
 `AUDIO_READY`, `COPPER`, `DMA_CHANGED`, `BUS_CHANGED`, `DEADLINE`.
 
+### Read-only beam projection
+
+Multicore hosts can copy the current scan geometry and project VPOS/HPOS at a
+later chipset time without stepping or reading the context:
+
+```c
+rigel_beam_geometry_t beam = rigel_get_beam_geometry(rigel);
+rigel_u16 vpos, hpos;
+bool exact = rigel_beam_position_at(&beam, cpu_time, &vpos, &hpos);
+```
+
+The projection is exact for uniform progressive scan. It returns `false` for
+interlace, long-line toggling, transient LOF/LOL state, invalid snapshots, or a
+time before the snapshot. Hosts must then synchronize with the Rigel owner and
+read VPOSR/VHPOSR normally. The copied snapshot contains no context pointer and
+is safe to publish between host threads.
+
 ## Step approaches
 
 ### A — Cycle-step (current)

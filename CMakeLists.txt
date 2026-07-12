@@ -23,6 +23,7 @@ endif()
 add_library(rigel
     src/chipset/chipset.c
     src/core/rigel.c
+    src/core/rigel_beam_api.c
     src/core/rigel_context.c
     src/core/rigel_audio_api.c
     src/core/rigel_cia_api.c

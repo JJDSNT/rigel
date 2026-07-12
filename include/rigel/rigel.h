@@ -2,6 +2,7 @@
 #define RIGEL_H
 
 #include "rigel_audio.h"
+#include "rigel_beam.h"
 #include "rigel_bus.h"
 #include "rigel_cia.h"
 #include "rigel_config.h"
