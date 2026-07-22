@@ -307,8 +307,10 @@ int cia_timers_write_reg(CIA *cia, uint8_t reg, uint8_t val)
             cia->pb_timer_out |= 0x40u;
         if (val & CIA_CRA_LOAD)
             cia->ta_counter = cia->ta_latch;
-        if (!(cia->cra & CIA_CRA_START) && (cia->cra & CIA_CRA_RUNMODE))
-            cia->ta_counter = cia->ta_latch;
+        /* Stopping the timer (START=0) must NOT reload the counter from the
+         * latch: on real 8520 only the LOAD strobe or an underflow reloads.
+         * A stop-to-read one-shot stopwatch (latch $ffff, start, count, stop,
+         * read elapsed) relies on the counter holding its value when stopped. */
         return 1;
     }
 
@@ -319,8 +321,7 @@ int cia_timers_write_reg(CIA *cia, uint8_t reg, uint8_t val)
             cia->pb_timer_out |= 0x80u;
         if (val & CIA_CRB_LOAD)
             cia->tb_counter = cia->tb_latch;
-        if (!(cia->crb & CIA_CRB_START) && (cia->crb & CIA_CRB_RUNMODE))
-            cia->tb_counter = cia->tb_latch;
+        /* See CRA above: stopping a timer holds the counter, never reloads it. */
         return 1;
     }
 
