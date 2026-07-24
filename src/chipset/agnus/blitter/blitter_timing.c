@@ -2,6 +2,68 @@
 
 #include <string.h>
 
+#if RIGEL_ENABLE_STDLIB_ENV
+#include <stdlib.h>
+#endif
+
+/* Compile-time default for the channel-count cost model on hosts without env
+ * (baremetal). Override with -DRIGEL_BLITTER_CHANNEL_COST_DEFAULT=1. */
+#ifndef RIGEL_BLITTER_CHANNEL_COST_DEFAULT
+#define RIGEL_BLITTER_CHANNEL_COST_DEFAULT 0
+#endif
+
+/* -1 = use env/compile default; 0 = force off; 1 = force on. */
+static int g_channel_cost_override = -1;
+
+void blitter_set_channel_cost_enabled(int on)
+{
+    g_channel_cost_override = (on > 0) ? 1 : (on == 0 ? 0 : -1);
+}
+
+static bool blitter_channel_cost_enabled(void)
+{
+    if (g_channel_cost_override >= 0) {
+        return g_channel_cost_override != 0;
+    }
+#if RIGEL_ENABLE_STDLIB_ENV
+    {
+        const char *env = getenv("RIGEL_BLITTER_CHANNEL_COST");
+        return env != NULL && env[0] != '\0' && env[0] != '0';
+    }
+#else
+    return RIGEL_BLITTER_CHANNEL_COST_DEFAULT != 0;
+#endif
+}
+
+uint32_t blitter_active_channel_count(const BlitCommand *cmd)
+{
+    uint32_t channels = (cmd->use_a ? 1u : 0u)
+                      + (cmd->use_b ? 1u : 0u)
+                      + (cmd->use_c ? 1u : 0u)
+                      + (cmd->use_d ? 1u : 0u);
+
+    return channels == 0u ? 1u : channels;
+}
+
+uint32_t blitter_word_cost(const BlitCommand *cmd)
+{
+    uint32_t cost = blitter_active_channel_count(cmd);
+
+    /*
+     * Extra idle cycle when the blitter writes D but does not read C: the D
+     * write needs its own bus slot with no C read to pair with. This is why a
+     * D-only clear costs 2 cck/word (not 1) and an A->D copy/fill costs 3 (not
+     * 2) on real Agnus — the rates the Copperline timing oracle rows 23/24
+     * cross-checked against FS-UAE and vAmiga. Fill mode adds no further
+     * per-word cost (it resolves inside the D cycle).
+     */
+    if (cmd->use_d && !cmd->use_c) {
+        cost += 1u;
+    }
+
+    return cost;
+}
+
 void blitter_begin_command(BlitterState *b)
 {
     blitter_build_command(b);
@@ -53,7 +115,21 @@ uint32_t blitter_estimate_cycles(const BlitCommand *cmd)
         /* Line mode advances one pixel per granted blitter DMA slot. */
         cycles = (uint32_t)cmd->height_lines;
     } else {
-        cycles = (uint32_t)cmd->width_words * (uint32_t)cmd->height_lines;
+        uint32_t words = (uint32_t)cmd->width_words * (uint32_t)cmd->height_lines;
+
+        if (blitter_channel_cost_enabled()) {
+            /*
+             * Real Agnus spends one chip-bus cycle per active DMA channel per
+             * word (USEA/USEB/USEC/USED), plus one idle cycle when D writes
+             * without a C read. The legacy estimate charged one cycle per word
+             * regardless, running the blitter 2-4x too fast (the 2-3x undercharge
+             * the Copperline timing oracle measured, ISSUE-0071). See
+             * blitter_word_cost() for the per-word rule and its oracle basis.
+             */
+            cycles = words * blitter_word_cost(cmd);
+        } else {
+            cycles = words;
+        }
     }
 
     if (cycles == 0) {

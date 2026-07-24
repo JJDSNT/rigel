@@ -167,6 +167,7 @@ if(RIGEL_BUILD_TESTS)
         test_baremetal_log
         test_blitter
         test_blitter_dma
+        test_blitter_channel_cost
         test_copper
     )
 

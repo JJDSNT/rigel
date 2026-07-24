@@ -86,6 +86,19 @@ bool blitter_execute_reference(
 
 uint32_t blitter_estimate_cycles(const BlitCommand *cmd);
 
+/* Number of active DMA channels (USEA/USEB/USEC/USED) for a COPY command, 1..4. */
+uint32_t blitter_active_channel_count(const BlitCommand *cmd);
+
+/* Chip-bus cycles the blitter spends per output word: one per active channel,
+ * plus one idle cycle when D writes without a C read (D-only clear = 2, A->D
+ * copy/fill = 3, cookie-cut A+B+C+D = 4). Matches the Copperline oracle. */
+uint32_t blitter_word_cost(const BlitCommand *cmd);
+
+/* Opt-in gate for the channel-count cost model (ISSUE-0071). Default OFF, so
+ * shipped builds are byte-identical. on = 1 enable, 0 disable, -1 fall back to
+ * env RIGEL_BLITTER_CHANNEL_COST / RIGEL_BLITTER_CHANNEL_COST_DEFAULT. */
+void blitter_set_channel_cost_enabled(int on);
+
 void blitter_start_timing(BlitterState *b);
 
 void blitter_step_dma(
