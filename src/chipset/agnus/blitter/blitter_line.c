@@ -129,6 +129,7 @@ static void line_state_init(BlitterState *b)
     state->last_ddat   = 0;
     state->zero        = true;
     state->sign        = cmd->line_initial_sign;
+    state->pixel_slot_phase = 0;
     state->initialized = true;
 }
 

@@ -85,16 +85,19 @@ int main(void)
                   blitter_estimate_cycles(&ad), 600);
     }
 
-    /* --- 3. line mode is unaffected by the gate --------------------------- */
+    /* --- 3. line mode: two bus cycles per pixel when cycle-exact ----------- */
     {
         BlitCommand line;
         memset(&line, 0, sizeof(line));
         line.mode = BLITTER_MODE_LINE;
         line.height_lines = 37;
 
+        blitter_set_channel_cost_enabled(0);
+        check_u32("line OFF => 1 slot/pixel", blitter_estimate_cycles(&line), 37);
+
         blitter_set_channel_cost_enabled(1);
-        check_u32("line mode ignores channel cost",
-                  blitter_estimate_cycles(&line), 37);
+        check_u32("line ON => 2 slots/pixel (C read + D write)",
+                  blitter_estimate_cycles(&line), 74);
     }
 
     /* restore default so nothing leaks into other state */

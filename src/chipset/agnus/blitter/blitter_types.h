@@ -65,6 +65,10 @@ typedef struct BlitterLineState {
     bool     zero;
     bool     sign;
     bool     initialized;
+    /* Cycle-exact cadence: each line pixel is a C read + D write = two chip-bus
+     * slots. 0 = next granted slot is the read (no pixel commit yet), 1 = the
+     * write (commit the pixel). Only consulted when the cycle-exact gate is on. */
+    uint8_t  pixel_slot_phase;
 } BlitterLineState;
 
 typedef struct BlitterRegs {

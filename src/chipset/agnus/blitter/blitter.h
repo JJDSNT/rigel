@@ -94,10 +94,12 @@ uint32_t blitter_active_channel_count(const BlitCommand *cmd);
  * copy/fill = 3, cookie-cut A+B+C+D = 4). Matches the Copperline oracle. */
 uint32_t blitter_word_cost(const BlitCommand *cmd);
 
-/* Opt-in gate for the channel-count cost model (ISSUE-0071). Default OFF, so
+/* Opt-in gate for the cycle-exact blitter cost model (ISSUE-0071): per-word
+ * channel cost (COPY) and two-cycle-per-pixel cadence (LINE). Default OFF, so
  * shipped builds are byte-identical. on = 1 enable, 0 disable, -1 fall back to
  * env RIGEL_BLITTER_CHANNEL_COST / RIGEL_BLITTER_CHANNEL_COST_DEFAULT. */
 void blitter_set_channel_cost_enabled(int on);
+bool blitter_cycle_exact_enabled(void);
 
 void blitter_start_timing(BlitterState *b);
 

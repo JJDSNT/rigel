@@ -13,18 +13,31 @@ void blitter_step_dma(
         return;
     }
 
-    /* LINE mode: one pixel per DMA slot using the incremental Bresenham path. */
+    /* LINE mode: each pixel is a C read + D write. The legacy model commits a
+     * pixel every granted slot (1 bus cycle/pixel); the cycle-exact model
+     * spends two slots per pixel (the read slot, then the write slot that
+     * commits it), matching real line-blit cadence (oracle row 25). */
     if (b->cmd.mode == BLITTER_MODE_LINE) {
+        bool two_cycle = blitter_cycle_exact_enabled();
+
         for (i = 0; i < dma_slots; i++) {
             if (blitter_line_done(b)) {
                 break;
             }
 
-            blitter_line_step(b, mem, irq);
             b->dma_slots_consumed++;
             if (b->cycles_remaining > 0u) {
                 b->cycles_remaining--;
             }
+
+            if (two_cycle && b->line_state.pixel_slot_phase == 0u) {
+                /* Read slot: consume the bus cycle, defer the pixel commit. */
+                b->line_state.pixel_slot_phase = 1u;
+                continue;
+            }
+            b->line_state.pixel_slot_phase = 0u;
+
+            blitter_line_step(b, mem, irq);
 
             if (blitter_line_done(b)) {
                 b->cycles_remaining = 0;

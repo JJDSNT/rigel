@@ -20,7 +20,7 @@ void blitter_set_channel_cost_enabled(int on)
     g_channel_cost_override = (on > 0) ? 1 : (on == 0 ? 0 : -1);
 }
 
-static bool blitter_channel_cost_enabled(void)
+bool blitter_cycle_exact_enabled(void)
 {
     if (g_channel_cost_override >= 0) {
         return g_channel_cost_override != 0;
@@ -112,12 +112,22 @@ uint32_t blitter_estimate_cycles(const BlitCommand *cmd)
     uint32_t cycles;
 
     if (cmd->mode == BLITTER_MODE_LINE) {
-        /* Line mode advances one pixel per granted blitter DMA slot. */
+        /*
+         * Line mode draws one pixel per iteration, and each pixel is a
+         * read-modify-write of the destination word: a C read plus a D write,
+         * i.e. two chip-bus cycles. The legacy model charged one slot per
+         * pixel, running line blits 2x too fast (Copperline oracle row 25:
+         * 0.49x of the FS-UAE reference). See blitter_dma.c for the two-slot
+         * cadence.
+         */
         cycles = (uint32_t)cmd->height_lines;
+        if (blitter_cycle_exact_enabled()) {
+            cycles *= 2u;
+        }
     } else {
         uint32_t words = (uint32_t)cmd->width_words * (uint32_t)cmd->height_lines;
 
-        if (blitter_channel_cost_enabled()) {
+        if (blitter_cycle_exact_enabled()) {
             /*
              * Real Agnus spends one chip-bus cycle per active DMA channel per
              * word (USEA/USEB/USEC/USED), plus one idle cycle when D writes
