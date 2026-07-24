@@ -44,6 +44,7 @@ rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx);
 rigel_cycle_t     rigel_get_next_bus_change(const RigelContext *ctx);
 bool              rigel_cpu_can_access_chip_ram(const RigelContext *ctx);
 bool              rigel_cpu_can_access_custom(const RigelContext *ctx);
+bool              rigel_cpu_would_stall(const RigelContext *ctx);
 rigel_cycle_t     rigel_get_cpu_resume_time(const RigelContext *ctx);
 
 #endif

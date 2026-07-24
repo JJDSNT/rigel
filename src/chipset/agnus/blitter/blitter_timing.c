@@ -2,39 +2,6 @@
 
 #include <string.h>
 
-#if RIGEL_ENABLE_STDLIB_ENV
-#include <stdlib.h>
-#endif
-
-/* Compile-time default for the channel-count cost model on hosts without env
- * (baremetal). Override with -DRIGEL_BLITTER_CHANNEL_COST_DEFAULT=1. */
-#ifndef RIGEL_BLITTER_CHANNEL_COST_DEFAULT
-#define RIGEL_BLITTER_CHANNEL_COST_DEFAULT 0
-#endif
-
-/* -1 = use env/compile default; 0 = force off; 1 = force on. */
-static int g_channel_cost_override = -1;
-
-void blitter_set_channel_cost_enabled(int on)
-{
-    g_channel_cost_override = (on > 0) ? 1 : (on == 0 ? 0 : -1);
-}
-
-bool blitter_cycle_exact_enabled(void)
-{
-    if (g_channel_cost_override >= 0) {
-        return g_channel_cost_override != 0;
-    }
-#if RIGEL_ENABLE_STDLIB_ENV
-    {
-        const char *env = getenv("RIGEL_BLITTER_CHANNEL_COST");
-        return env != NULL && env[0] != '\0' && env[0] != '0';
-    }
-#else
-    return RIGEL_BLITTER_CHANNEL_COST_DEFAULT != 0;
-#endif
-}
-
 uint32_t blitter_active_channel_count(const BlitCommand *cmd)
 {
     uint32_t channels = (cmd->use_a ? 1u : 0u)
@@ -92,21 +59,13 @@ void blitter_publish_result(BlitterState *b)
      */
 }
 
-uint32_t blitter_estimate_cycles(const BlitCommand *cmd)
+uint32_t blitter_estimate_cycles(const BlitCommand *cmd, bool cycle_exact)
 {
     /*
-     * Very rough initial estimation.
-     *
-     * This is NOT cycle exact.
-     * It only provides observable timing
-     * coherent enough for the current early integration stage.
-     *
-     * Future versions can model:
-     *   - DMA slot ownership
-     *   - bus contention
-     *   - nasty mode
-     *   - line mode timing
-     *   - fill mode timing
+     * cycle_exact selects the hardware-faithful cost model; when false the
+     * legacy coarse estimate is used (one slot per word / per pixel). The mode
+     * comes from rigel_config.cycle_exact via BlitterState.cycle_exact — it is
+     * not a per-module flag. See ISSUE-0071.
      */
 
     uint32_t cycles;
@@ -121,13 +80,13 @@ uint32_t blitter_estimate_cycles(const BlitCommand *cmd)
          * cadence.
          */
         cycles = (uint32_t)cmd->height_lines;
-        if (blitter_cycle_exact_enabled()) {
+        if (cycle_exact) {
             cycles *= 2u;
         }
     } else {
         uint32_t words = (uint32_t)cmd->width_words * (uint32_t)cmd->height_lines;
 
-        if (blitter_cycle_exact_enabled()) {
+        if (cycle_exact) {
             /*
              * Real Agnus spends one chip-bus cycle per active DMA channel per
              * word (USEA/USEB/USEC/USED), plus one idle cycle when D writes
@@ -159,7 +118,7 @@ void blitter_start_timing(BlitterState *b)
     memset(&b->line_state, 0, sizeof(b->line_state));
     b->dma_slots_consumed = 0;
     b->cycles_remaining =
-        blitter_estimate_cycles(&b->cmd);
+        blitter_estimate_cycles(&b->cmd, b->cycle_exact);
 
     /*
      * Hardware starts with BLTZERO set.

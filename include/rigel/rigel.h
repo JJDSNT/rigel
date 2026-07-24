@@ -32,6 +32,16 @@ void rigel_chipset_wire(RigelContext *ctx);
 
 void rigel_reset(RigelContext *ctx);
 
+/*
+ * Cycle-exact mode (rigel_config.cycle_exact) — set at runtime for A/B testing
+ * or when the host defers the decision past rigel_create. When on, Rigel applies
+ * the hardware-faithful honest-hybrid cost model (blitter per-word channel cost,
+ * line two-cycle cadence, and — as they land — CPU stall and the per-slot
+ * deadline walk). See ISSUE-0071.
+ */
+void rigel_set_cycle_exact(RigelContext *ctx, bool on);
+bool rigel_get_cycle_exact(const RigelContext *ctx);
+
 void rigel_take_snapshot(const RigelContext *ctx, rigel_snapshot_t *snapshot);
 
 #endif

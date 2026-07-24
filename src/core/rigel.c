@@ -190,6 +190,23 @@ void rigel_reset(RigelContext *ctx)
     );
     rigel_denise_set_framebuffer_target(&ctx->chipset.denise, &ctx->config.framebuffer);
     rigel_chipset_wire(ctx);
+
+    /* Mirror the cycle-exact mode into the blitter; chipset reset cleared it. */
+    ctx->chipset.agnus.blitter.cycle_exact = ctx->config.cycle_exact;
+}
+
+void rigel_set_cycle_exact(RigelContext *ctx, bool on)
+{
+    if (ctx == NULL) {
+        return;
+    }
+    ctx->config.cycle_exact = on;
+    ctx->chipset.agnus.blitter.cycle_exact = on;
+}
+
+bool rigel_get_cycle_exact(const RigelContext *ctx)
+{
+    return ctx != NULL && ctx->config.cycle_exact;
 }
 
 rigel_u32 rigel_get_clock_hz(const RigelContext *ctx)
@@ -657,8 +674,13 @@ rigel_bus_state_t rigel_get_bus_state(const RigelContext *ctx)
         state.cpu_would_stall = agnus_slot_scheduler_cpu_stall(&ctx->chipset.agnus.scheduler);
         state.owner = slot_to_bus_owner(slot_owner);
         state.next_change = ctx->chipset.cycles +
-            agnus_slot_scheduler_next_event(&ctx->chipset.agnus.scheduler,
-                                            ctx->chipset.agnus.beam.line_clocks);
+            (state.cpu_would_stall
+                ? agnus_slot_scheduler_cpu_resume_in(
+                      &ctx->chipset.agnus.scheduler,
+                      ctx->chipset.agnus.beam.line_clocks)
+                : agnus_slot_scheduler_next_event(
+                      &ctx->chipset.agnus.scheduler,
+                      ctx->chipset.agnus.beam.line_clocks));
     }
 
     state.cpu_can_access_chip_ram = !state.cpu_would_stall;
@@ -673,7 +695,7 @@ rigel_cycle_t rigel_get_next_bus_change(const RigelContext *ctx)
 
 bool rigel_cpu_can_access_chip_ram(const RigelContext *ctx)
 {
-    return rigel_get_bus_state(ctx).cpu_can_access_chip_ram;
+    return !rigel_cpu_would_stall(ctx);
 }
 
 bool rigel_cpu_can_access_custom(const RigelContext *ctx)
@@ -683,6 +705,23 @@ bool rigel_cpu_can_access_custom(const RigelContext *ctx)
     }
 
     return true;
+}
+
+bool rigel_cpu_would_stall(const RigelContext *ctx)
+{
+    bool blit_busy;
+    bool blt_pri;
+
+    if (ctx == NULL)
+        return false;
+
+    blit_busy = blitter_is_busy(&ctx->chipset.agnus.blitter) != 0;
+    blt_pri = (ctx->chipset.agnus.dma.dmacon & RIGEL_DMACON_BLTPRI) != 0;
+    if (blit_busy && blt_pri)
+        return true;
+
+    return agnus_slot_scheduler_cpu_stall(
+        &ctx->chipset.agnus.scheduler);
 }
 
 rigel_cycle_t rigel_get_cpu_resume_time(const RigelContext *ctx)

@@ -462,12 +462,6 @@ static void dispatch_slot(agnus_slot_owner_t owner,
 
     case AGNUS_SLOT_COPPER:
         if (ctx) {
-            rigel_copper_domain_step(
-                &ctx->chipset.agnus.copper,
-                &ctx->chipset.agnus.beam,
-                &ctx->chipset.agnus.dma,
-                blitter_is_busy(&ctx->chipset.agnus.blitter) != 0
-            );
             rigel_copper_service_step_program(ctx);
         }
         break;
@@ -643,21 +637,26 @@ void agnus_slot_scheduler_rebuild(agnus_slot_scheduler_t *sched,
                 bitplane_slots++;
             }
         } else {
+            /* OCS/ECS lores fetch order inside each eight-CCK unit:
+             * 8,4,6,2,7,3,5,1. With six planes this deliberately leaves
+             * offsets 0 and 4 available to CPU/Copper/blitter arbitration. */
+            static const rigel_u16 lores_plane_order[8] = {
+                7u, 3u, 5u, 1u, 6u, 2u, 4u, 0u
+            };
             rigel_u16 words = bitplane_words_per_plane(sched);
             rigel_u16 depth = (rigel_u16)(sched->depth & 0x7u);
             rigel_u16 word;
             rigel_u16 plane;
 
             /*
-             * Lores bitplane DMA consumes one slot per active plane inside
-             * each 16-pixel fetch group.  A 6-plane screen therefore uses six
-             * adjacent slots every 8 CCK, not a single stride-2 stream.  The
-             * logical index is still word-major so Denise receives complete
-             * planar words in display order.
+             * The logical index remains word-major even though hardware fetch
+             * order is interleaved, so Denise receives complete planar words
+             * in display order.
              */
             for (word = 0u; word < words; ++word) {
                 for (plane = 0u; plane < depth; ++plane) {
-                    h = (rigel_u16)(bpl_start + word * 8u + plane);
+                    h = (rigel_u16)(bpl_start + word * 8u +
+                                    lores_plane_order[plane]);
                     if (h < AGNUS_SLOTS_PER_LINE) {
                         fill_bitplane_slot(sched, h, bitplane_slots);
                     }
@@ -742,6 +741,7 @@ void agnus_slot_scheduler_init(agnus_slot_scheduler_t *sched)
     sched->line_is_vbl       = false;
     sched->table_dirty       = true;
     sched->copper_active     = false;
+    sched->copper_request    = false;
     sched->blitter_nasty     = false;
     sched->blitter_active    = false;
     sched->fetch_plane_index = 0;
@@ -817,6 +817,17 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
             blitter_is_busy(&ctx->chipset.agnus.blitter) != 0 &&
             dmacon_blten(sched->dmacon);
         sched->copper_active  = dmacon_copen(sched->dmacon);
+        /* WAIT comparison follows the beam without consuming the chip bus.
+         * Only an instruction fetch ready on this CCK requests a FREE slot. */
+        rigel_copper_domain_step(
+            &ctx->chipset.agnus.copper,
+            &ctx->chipset.agnus.beam,
+            &ctx->chipset.agnus.dma,
+            blitter_is_busy(&ctx->chipset.agnus.blitter) != 0
+        );
+        sched->copper_request =
+            sched->copper_active &&
+            ctx->chipset.agnus.copper.fetch_pending;
         sched->blitter_nasty  = (sched->dmacon & DMACON_BLTPRI) != 0;
         sched->hpos           = beam->hpos;
         line_clocks           = beam->line_clocks;
@@ -866,7 +877,7 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
         if (owner == AGNUS_SLOT_FREE ||
             (sched->blitter_nasty && owner == AGNUS_SLOT_CPU))
             owner = AGNUS_SLOT_BLITTER;
-    } else if (sched->copper_active && owner == AGNUS_SLOT_FREE) {
+    } else if (sched->copper_request && owner == AGNUS_SLOT_FREE) {
         owner = AGNUS_SLOT_COPPER;
     }
 
@@ -962,7 +973,7 @@ agnus_slot_owner_t agnus_slot_scheduler_current_owner(const agnus_slot_scheduler
     if (sched->blitter_active) {
         if (o == AGNUS_SLOT_FREE || (sched->blitter_nasty && o == AGNUS_SLOT_CPU))
             return AGNUS_SLOT_BLITTER;
-    } else if (sched->copper_active && o == AGNUS_SLOT_FREE) {
+    } else if (sched->copper_request && o == AGNUS_SLOT_FREE) {
         return AGNUS_SLOT_COPPER;
     }
 
@@ -973,4 +984,30 @@ bool agnus_slot_scheduler_cpu_stall(const agnus_slot_scheduler_t *sched)
 {
     agnus_slot_owner_t o = agnus_slot_scheduler_current_owner(sched);
     return o != AGNUS_SLOT_CPU && o != AGNUS_SLOT_FREE;
+}
+
+rigel_u32 agnus_slot_scheduler_cpu_resume_in(
+    const agnus_slot_scheduler_t *sched, rigel_u16 line_clocks)
+{
+    rigel_u16 h;
+
+    if (sched->table_dirty)
+        return 1u;
+
+    for (h = (rigel_u16)(sched->hpos + 1u); h < line_clocks; h++) {
+        agnus_slot_owner_t o = sched->table[h];
+
+        if (sched->blitter_active) {
+            if (o == AGNUS_SLOT_FREE ||
+                (sched->blitter_nasty && o == AGNUS_SLOT_CPU))
+                o = AGNUS_SLOT_BLITTER;
+        } else if (sched->copper_request && o == AGNUS_SLOT_FREE) {
+            o = AGNUS_SLOT_COPPER;
+        }
+
+        if (o == AGNUS_SLOT_CPU || o == AGNUS_SLOT_FREE)
+            return (rigel_u32)(h - sched->hpos);
+    }
+
+    return (rigel_u32)(line_clocks - sched->hpos);
 }

@@ -21,6 +21,42 @@ static unsigned count_bitplane_slots(const agnus_slot_scheduler_t *sched)
     return count;
 }
 
+static int test_cpu_resume_targets_first_free_slot(void)
+{
+    agnus_slot_scheduler_t sched = { 0 };
+
+    for (unsigned i = 0; i < AGNUS_SLOTS_PER_LINE; ++i)
+        sched.table[i] = AGNUS_SLOT_CPU;
+
+    sched.hpos = 20u;
+    sched.table[20] = AGNUS_SLOT_BITPLANE;
+    sched.table[21] = AGNUS_SLOT_SPRITE_0;
+    sched.table[22] = AGNUS_SLOT_FREE;
+    sched.table[23] = AGNUS_SLOT_BITPLANE;
+
+    if (!agnus_slot_scheduler_cpu_stall(&sched) ||
+        agnus_slot_scheduler_cpu_resume_in(&sched,
+                                           AGNUS_SLOTS_PER_LINE) != 2u) {
+        fprintf(stderr, "CPU resume did not target first free slot\n");
+        return 1;
+    }
+
+    sched.hpos = 22u;
+    sched.copper_active = true;
+    sched.copper_request = false;
+    if (agnus_slot_scheduler_cpu_stall(&sched)) {
+        fprintf(stderr, "sleeping Copper incorrectly stalled CPU\n");
+        return 1;
+    }
+    sched.copper_request = true;
+    if (!agnus_slot_scheduler_cpu_stall(&sched)) {
+        fprintf(stderr, "pending Copper fetch did not own free slot\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 static int expect_bitplane_slot(const agnus_slot_scheduler_t *sched,
                                 rigel_u16 hpos,
                                 rigel_u16 logical)
@@ -43,8 +79,10 @@ static int expect_lores_bitplane_layout(RigelChipset *chipset,
                                         rigel_u16 ddfstrt,
                                         rigel_u16 words)
 {
+    static const rigel_u16 lores_plane_order[6] = {
+        7u, 3u, 5u, 1u, 6u, 2u
+    };
     rigel_u16 expected_slots = (rigel_u16)(words * depth);
-    rigel_u16 last_hpos = (rigel_u16)(ddfstrt + (words - 1u) * 8u + depth - 1u);
 
     if (count_bitplane_slots(&chipset->agnus.scheduler) != expected_slots) {
         fprintf(stderr,
@@ -57,7 +95,8 @@ static int expect_lores_bitplane_layout(RigelChipset *chipset,
 
     for (rigel_u16 plane = 0u; plane < depth; ++plane) {
         if (!expect_bitplane_slot(&chipset->agnus.scheduler,
-                                  (rigel_u16)(ddfstrt + plane),
+                                  (rigel_u16)(ddfstrt +
+                                      lores_plane_order[plane]),
                                   plane)) {
             fprintf(stderr,
                     "missing first lores bitplane slot: depth=%u plane=%u\n",
@@ -67,14 +106,15 @@ static int expect_lores_bitplane_layout(RigelChipset *chipset,
         }
     }
 
-    if (chipset->agnus.scheduler.table[ddfstrt + depth] == AGNUS_SLOT_BITPLANE ||
-        chipset->agnus.scheduler.table[ddfstrt + 7u] == AGNUS_SLOT_BITPLANE) {
-        fprintf(stderr, "unexpected lores bitplane slot in fetch-group gap: depth=%u\n", depth);
-        return 0;
-    }
-
-    if (!expect_bitplane_slot(&chipset->agnus.scheduler, (rigel_u16)(ddfstrt + 8u), depth) ||
-        !expect_bitplane_slot(&chipset->agnus.scheduler, last_hpos, (rigel_u16)(expected_slots - 1u))) {
+    if (!expect_bitplane_slot(
+            &chipset->agnus.scheduler,
+            (rigel_u16)(ddfstrt + 8u + lores_plane_order[0]),
+            depth) ||
+        !expect_bitplane_slot(
+            &chipset->agnus.scheduler,
+            (rigel_u16)(ddfstrt + (words - 1u) * 8u +
+                        lores_plane_order[depth - 1u]),
+            (rigel_u16)(expected_slots - 1u))) {
         fprintf(stderr, "unexpected lores logical slot mapping: depth=%u\n", depth);
         return 0;
     }
@@ -183,10 +223,10 @@ static int test_bplcon0_depth_change_invalidates_slots(RigelContext *ctx,
                                  96u,
                                  &chipset->agnus.refresh);
     if (count_bitplane_slots(&chipset->agnus.scheduler) != 80u ||
-        !expect_bitplane_slot(&chipset->agnus.scheduler, 0x0038u, 0u) ||
-        !expect_bitplane_slot(&chipset->agnus.scheduler, 0x0039u, 1u) ||
-        !expect_bitplane_slot(&chipset->agnus.scheduler, 0x003au, 2u) ||
-        !expect_bitplane_slot(&chipset->agnus.scheduler, 0x003bu, 3u)) {
+        !expect_bitplane_slot(&chipset->agnus.scheduler, 0x003fu, 0u) ||
+        !expect_bitplane_slot(&chipset->agnus.scheduler, 0x003bu, 1u) ||
+        !expect_bitplane_slot(&chipset->agnus.scheduler, 0x003du, 2u) ||
+        !expect_bitplane_slot(&chipset->agnus.scheduler, 0x0039u, 3u)) {
         fprintf(stderr, "unexpected slots after BPLCON0 depth change\n");
         return 1;
     }
@@ -212,6 +252,9 @@ int main(void)
     cfg.chip_ram.opaque = chip_ram;
     cfg.chip_ram.read16 = test_chip_ram_read16;
     cfg.chip_ram.write16 = test_chip_ram_write16;
+    if (test_cpu_resume_targets_first_free_slot() != 0)
+        return 1;
+
     ctx = rigel_create(&cfg);
 
     if (ctx == NULL) {

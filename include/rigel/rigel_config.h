@@ -99,6 +99,17 @@ typedef struct rigel_config {
     rigel_chipset_model_t chipset_model;
     rigel_pixel_format_t pixel_format;
     rigel_framebuffer_target_t framebuffer;
+    /*
+     * Cycle-exact mode. When true, Rigel runs the honest hybrid: the deadline
+     * model skips idle stretches while contended stretches are walked with
+     * hardware-faithful per-cycle costs (blitter per-word channel cost, line
+     * two-cycle-per-pixel cadence, and — as they land — CPU bus stall and the
+     * per-slot deadline walk). When false, Rigel uses the coarser/faster model.
+     * This is the single institutional switch for cost fidelity; the host owns
+     * it (set here or via rigel_set_cycle_exact), and it defaults off so an
+     * unconfigured context behaves as before. See ISSUE-0071.
+     */
+    bool cycle_exact;
 } rigel_config_t;
 
 #endif

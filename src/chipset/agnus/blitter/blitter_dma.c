@@ -18,7 +18,7 @@ void blitter_step_dma(
      * spends two slots per pixel (the read slot, then the write slot that
      * commits it), matching real line-blit cadence (oracle row 25). */
     if (b->cmd.mode == BLITTER_MODE_LINE) {
-        bool two_cycle = blitter_cycle_exact_enabled();
+        bool two_cycle = b->cycle_exact;
 
         for (i = 0; i < dma_slots; i++) {
             if (blitter_line_done(b)) {

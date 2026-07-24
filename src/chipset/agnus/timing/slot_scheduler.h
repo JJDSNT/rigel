@@ -125,9 +125,11 @@ typedef struct agnus_slot_scheduler {
     bool      table_dirty;
 
     /* Dynamic overrides applied per-step (not baked into table):
-     *   copper_active  — copper may steal the next FREE slot
+     *   copper_active  — copper DMA is enabled
+     *   copper_request — copper has an instruction fetch ready this CCK
      *   blitter_nasty  — blitter also steals CPU slots (BLTCON0 bit 10) */
     bool      copper_active;
+    bool      copper_request;
     bool      blitter_nasty;
     bool      blitter_active;
 
@@ -199,5 +201,7 @@ agnus_slot_owner_t agnus_slot_scheduler_current_owner(const agnus_slot_scheduler
 /* True if the CPU would be denied the bus at the current slot
  * (owner != FREE && owner != CPU, or blitter_nasty with blitter active). */
 bool agnus_slot_scheduler_cpu_stall(const agnus_slot_scheduler_t *sched);
+rigel_u32 agnus_slot_scheduler_cpu_resume_in(
+    const agnus_slot_scheduler_t *sched, rigel_u16 line_clocks);
 
 #endif

@@ -69,20 +69,17 @@ int main(void)
         check_u32("word cost A+C+D = 3 (C pairs D)", blitter_word_cost(&acd), 3);
     }
 
-    /* --- 2. gate: default OFF = legacy words ------------------------------- */
+    /* --- 2. cycle_exact off = legacy words, on = per-word cost ------------- */
     {
         BlitCommand abcd = make_copy(true, true, true, true, 20, 10); /* 200 words */
 
-        blitter_set_channel_cost_enabled(0);
-        check_u32("gate OFF => words only", blitter_estimate_cycles(&abcd), 200);
-
-        blitter_set_channel_cost_enabled(1);
-        check_u32("gate ON cookie-cut => words * 4",
-                  blitter_estimate_cycles(&abcd), 800);
+        check_u32("off => words only", blitter_estimate_cycles(&abcd, false), 200);
+        check_u32("on cookie-cut => words * 4",
+                  blitter_estimate_cycles(&abcd, true), 800);
 
         BlitCommand ad = make_copy(true, false, false, true, 20, 10);
-        check_u32("gate ON A->D => words * 3 (2 channels + D idle)",
-                  blitter_estimate_cycles(&ad), 600);
+        check_u32("on A->D => words * 3 (2 channels + D idle)",
+                  blitter_estimate_cycles(&ad, true), 600);
     }
 
     /* --- 3. line mode: two bus cycles per pixel when cycle-exact ----------- */
@@ -92,16 +89,10 @@ int main(void)
         line.mode = BLITTER_MODE_LINE;
         line.height_lines = 37;
 
-        blitter_set_channel_cost_enabled(0);
-        check_u32("line OFF => 1 slot/pixel", blitter_estimate_cycles(&line), 37);
-
-        blitter_set_channel_cost_enabled(1);
-        check_u32("line ON => 2 slots/pixel (C read + D write)",
-                  blitter_estimate_cycles(&line), 74);
+        check_u32("line off => 1 slot/pixel", blitter_estimate_cycles(&line, false), 37);
+        check_u32("line on => 2 slots/pixel (C read + D write)",
+                  blitter_estimate_cycles(&line, true), 74);
     }
-
-    /* restore default so nothing leaks into other state */
-    blitter_set_channel_cost_enabled(-1);
 
     if (failures == 0) {
         printf("test_blitter_channel_cost: OK\n");

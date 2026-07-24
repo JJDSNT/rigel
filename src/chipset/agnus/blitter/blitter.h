@@ -55,6 +55,12 @@ typedef struct BlitterState
 
     bool debug_trace;
 
+    /* Cycle-exact cost mode, mirrored from rigel_config.cycle_exact by
+     * rigel_create/rigel_reset/rigel_set_cycle_exact. When true the blitter
+     * charges hardware-faithful per-word channel cost and two-cycle-per-pixel
+     * line cadence; when false it uses the legacy coarse model. */
+    bool cycle_exact;
+
     BlitterLineState line_state;
 } BlitterState;
 
@@ -84,7 +90,10 @@ bool blitter_execute_reference(
     BlitterMemory mem
 );
 
-uint32_t blitter_estimate_cycles(const BlitCommand *cmd);
+/* Estimate the DMA cost of a blit. cycle_exact selects the hardware-faithful
+ * model (per-word channel cost for COPY, two-cycle-per-pixel for LINE) over the
+ * legacy coarse model; callers pass BlitterState.cycle_exact. */
+uint32_t blitter_estimate_cycles(const BlitCommand *cmd, bool cycle_exact);
 
 /* Number of active DMA channels (USEA/USEB/USEC/USED) for a COPY command, 1..4. */
 uint32_t blitter_active_channel_count(const BlitCommand *cmd);
@@ -93,13 +102,6 @@ uint32_t blitter_active_channel_count(const BlitCommand *cmd);
  * plus one idle cycle when D writes without a C read (D-only clear = 2, A->D
  * copy/fill = 3, cookie-cut A+B+C+D = 4). Matches the Copperline oracle. */
 uint32_t blitter_word_cost(const BlitCommand *cmd);
-
-/* Opt-in gate for the cycle-exact blitter cost model (ISSUE-0071): per-word
- * channel cost (COPY) and two-cycle-per-pixel cadence (LINE). Default OFF, so
- * shipped builds are byte-identical. on = 1 enable, 0 disable, -1 fall back to
- * env RIGEL_BLITTER_CHANNEL_COST / RIGEL_BLITTER_CHANNEL_COST_DEFAULT. */
-void blitter_set_channel_cost_enabled(int on);
-bool blitter_cycle_exact_enabled(void);
 
 void blitter_start_timing(BlitterState *b);
 
