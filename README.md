@@ -14,12 +14,26 @@ ctest --test-dir build --output-on-failure
 ./build/test_blitter       # run a single test
 ```
 
-Optional: Musashi integration harness for timing verification:
+Optional: the Musashi integration harness — a real 68k machine around Rigel,
+used for timing verification and for booting Kickstart against the chipset.
 
 ```sh
-cmake -S . -B build-harness -DRIGEL_BUILD_HARNESS=ON -DRIGEL_BUILD_TESTS=OFF
-cmake --build build-harness
+./run.sh
 ```
+
+That fetches and patches Musashi, builds the harness and the launcher, and
+opens a TUI to pick the ROM, the disk and the machine options. Drop images into
+`media/roms` and `media/disks` (created on first run), or point `MEDIA_DIR`
+somewhere else.
+
+```sh
+./run.sh --headless --frames 600 --screenshot boot.ppm   # options pass through
+./run.sh test                                            # every suite
+KICKSTART=kick13.rom ADF=wb13.adf ./run.sh               # skip the TUI
+```
+
+See [`harness/README.md`](harness/README.md) for the memory map, the full option
+list, and the manual CMake path.
 
 Bare-metal or freestanding-style hosts can disable the default `stderr` log sink:
 

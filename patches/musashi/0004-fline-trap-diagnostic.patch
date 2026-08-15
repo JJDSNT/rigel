@@ -1,0 +1,43 @@
+diff --git a/m68kcpu.h b/m68kcpu.h
+index a743cdb..f3b62ca 100644
+--- a/m68kcpu.h
++++ b/m68kcpu.h
+@@ -41,6 +41,17 @@ extern "C" {
+ 
+ #include <assert.h>
+ #include <limits.h>
++#include <stdio.h>
++
++/* Rigel: diagnostic output hook for the [F-LINE-TRAP] trace below and the
++ * FPU-gate trace in m68k_in.c. Musashi is built as a standalone library with
++ * its own include path, so it cannot reach a Rigel or host header. Hosts
++ * without libc stdio (bare metal) override it on the compiler command line:
++ *   -DRIGEL_M68K_LOG=my_serial_printf
++ * Origin: bellatrix patches/0015 + 0018, where this was a kprintf() alias. */
++#ifndef RIGEL_M68K_LOG
++#define RIGEL_M68K_LOG(...) fprintf(stderr, __VA_ARGS__)
++#endif
+ 
+ #include <setjmp.h>
+ 
+@@ -1994,6 +2005,20 @@ static inline void m68ki_exception_1111(void)
+ {
+ 	uint sr;
+ 
++	/* Rigel: F-line traps are otherwise silent on the host side — the guest
++	 * shows an Alert, but nothing tells us WHICH opcode faulted. Capped, so a
++	 * boot loop that keeps re-triggering this cannot flood the log. */
++	{
++		static int s_hits = 0;
++		if (s_hits < 30) {
++			s_hits++;
++			RIGEL_M68K_LOG("[F-LINE-TRAP] pc=%08x ir=%04x opcode_bytes=%04x %04x\n",
++			               (unsigned)ADDRESS_68K(REG_PPC), (unsigned)REG_IR,
++			               (unsigned)m68k_read_immediate_16(ADDRESS_68K(REG_PPC)),
++			               (unsigned)m68k_read_immediate_16(ADDRESS_68K(REG_PPC) + 2));
++		}
++	}
++
+ #if M68K_LOG_1010_1111 == M68K_OPT_ON
+ 	M68K_DO_LOG_EMU((M68K_LOG_FILEHANDLE "%s at %08x: called 1111 instruction %04x (%s)\n",
+ 					 m68ki_cpu_names[CPU_TYPE], ADDRESS_68K(REG_PPC), REG_IR,

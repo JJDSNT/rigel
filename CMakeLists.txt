@@ -214,6 +214,28 @@ endif()
 if(RIGEL_BUILD_HARNESS)
     set(MUSASHI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/musashi)
 
+    if(NOT EXISTS ${MUSASHI_DIR}/m68kcpu.c)
+        message(FATAL_ERROR
+            "external/musashi is empty. Run:\n"
+            "    git submodule update --init external/musashi\n"
+            "    scripts/apply_musashi_patches.sh")
+    endif()
+
+    # Rigel's local Musashi changes live in patches/musashi and are applied to
+    # the submodule, not committed into it. Building against a pristine tree
+    # would silently lose the FPU fixes and the F-line diagnostic.
+    execute_process(
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/apply_musashi_patches.sh --check
+        RESULT_VARIABLE MUSASHI_PATCHED
+        OUTPUT_QUIET ERROR_QUIET
+    )
+    if(NOT MUSASHI_PATCHED EQUAL 0)
+        message(FATAL_ERROR
+            "external/musashi is missing Rigel's patches. Run:\n"
+            "    scripts/apply_musashi_patches.sh\n"
+            "See patches/musashi/README.md.")
+    endif()
+
     # Generate m68kops.c / m68kops.h from m68k_in.c
     add_executable(m68kmake ${MUSASHI_DIR}/m68kmake.c)
     set(MUSASHI_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/musashi_gen)
@@ -242,10 +264,16 @@ if(RIGEL_BUILD_HARNESS)
 
     add_library(rigel_harness STATIC
         harness/harness.c
+        harness/expansions/lide.c
+        harness/expansions/fastram.c
+        harness/expansions/zorro.c
+        harness/expansions/ata_ide.c
+        harness/expansions/atapi_cdrom.c
     )
     target_link_libraries(rigel_harness PUBLIC rigel musashi)
     target_include_directories(rigel_harness PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/harness
+        ${CMAKE_CURRENT_SOURCE_DIR}/harness/expansions
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${MUSASHI_DIR}
     )
@@ -261,4 +289,36 @@ if(RIGEL_BUILD_HARNESS)
         target_link_libraries(harness_${test_name} PRIVATE rigel_harness)
         add_test(NAME harness_${test_name} COMMAND harness_${test_name})
     endforeach()
+
+    # ---------------------------------------------------------------------
+    # rigel-harness front-end
+    #
+    # SDL2 is optional: without it the front-end still builds and runs
+    # headless, which is all CI needs.
+    # ---------------------------------------------------------------------
+    add_executable(rigel-harness harness/main.c harness/harness_diag.c)
+    target_link_libraries(rigel-harness PRIVATE rigel_harness m)
+
+    find_package(SDL2 QUIET)
+    if(NOT SDL2_FOUND)
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(SDL2 QUIET sdl2)
+        endif()
+    endif()
+
+    if(SDL2_FOUND)
+        target_sources(rigel-harness PRIVATE harness/harness_video.c)
+        target_compile_definitions(rigel-harness PRIVATE RIGEL_HARNESS_SDL=1)
+        if(TARGET SDL2::SDL2)
+            target_link_libraries(rigel-harness PRIVATE SDL2::SDL2)
+        else()
+            target_include_directories(rigel-harness PRIVATE ${SDL2_INCLUDE_DIRS})
+            target_link_libraries(rigel-harness PRIVATE ${SDL2_LIBRARIES})
+            target_link_directories(rigel-harness PRIVATE ${SDL2_LIBRARY_DIRS})
+        endif()
+        message(STATUS "rigel-harness: SDL2 found, interactive video enabled")
+    else()
+        message(STATUS "rigel-harness: SDL2 not found, headless only")
+    endif()
 endif()

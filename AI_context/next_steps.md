@@ -1,26 +1,34 @@
 # Next Steps
 
-## Immediate — Host integration blockers (ordered by cost/benefit)
+## Immediate — what the harness found
 
-1. **CIA into chipset** ← maior gap
-   - Add `CIA_State cia[2]` to `RigelChipset`
-   - CIA-A attached to INTREQ PORTS (bit 3), CIA-B to INTREQ EXTER (bit 13)
-   - Step CIA at E-clock rate (CCK / 5) from `rigel_chipset_step`
-   - Pulse CIA-A TOD on VBL
-   - Add `rigel_cia.h`: `rigel_cia_read8 / rigel_cia_write8`
-   - Add `rigel_keyboard.h`: `rigel_keyboard_inject(ctx, keycode, pressed)` via `cia_receive_sdr(cia_b, ...)`
+The old "host integration blockers" list here is done: CIA, the serial API, RTC
+in `rigel_config_t` and the audio event all exist. What replaces it comes from
+running real software through `harness/` — see [`harness.md`](harness.md) for
+the full record and the repro commands.
 
-2. **Serial public API**
-   - `rigel_serial.h` com `rigel_serial_receive_byte / tx_available / pop_tx_byte`
-   - Wrappers directos sobre `serial_receive_byte / serial_pop_tx_byte` existentes
+1. **Vertical banding in a scrolling playfield** ← best lead
+   - Battle Squadron's title and menu are pixel-correct; its scrolling
+     gameplay shows vertical stripes that are not in the game.
+   - First rendering defect with a short deterministic repro (~1 min headless).
+   - Start from `from_bellatrix/rigel_graphics_dma_scroll_investigation.md`;
+     BPLCON1 scroll and bitplane modulo are the obvious suspects.
 
-3. **RTC em `rigel_config_t`**
-   - Adicionar `rtc_model` e `rtc_time` à config
-   - Inicializar em `rigel_create` em vez de exigir chamadas pós-init
+2. **AROS jumps into zeroed memory**
+   - Reaches `InitResident("dosboot.resource")`, then faults at `0x000387A4`,
+     which holds nothing. Not an opcode gap — a load or relocation that never
+     happened.
+   - `--watch 387a0:20` should name whoever was supposed to fill it.
 
-4. **`RIGEL_EVENT_AUDIO_READY`**
-   - Flag `sample_ready` em `audio_state_t`, set em `audio_mix()` quando sample muda
-   - Check em `rigel_step()`, disparar o evento, clear a flag
+3. **ISO does not mount**
+   - The ATAPI exchange is real and then stops after REQUEST SENSE.
+   - ODFS is built and served from the board's second ROM bank, so the
+     question is on the lide.device side, not the media side.
+
+4. **Audio mix has no headroom**
+   - Every capture peaks at exactly 32768, the absolute value of the int16
+     minimum. Plausible once, suspicious every time.
+   - `--audio-out FILE.wav` reports peak and RMS.
 
 ## Near-Term Targets (fidelidade e completude)
 

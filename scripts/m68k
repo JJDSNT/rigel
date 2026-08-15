@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+#
+# Run an m68k cross tool against files in this repository.
+#
+#   scripts/m68k vasmm68k_mot -Fbin -o test.rom test.S
+#   scripts/m68k m68k-amigaos-gcc -c foo.c
+#   scripts/m68k --check          report which backend is available
+#   scripts/m68k --tools          list what the backend provides
+#
+# Two backends, tried in this order:
+#
+#   docker  amigadev/crosstools:m68k-amigaos — vasm, vlink, vbcc and the
+#           m68k-amigaos GCC. This is the full Amiga toolchain and the one the
+#           regression tests assume.
+#   apt     m68k-linux-gnu-* from binutils-m68k-linux-gnu / gcc-m68k-linux-gnu.
+#           Enough to assemble and link freestanding test programs; it has no
+#           AmigaOS headers or hunk output.
+#
+# The container runs as the calling user with $HOME mounted at the same path,
+# so paths inside and outside match and output files are owned by you.
+#
+set -euo pipefail
+
+IMAGE="${RIGEL_M68K_IMAGE:-amigadev/crosstools:m68k-amigaos}"
+
+have_docker_image() {
+    command -v docker >/dev/null 2>&1 || return 1
+    # Probe with plain `docker images` and parse the table. `docker info` is
+    # unimplemented by the wslc shim used on WSL, and its `--format` accepts
+    # only json/table — not Go templates — so neither is portable here.
+    docker images 2>/dev/null |
+        awk 'NR > 1 { print $1 ":" $2 }' |
+        grep -qx "$IMAGE"
+}
+
+have_apt_toolchain() {
+    command -v m68k-linux-gnu-as >/dev/null 2>&1
+}
+
+backend() {
+    if have_docker_image; then echo docker
+    elif have_apt_toolchain; then echo apt
+    else echo none
+    fi
+}
+
+case "${1:-}" in
+--check)
+    b="$(backend)"
+    case "$b" in
+    docker) echo "docker: $IMAGE" ;;
+    apt)    echo "apt: $(m68k-linux-gnu-as --version | head -1)" ;;
+    none)
+        cat >&2 <<EOF
+No m68k toolchain found.
+
+  Preferred — pull the Amiga cross toolchain (vasm, vlink, vbcc, gcc):
+      docker pull $IMAGE
+
+  Or install the GNU cross tools (assemble/link only, no AmigaOS):
+      sudo apt install binutils-m68k-linux-gnu gcc-m68k-linux-gnu
+EOF
+        exit 1 ;;
+    esac
+    exit 0 ;;
+--tools)
+    case "$(backend)" in
+    docker) echo "vasmm68k_mot vlink vbccm68k m68k-amigaos-gcc m68k-amigaos-as m68k-amigaos-ld" ;;
+    apt)    echo "m68k-linux-gnu-as m68k-linux-gnu-ld m68k-linux-gnu-gcc m68k-linux-gnu-objcopy m68k-linux-gnu-objdump" ;;
+    none)   exit 1 ;;
+    esac
+    exit 0 ;;
+"")
+    echo "usage: scripts/m68k <tool> [args...]   (--check, --tools)" >&2
+    exit 2 ;;
+esac
+
+case "$(backend)" in
+docker)
+    # Mount $HOME and /tmp at the same paths inside, so a path written on the
+    # command line means the same thing on both sides and output files land
+    # where the caller expects. /tmp matters because scripts do their work in
+    # mktemp directories. No -it: this must work with no terminal attached.
+    mounts=(-v "$HOME:$HOME")
+    [ -d /tmp ] && mounts+=(-v /tmp:/tmp)
+    case "$PWD" in
+        "$HOME"/*|"$HOME"|/tmp/*|/tmp) ;;
+        *) mounts+=(-v "$PWD:$PWD") ;;
+    esac
+    exec docker run --rm -u "$(id -u):$(id -g)" \
+        "${mounts[@]}" -w "$PWD" "$IMAGE" "$@"
+    ;;
+apt)
+    exec "$@"
+    ;;
+none)
+    echo "scripts/m68k: no toolchain; run 'scripts/m68k --check' for how to install one" >&2
+    exit 1
+    ;;
+esac

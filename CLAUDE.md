@@ -15,11 +15,41 @@ ctest --test-dir build --output-on-failure   # run all tests
 ./build/test_floppy          # run a single test by name
 ```
 
-Musashi integration harness (off by default):
+Musashi integration harness (off by default). `./run.sh` does the whole thing —
+submodule, patches, build, media-picking TUI, run:
 ```sh
+./run.sh                     # TUI, then run
+./run.sh test                # core + harness + launcher suites
+./run.sh --headless --frames 600 --screenshot boot.ppm
+
+# or by hand
+git submodule update --init external/musashi
+scripts/apply_musashi_patches.sh    # required; CMake refuses to configure without it
 cmake -S . -B build-harness -DRIGEL_BUILD_HARNESS=ON -DRIGEL_BUILD_TESTS=OFF
 cmake --build build-harness
+./build-harness/rigel-harness kick13.rom --adf wb13.adf
 ```
+
+## Harness
+
+`harness/` is a real 68k machine around Rigel — Musashi runs the CPU, the
+harness owns the memory map and ROM, Rigel owns the chipset. Read
+`harness/README.md` before changing it. Three things there are easy to get
+wrong and expensive to debug:
+
+- **Two clocks.** Rigel counts CCK (~3.55 MHz), Musashi counts CPU cycles
+  (~7.09 MHz). The harness halves and carries the odd cycle across timeslices.
+- **Flush before chipset access.** Every custom/CIA access advances Rigel by the
+  cycles run so far first, so `VPOS`/`INTREQ` reads see the real beam position.
+- **IPL is a level, not an edge.** It is republished after every advance and
+  after every write that can move it. Mirroring it only on
+  `RIGEL_EVENT_IRQ_CHANGED` wedges the machine.
+
+Local Musashi changes live in `patches/musashi/`, applied to the submodule
+rather than committed into it. See `patches/musashi/README.md`.
+
+`tools/launcher/` is a Go/bubbletea TUI that scans ROM/ADF/ISO/HDF and builds
+the harness command line (`go test ./...` covers it).
 
 ## Architecture
 
@@ -62,6 +92,10 @@ Rigel will expose `rigel_get_frame(ctx)` after `RIGEL_EVENT_FRAME_READY`. The pi
 - `temporal_bus_api.md` — Temporal API + Bus Observation design and rationale
 - `dma_slot_timing.md` — DMA slot sequence as timing foundation, step approach tradeoffs
 - `video_output.md` — video pipeline, frame struct, dirty tracking design
+- `from_bellatrix/` — notes carried over from Bellatrix's `legacy` branch: host
+  integration, gap analysis, and investigations into KS20 video, graphics DMA,
+  and AROS ADF boot. Historical — they describe Rigel at an older commit; check
+  `include/rigel/` before acting on any API claim.
 
 ## Tests
 
