@@ -159,6 +159,8 @@ struct lide_board {
 
     bool logged_hdr;
     bool logged_dev;
+    bool logged_odfs;
+    uint64_t odfs_reads;
 
     /* Access counters: the difference between "the driver gave up" and "the
      * driver is still polling a status bit that never sets" is invisible
@@ -229,6 +231,8 @@ void lide_destroy(lide_board_t *b)
             (unsigned long long)b->ata_reads,
             (unsigned long long)b->ata_writes,
             (unsigned long long)b->rom_reads);
+    kprintf("[LIDE] ODFS bank reads: %llu\n",
+            (unsigned long long)b->odfs_reads);
     ata_ide_channel_free(&b->ide);
     if (b->iso.fp) fclose(b->iso.fp);
     if (b->hdf.fp) fclose(b->hdf.fp);
@@ -404,6 +408,12 @@ uint32_t lide_read(lide_board_t *b, uint32_t addr, unsigned size)
 
     if (b->odfs != NULL && off >= ODFS_BANK_BASE && off < ODFS_BANK_END) {
         uint8_t b0 = odfs_byte(b, off);
+        b->odfs_reads++;
+        if (!b->logged_odfs) {
+            b->logged_odfs = true;
+            kprintf("[LIDE] guest started reading the ODFS bank at +%05x\n",
+                    (unsigned)off);
+        }
         if (size == 1) return b0;
         if (size == 2) return ((uint32_t)b0 << 8) | odfs_byte(b, off + 1u);
         return 0xFFFFFFFFu;

@@ -39,22 +39,78 @@ it.
 | Kickstart 1.3 | insert-disk screen, and the Workbench 1.3 desktop from `wb13.adf` |
 | Battle Squadron | cracktro → title → menu → gameplay, with sound |
 | DiagROM | full serial diagnostic, Chip RAM test passes |
-| AROS (1 MB) | boots far enough to print its whole serial log, then fails |
+| AROS (1 MB) | boots to its startup screen, with Fast RAM — see below |
 | Zorro II autoconfig | Fast RAM at `0x200000` and LIDE at `0xEA0000`, enumerated in chain order |
-| LIDE / ATAPI | driver loads from the board ROM; the guest reaches TEST UNIT READY and REQUEST SENSE |
+| LIDE / ATAPI | see below — the board loads and talks, but breaks the boot |
 
 ## What does not
 
-**AROS never draws.** It runs to `InitResident("dosboot.resource")`, then takes
-an illegal instruction at `0x000387A4`. That address disassembles to zeros, so
-it is not an unimplemented opcode — AROS jumped through a pointer into memory
-nothing ever filled. Whatever should have loaded or relocated there did not.
-`--watch` on that address should name the culprit.
+**AROS needs Fast RAM.** It boots to its startup screen — a hires Intuition
+window with the version banner — but only with Fast RAM present. Without it,
+the console handler dies repeatedly with `PC: 0x00000008`, a call through a
+null pointer.
 
-**An ISO does not mount.** The ATAPI conversation is real — IDENTIFY, packet
-writes, TEST UNIT READY returning UNIT_ATTENTION, then REQUEST SENSE — but it
-stops after that. ODFS is built and served from the board's second bank; the
-open question is where lide.device gives up.
+| Chip | Fast | Result |
+| --- | --- | --- |
+| 512 KB | none | stops at InitCode phase `0x01`, never reaches DOS |
+| 1 MB | none | phase `0x04`, 23 Software Failures in task CON |
+| 2 MB | none | phase `0x04`, 23 Software Failures in task CON |
+| 1 MB | 8 MB | **boots clean** |
+| 2 MB | 8 MB | **boots clean** |
+
+Chip RAM size is not the variable; the presence of Fast RAM is. Whether that is
+a Rigel defect or simply AROS needing more memory than a stock Amiga has is not
+settled — the failing case is worth a look because running entirely from Chip
+RAM is the configuration where DMA contention is heaviest.
+
+`tools/tests/aros_boot/run.sh` locks the working configuration in as a
+regression test. It uses only free media, so it can run anywhere.
+
+Earlier notes here blamed a jump into zeroed memory at `0x387A4`. That was an
+artefact of running AROS with no boot media at all, so dosboot waited forever;
+the address was noise.
+
+**Attaching the LIDE board breaks an otherwise working boot.** This is the
+sharpest open defect, and it covers both HDF and ISO.
+
+With the same budget and memory, Kickstart 2.0 boots Workbench 2.0 from
+`wb20.adf` and reaches a 672x256 screen. Attach a CD or an HDF and the machine
+ends at 256x256 having never got there:
+
+| Configuration | Result |
+| --- | --- |
+| KS20 alone | 592x200, insert-disk screen |
+| KS20 + `wb20.adf` | **672x256, Workbench boots** |
+| KS20 + `wb20.adf` + CU CD | 256x256 |
+| KS20 + `wb20.hdf` | 256x256, with or without Fast RAM |
+
+The machine is not hung — it is busier with the board attached (183k register
+writes vs 90k) and the PC keeps moving. It simply never gets where it was
+going. Fast RAM is not the variable, so the autoconfig chain is not the cause.
+
+Everything up to that point does work, which is what makes the defect narrow:
+
+- autoconfig assigns the board a base
+- expansion.library reads the DiagArea at `+0004`
+- the boot loader pulls lide.device out of the ROM
+- the ODFS bank is read essentially end to end (31156 reads of a 31152-byte
+  binary), starting at `+1fff8` where the loader looks for the signature
+- ATAPI runs a correct exchange: TEST UNIT READY → UNIT_ATTENTION, REQUEST
+  SENSE, TEST UNIT READY → OK, READ CAPACITY returning the right last-LBA
+  (`0x0004F1A6`) and block size
+
+Then the driver polls TEST UNIT READY forever and never issues READ TOC or
+READ(10). No interrupt is wired from the board, which is the first thing to
+check: a driver waiting on command completion would look exactly like this.
+
+The board was reported as working earlier on the strength of log lines showing
+the driver loading. That was never a boot — no screenshot was ever taken. It is
+recorded here so the same mistake is not repeated: an emulator milestone is a
+picture or an assertion, not a trace line.
+
+The CU CD is a CDTV disc (`CD001`, System ID `CDTV`), so it is already marked
+bootable and the `HARNESS_CD_BOOTABLE` PVD patch does not apply to it. Kickstart
+2.0 booting this ISO is a known-good result from Bellatrix.
 
 **Vertical banding in Battle Squadron gameplay.** The title and menu screens
 are pixel-correct; the scrolling playfield shows vertical stripes that are not
