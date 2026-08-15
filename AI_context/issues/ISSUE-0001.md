@@ -1,9 +1,9 @@
 ---
 id: ISSUE-0001
-title: "Bare executables load and run under --exec but produce no output"
+title: "Support loading aros.elf as well as aros.rom, selectable in the TUI"
 status: open
-priority: medium
-type: bug
+priority: high
+type: enhancement
 owner: unassigned
 created_at: 2026-08-15
 updated_at: 2026-08-15
@@ -13,7 +13,11 @@ tags:
   - emu68
   - exec
   - framebuffer
+  - elf
+  - aros
+  - tui
 related_files:
+  - tools/launcher/tui.go
   - harness/hunk.c
   - harness/hunk.h
   - harness/harness.c
@@ -23,7 +27,16 @@ related_files:
   - media/roms/sysinfo.rom
 ---
 
-## What
+## Goal
+
+The TUI should offer AROS either way: `aros.rom` through the ROM path, which
+boots today, or `aros-emu68-m68k.elf` through an ELF path, which does not
+exist yet. Same operating system, two ways in — the ROM path is a plain Amiga
+with a Kickstart, the ELF path puts the harness in the role Emu68 plays.
+
+Everything below is what stands between here and that.
+
+## Where it started
 
 `--exec` LoadSegs an AmigaOS hunk executable and runs it in place of a ROM.
 Emu68's two bare-metal examples — `Buddha.rom` (a Buddhabrot renderer) and
@@ -143,3 +156,73 @@ already load and run, so whatever stops them reaching the framebuffer is a
 bounded question. The ELF loader is a known quantity — a day's transcription
 of `ElfLoader.c` against our memory accessors — but it lands on top of an
 `--exec` path that is not yet proven to produce output at all.
+
+
+## Update 2 — what the ELF path actually requires
+
+Read the AROS side, in `aros/arch/m68k-emu68/boot/boot.c` of the current
+Bellatrix. The contract is larger than the examples', and one part of it is
+not optional.
+
+`.text` begins with:
+
+```
+move.l D2,-(A7)      ; height
+move.l D1,-(A7)      ; width
+move.l D0,-(A7)      ; pitch
+move.l A0,-(A7)      ; framebuffer
+move.l A6,-(A7)      ; fdt
+jsr    <relocated>
+lea    20(A7),A7
+stop   #$2700
+```
+
+which lands on:
+
+```c
+void emu68_bootstrap(const void *fdt, void *framebuffer, uint32_t pitch,
+                     uint32_t width, uint32_t height)
+```
+
+So the entry registers are **A6 = flattened device tree, A0 = framebuffer,
+D0 = pitch, D1 = width, D2 = height**. The framebuffer four are what the
+Emu68 examples already take; A6 is new and it is the hard part.
+
+**The device tree is mandatory.** `emu68_bootstrap` calls `parse_fdt`, which
+walks the tree for a `/memory` node and fills `memory_base`/`memory_size`,
+setting `EMU68_BOOT_MEMORY_VALID`. `start_aros` then opens with:
+
+```c
+if (!(ctx->flags & EMU68_BOOT_MEMORY_VALID))
+    return;
+```
+
+Pass no FDT — or one without a memory node — and AROS returns without booting.
+`parse_fdt` bails out cleanly on a bad header rather than crashing, so the
+failure is silent: exactly the shape of "loads, runs, produces nothing" that
+this issue opened with.
+
+`/chosen` bootargs are read too, but nothing depends on them.
+
+### The work
+
+1. **ELF32 BE m68k `ET_REL` loader.** Sections rather than segments; place
+   every `SHF_ALLOC` one, split RO from RW; resolve 12162 relocations
+   (`R_68K_32`, `R_68K_PC32`) against the symbol table, handling `SHN_UNDEF`
+   and `SHN_COMMON`. Entry is the load base, since `.text` is placed first.
+   Emu68's `src/ElfLoader.c` is 542 lines and is the reference.
+2. **Synthesise a minimal FDT** — a header, one `/memory` node with the
+   harness's RAM range, optionally `/chosen` for bootargs. A few hundred bytes
+   of well-documented binary format, generated in C.
+3. **Pass A6** alongside the four registers `--exec` already sets.
+4. **Dispatch on the file** — `0x000003F3` is hunk, `\x7fELF` is ELF. One
+   `--exec` handles both.
+5. **TUI**: let a `.elf` be picked in the Kickstart pane and routed to
+   `--exec` instead of being passed as a ROM.
+
+### On the examples
+
+They remain the cheaper thing to get working first — 12 KB rather than 865 KB,
+and no device tree involved. But they are no longer the point, and if they
+turn out to need something obscure they should not hold the ELF path up: the
+two share the loader plumbing, not the environment.

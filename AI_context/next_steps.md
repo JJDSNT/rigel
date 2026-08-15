@@ -7,6 +7,11 @@ in `rigel_config_t` and the audio event all exist. What replaces it comes from
 running real software through `harness/` — see [`harness.md`](harness.md) for
 the full record and the repro commands.
 
+0. **Load aros.elf as well as aros.rom, selectable in the TUI** — see
+   [`issues/ISSUE-0001.md`](issues/ISSUE-0001.md). Needs an ELF32 `ET_REL`
+   loader, a synthesised device tree (AROS refuses to boot without a `/memory`
+   node), and A6 added to the entry registers.
+
 1. **Vertical banding in a scrolling playfield** ← best lead
    - Battle Squadron's title and menu are pixel-correct; its scrolling
      gameplay shows vertical stripes that are not in the game.
