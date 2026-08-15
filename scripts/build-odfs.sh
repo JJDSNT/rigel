@@ -68,6 +68,22 @@ CFLAGS="-Os -m68000 -mtune=68020-60 -msoft-float -noixemul -nostartfiles \
  -DODFS_FEATURE_CACHE_STREAM=0 \
  -include $COMPAT_HDR"
 
+# The CD01 ROMtag is what makes the handler register itself in
+# FileSystem.resource; without it lide.device loads the binary and then never
+# mounts anything. See patches/odfs/README.md.
+echo "[odfs] applying patches..."
+for patch in "$ROOT"/patches/odfs/*.patch; do
+    name="$(basename "$patch")"
+    if patch -d "$ODFS_DIR" -p1 --dry-run --silent --force --reverse <"$patch" >/dev/null 2>&1; then
+        printf '  %-32s already applied\n' "$name"
+    elif patch -d "$ODFS_DIR" -p1 --silent --force <"$patch" >/dev/null 2>&1; then
+        printf '  %-32s applied\n' "$name"
+    else
+        echo "  $name DOES NOT APPLY" >&2
+        exit 1
+    fi
+done
+
 echo "[odfs] building..."
 # Always from scratch: a stale object built with different feature flags links
 # into a binary that looks fine and behaves like a regression.

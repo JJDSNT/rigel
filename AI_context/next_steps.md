@@ -14,21 +14,14 @@ the full record and the repro commands.
    - Start from `from_bellatrix/rigel_graphics_dma_scroll_investigation.md`;
      BPLCON1 scroll and bitplane modulo are the obvious suspects.
 
-2. **A CD is identified but never mounted**
-   - HDF boots to the Workbench desktop with a CD attached, but no CD volume
-     appears. ATAPI is correct through READ CAPACITY, then the driver polls
-     TEST UNIT READY forever and never issues READ TOC or READ(10).
-   - Everything below the driver is verified, so the gap is in what makes
-     lide.device's mounter proceed.
-
-3. **AROS without Fast RAM**
+2. **AROS without Fast RAM**
    - Boots clean with Fast RAM. Without it the console handler dies with
      `PC: 0x00000008` regardless of Chip RAM size.
    - May simply be AROS wanting more memory than a stock Amiga has, but the
      failing case is the one where DMA contention on Chip RAM is heaviest, so
      it is worth confirming rather than assuming.
 
-4. **Audio mix has no headroom**
+3. **Audio mix has no headroom**
    - Every capture peaks at exactly 32768, the absolute value of the int16
      minimum. Plausible once, suspicious every time.
    - `--audio-out FILE.wav` reports peak and RMS.

@@ -42,7 +42,7 @@ it.
 | AROS (1 MB) | boots to its startup screen, with Fast RAM — see below |
 | Zorro II autoconfig | Fast RAM at `0x200000` and LIDE at `0xEA0000`, enumerated in chain order |
 | HDF | Kickstart 2.0 boots Workbench 2.0 from `wb20.hdf`, volume mounted through the board |
-| CD-ROM | identified and talked to, but never mounted — see below |
+| CD-ROM | the CU Amiga cover CD boots and renders its intro |
 
 ## What does not
 
@@ -70,33 +70,6 @@ regression test. It uses only free media, so it can run anywhere.
 Earlier notes here blamed a jump into zeroed memory at `0x387A4`. That was an
 artefact of running AROS with no boot media at all, so dosboot waited forever;
 the address was noise.
-
-**A CD is identified but never mounted.** Kickstart 2.0 boots Workbench from
-`wb20.hdf` with a CD attached, but no CD volume appears on the desktop.
-
-The ATAPI exchange is correct as far as it goes — TEST UNIT READY returning
-UNIT_ATTENTION, REQUEST SENSE, TEST UNIT READY now OK, then READ CAPACITY
-answering with the right last-LBA (`0x0004F1A6`) and 2048-byte blocks. After
-that the driver polls TEST UNIT READY forever and never issues READ TOC (0x43)
-or READ(10) (0x28), so it never looks at the disc. Whatever makes lide.device's
-mounter decide to go on is missing.
-
-Everything under that is verified: autoconfig, the DiagArea at `+0004`,
-lide.device loaded from the ROM, and the whole ODFS binary read from the second
-bank (31156 reads of a 31152-byte image, starting at `+1fff8` where the loader
-looks for the signature). Attaching a CD no longer harms the machine.
-
-The CU CD is a CDTV disc (`CD001`, System ID `CDTV`), so it is already marked
-bootable and the `HARNESS_CD_BOOTABLE` PVD patch skips it. Kickstart 2.0
-booting this CD is a known-good result from Bellatrix, so the gap is on our
-side.
-
-Two things were fixed getting here, both found by diffing against Bellatrix's
-board: the ATAPI layer was never wired to ATA DEVICE RESET (`ide.atapi_reset`),
-and the ATA channel was not reset after media was attached.
-
-An earlier note blamed a missing board interrupt. Bellatrix's board does not
-raise one either, so that was wrong.
 
 **Vertical banding in Battle Squadron gameplay.** The title and menu screens
 are pixel-correct; the scrolling playfield shows vertical stripes that are not
@@ -133,6 +106,16 @@ Kept because each one wasted real time and would again.
   `--stop-on-halt` restores the old behaviour for a caller that wants it.
 - **The overlay applies to debug reads too.** A `--dump` of low memory returns
   ROM while OVL is asserted — correct, and confusing. `--dump` now says so.
+- **A patch left behind looks exactly like a driver bug.** A CD was identified
+  and then ignored — a correct ATAPI exchange through READ CAPACITY, and never
+  a READ TOC or READ(10). The cause was not in the emulation at all: Bellatrix
+  carried `patches/0012-odfs-cd01-romtag`, which gives ODFileSystem a ROMtag
+  and the code to register itself in `FileSystem.resource` under DosType
+  `CD01`. Without it the handler is loaded and relocated but never announces
+  itself, so `lide.device`'s `FindCDFS()` finds nothing. It was missed because
+  the patch sweep filtered on "musashi". With it applied the driver goes
+  straight on to START STOP UNIT, READ TOC, READ(10) and MODE SELECT, and the
+  disc boots.
 - **A build that fails silently produces something that runs.** The lide.rom
   this repository built did not work, while Bellatrix's from the same commit
   did. The cause was `git describe` failing inside the container — git refuses
