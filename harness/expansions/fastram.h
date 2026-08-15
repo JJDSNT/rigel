@@ -30,6 +30,10 @@ bool     fastram_owns(const fastram_board_t *b, uint32_t addr);
 uint32_t fastram_read(const fastram_board_t *b, uint32_t addr, unsigned size);
 void     fastram_write(fastram_board_t *b, uint32_t addr, uint32_t value, unsigned size);
 
+/* Configure the board directly, for a machine with no Kickstart to run
+ * autoconfig — loading a bare executable, for instance. */
+void fastram_force_configure(fastram_board_t *b, uint32_t base);
+
 uint32_t fastram_base(const fastram_board_t *b);
 uint32_t fastram_size(const fastram_board_t *b);
 

@@ -94,6 +94,15 @@ void fastram_ac_write(fastram_board_t *b, uint32_t off, uint8_t value)
     }
 }
 
+void fastram_force_configure(fastram_board_t *b, uint32_t base)
+{
+    if (b == NULL || b->configured) return;
+    b->base = base;
+    b->configured = true;
+    kprintf("[FASTRAM] %u MB forced to %06x (no autoconfig without a ROM)\n",
+            (unsigned)(b->size / (1024u * 1024u)), (unsigned)base);
+}
+
 bool fastram_owns(const fastram_board_t *b, uint32_t addr)
 {
     return b != NULL && b->configured &&

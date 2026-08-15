@@ -2,6 +2,7 @@
 #define RIGEL_HARNESS_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "rigel/rigel.h"
@@ -36,7 +37,10 @@ enum {
     HARNESS_ROM_EXT_BASE  = 0xE00000,
     HARNESS_SLOW_RAM_BASE = 0xC00000,
     HARNESS_MAX_WIDTH     = 1024,         /* RIGEL_DENISE_MAX_SCANLINE_PIXELS */
-    HARNESS_MAX_HEIGHT    = 312           /* PAL */
+    HARNESS_MAX_HEIGHT    = 312,          /* PAL */
+    /* Where a hunk image's entry point returns to: a branch-to-self placed in
+     * Chip RAM above the exception vectors. */
+    HARNESS_EXEC_EXIT_ADDR = 0x800
 };
 
 /*
@@ -137,6 +141,38 @@ bool harness_attach_lide(harness_t *h, const char *rom_path);
 bool harness_attach_hdf(harness_t *h, const char *path);
 bool harness_attach_iso(harness_t *h, const char *path);
 bool harness_load_odfs(harness_t *h, const char *path);
+
+/*
+ * Load an AmigaOS hunk executable and run it instead of a ROM.
+ *
+ * Emu68's bare-metal test programs are ordinary executables that open no
+ * libraries — they drive the hardware directly — so LoadSeg-ing one and
+ * jumping to it is a complete machine with no Kickstart involved.
+ *
+ * The image goes into Fast RAM when a board is attached (the Buddhabrot
+ * renderer alone wants 2.6 MB of BSS, more than Chip RAM can hold) and into
+ * Chip RAM otherwise. With no Kickstart nothing runs autoconfig, so the board
+ * is configured directly here.
+ *
+ * Returns false and fills `err` on a malformed or oversized image.
+ */
+bool harness_load_hunk(harness_t *h, const uint8_t *data, uint32_t size,
+                       uint32_t fb_width, uint32_t fb_height,
+                       char *err, size_t err_len);
+
+/*
+ * Where the framebuffer handed to a hunk image lives.
+ *
+ * Emu68's examples are entered with D0=pitch, A0=framebuffer, D1=width,
+ * D2=height, and they draw everything there — including their text, which
+ * put_char renders with a built-in font rather than sending anywhere. Reading
+ * this buffer back is the only way to see what they produced.
+ *
+ * Returns false when no image is loaded. Format is RGB565.
+ */
+bool harness_exec_framebuffer(const harness_t *h, uint32_t *addr,
+                              uint32_t *width, uint32_t *height,
+                              uint32_t *pitch);
 
 /* Insert an ADF into a drive. Thin wrapper over rigel_floppy_insert that keeps
  * ownership of the image with the harness. */

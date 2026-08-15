@@ -264,6 +264,7 @@ if(RIGEL_BUILD_HARNESS)
 
     add_library(rigel_harness STATIC
         harness/harness.c
+        harness/hunk.c
         harness/expansions/lide.c
         harness/expansions/fastram.c
         harness/expansions/zorro.c

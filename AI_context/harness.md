@@ -160,3 +160,51 @@ FPU opmodes that `patches/musashi/0005` adds — 21 of them.
 The disassembler is Musashi's own rather than Capstone: it needs no dependency
 and it decodes exactly what the emulated CPU will execute, including the opcodes
 our patches add. Agreeing with the emulator is the point.
+
+## Running bare executables (`--exec`)
+
+`media/roms/Buddha.rom` and `sysinfo.rom` are not ROMs — the `.rom` extension
+is an accident of where they were filed. Both are AmigaOS hunk executables
+(`HUNK_HEADER`, `0x000003F3`) from Emu68's `examples/`: a Buddhabrot renderer
+and a Dhrystone/BUSTEST benchmark. Neither opens a library; they drive the
+hardware directly, so running one needs no operating system — only what
+LoadSeg does.
+
+`harness/hunk.c` is that loader, ported from Emu68's `src/HunkLoader.c`, and
+`--exec FILE` runs an image instead of a ROM. Getting there needed four things
+that are easy to miss:
+
+- **The entry takes register arguments.** Emu68 calls `_c_start` with
+  `D0`=pitch, `A0`=framebuffer, `D1`=width, `D2`=height. Jumping to it with
+  those unset makes the program dereference a garbage pointer and write over
+  memory until it derails.
+- **Output goes into the framebuffer, not a serial port.** `put_char` draws
+  characters with a built-in font. `--exec-fb WxH` sizes the buffer and
+  `--exec-fb-out FILE` dumps it; the pixels are little-endian RGB565, which is
+  visible as the `ror.w #8` in the program's own pixel packer.
+- **The overlay has to be off.** The image sits in low memory that OVL would
+  shadow, and with no Kickstart nothing will ever clear it.
+- **The entry point returns.** It is a C function ending in `rts`, so a return
+  address has to be on the stack. It points at a branch-to-self so a finished
+  program parks instead of running into stack contents.
+
+Fast RAM is forced configured for this path, since nothing runs autoconfig
+without a ROM, and the Buddhabrot's BSS alone is 2.6 MB.
+
+`patches/musashi/0007` adds the two control registers Emu68 invents to hand
+its timer to the guest, read through MOVEC: a frequency and a counter. Two
+numberings exist — `0x0E0`/`0x0E1` in the sources shipped with Emu68 and
+`0x0C00`/`0x0C01` in binaries built against a later one — and both are
+answered. The values are emulated CPU time rather than wall clock, so a
+benchmark measures the machine being emulated and gives the same answer every
+run.
+
+### Where this stands
+
+Both images load, relocate and execute — Buddha ran 2.8 billion cycles without
+a single exception — but **neither has produced output yet**. The framebuffer
+stays untouched. Whether the programs need something else from the Emu68
+environment, or the entry convention is not yet exactly right, is not settled.
+
+The goal this path is heading towards is loading `aros_68k.elf`, which will
+need an ELF loader alongside the hunk one.

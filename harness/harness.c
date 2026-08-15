@@ -1,5 +1,6 @@
 #include "harness.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,6 +10,8 @@
 #include "rigel/rigel_bus.h"
 #include "rigel/rigel_serial.h"
 #include "rigel/rigel_time.h"
+
+#include "hunk.h"
 
 #include "expansions/fastram.h"
 #include "expansions/lide.h"
@@ -65,6 +68,9 @@ struct harness_t {
     unsigned pc_stall_steps;
 
     uint8_t last_ipl;         /* level currently asserted into Musashi */
+    bool    exec_mode;        /* running a hunk image, so there is no ROM */
+    uint32_t exec_fb, exec_fb_w, exec_fb_h, exec_fb_pitch;
+    uint32_t exec_exit;       /* the park-here address the entry returns to */
 
     harness_serial_fn serial_fn;
     void             *serial_opaque;
@@ -211,6 +217,10 @@ static void harness_flush(harness_t *h)
  * reset vector at address 0. */
 static bool harness_overlay(harness_t *h)
 {
+    /* A hunk image lives in low Chip RAM, which the overlay would shadow. With
+     * no Kickstart there is nothing to overlay anyway, and nothing will ever
+     * clear OVL through the CIA. */
+    if (h->exec_mode) return false;
     if (h->rom_size == 0u) return false;
     if (!(rigel_cia_read(h->rigel, 0u, 0x2u) & 0x01u)) return true;
     return (rigel_cia_read(h->rigel, 0u, 0x0u) & 0x01u) != 0u;
@@ -480,6 +490,28 @@ static void harness_write16(harness_t *h, uint32_t addr, uint16_t value)
 }
 
 /* -------------------------------------------------------------------------
+ * Emu68 timer control registers (MOVEC 0x0E0 / 0x0E1)
+ *
+ * Emu68's bare-metal examples time themselves through two control registers
+ * it invents. Answering with emulated CPU time rather than the wall clock
+ * makes a benchmark measure the machine being emulated, and makes the number
+ * the same on every run.
+ * ------------------------------------------------------------------------- */
+
+unsigned int rigel_m68k_timer_freq(void)
+{
+    return g_harness != NULL ? rigel_get_clock_hz(g_harness->rigel) : 7093790u;
+}
+
+unsigned int rigel_m68k_timer_ticks(void)
+{
+    if (g_harness == NULL) return 0u;
+    /* Cycles run so far, including the part of the current timeslice. */
+    return (unsigned int)(g_harness->cpu_cycles_total +
+                          (uint64_t)m68k_cycles_run());
+}
+
+/* -------------------------------------------------------------------------
  * Musashi memory callbacks
  * ------------------------------------------------------------------------- */
 
@@ -538,7 +570,14 @@ static uint16_t harness_peek16(harness_t *h, uint32_t addr)
         return (uint16_t)((h->slow_ram[off] << 8) | h->slow_ram[off + 1u]);
     }
 
+    /* Fast RAM is plain memory, so peeking it has no side effects. The LIDE
+     * board is deliberately left out: its ATA registers advance a transfer
+     * pointer when read, which a debugger must never do. */
+    if (fastram_owns(h->fastram, addr) && fastram_owns(h->fastram, addr + 1u))
+        return (uint16_t)fastram_read(h->fastram, addr, 2);
+
     if (addr_in_cia(addr) || addr_in_custom(addr)) return 0u;
+    if (lide_owns(h->lide, addr)) return 0u;
 
     return (uint16_t)((harness_rom_read8(h, addr) << 8) |
                       harness_rom_read8(h, addr + 1u));
@@ -758,6 +797,135 @@ bool harness_load_kickstart(harness_t *h, const uint8_t *data, uint32_t size)
     m68k_pulse_reset();
     h->last_pc = m68k_get_reg(NULL, M68K_REG_PC);
     h->pc_stall_steps = 0;
+    return true;
+}
+
+/* Guest-memory accessors for the hunk loader. These go through the same byte
+ * paths the CPU uses, so a segment placed in Fast RAM lands in the board. */
+static void hunk_write8(void *ctx, uint32_t addr, uint8_t value)
+{
+    harness_write8((harness_t *)ctx, addr, value);
+}
+
+static uint8_t hunk_read8(void *ctx, uint32_t addr)
+{
+    return harness_read8((harness_t *)ctx, addr);
+}
+
+bool harness_load_hunk(harness_t *h, const uint8_t *data, uint32_t size,
+                       uint32_t fb_width, uint32_t fb_height,
+                       char *err, size_t err_len)
+{
+    hunk_image_t img;
+    uint32_t load_addr, limit, sp;
+    uint32_t fb, pitch, fb_bytes;
+
+    if (h == NULL || data == NULL) return false;
+
+    if (h->fastram != NULL) {
+        /* Nothing will run autoconfig without a Kickstart, so place the board
+         * where a guest would have put it and mark it configured. */
+        fastram_force_configure(h->fastram, 0x200000u);
+        load_addr = fastram_base(h->fastram);
+        limit     = load_addr + fastram_size(h->fastram);
+    } else {
+        /* Leave the low 4 KB alone: that is the exception vector table, and a
+         * program that installs handlers expects to own it. */
+        load_addr = 0x1000u;
+        limit     = h->chip_ram_size;
+    }
+
+    if (!hunk_load(data, size, load_addr, limit, h,
+                   hunk_write8, hunk_read8, &img, err, err_len))
+        return false;
+
+    /*
+     * With the overlay off the CPU reads its reset vector straight out of Chip
+     * RAM, so write it there: stack below the image when it sits low, PC at
+     * the first hunk.
+     */
+    h->exec_mode = true;
+    sp = (img.base >= 0x1000u && img.base < h->chip_ram_size)
+        ? h->chip_ram_size   /* image is low: stack at the top of Chip RAM */
+        : h->chip_ram_size;
+    /*
+     * The entry point is a C function: it ends in `rts`, so it needs a return
+     * address. Give it one pointing at a branch-to-self, which parks the CPU
+     * when the program finishes instead of returning into stack garbage.
+     */
+    h->exec_exit = HARNESS_EXEC_EXIT_ADDR;
+    h->chip_ram[h->exec_exit]      = 0x60u;   /* bra.s * */
+    h->chip_ram[h->exec_exit + 1u] = 0xFEu;
+
+    sp -= 4u;
+    h->chip_ram[sp]      = (uint8_t)(h->exec_exit >> 24);
+    h->chip_ram[sp + 1u] = (uint8_t)(h->exec_exit >> 16);
+    h->chip_ram[sp + 2u] = (uint8_t)(h->exec_exit >>  8);
+    h->chip_ram[sp + 3u] = (uint8_t)(h->exec_exit);
+
+    h->chip_ram[0] = (uint8_t)(sp >> 24); h->chip_ram[1] = (uint8_t)(sp >> 16);
+    h->chip_ram[2] = (uint8_t)(sp >>  8); h->chip_ram[3] = (uint8_t)(sp);
+    h->chip_ram[4] = (uint8_t)(img.entry >> 24);
+    h->chip_ram[5] = (uint8_t)(img.entry >> 16);
+    h->chip_ram[6] = (uint8_t)(img.entry >>  8);
+    h->chip_ram[7] = (uint8_t)(img.entry);
+
+    /*
+     * Place the framebuffer above the image, and leave a gap for the stack:
+     * the entry point is called, not jumped to, and it pushes.
+     */
+    pitch    = fb_width * 2u;            /* RGB565 */
+    fb_bytes = pitch * fb_height;
+    fb       = (img.end + 0x10000u + 31u) & ~31u;
+
+    if (fb + fb_bytes > limit) {
+        if (err != NULL)
+            snprintf(err, err_len,
+                     "no room for a %ux%u framebuffer after the image "
+                     "(needs %u bytes at %08x, limit %08x)",
+                     fb_width, fb_height, fb_bytes, fb, limit);
+        return false;
+    }
+
+    {
+        uint32_t i;
+        for (i = 0; i < fb_bytes; i++) harness_write8(h, fb + i, 0u);
+    }
+
+    h->exec_fb       = fb;
+    h->exec_fb_w     = fb_width;
+    h->exec_fb_h     = fb_height;
+    h->exec_fb_pitch = pitch;
+
+    m68k_pulse_reset();
+
+    /* The Emu68 entry convention. Without these the example dereferences a
+     * garbage framebuffer pointer and writes over memory until it derails. */
+    m68k_set_reg(M68K_REG_D0, pitch);
+    m68k_set_reg(M68K_REG_A0, fb);
+    m68k_set_reg(M68K_REG_D1, fb_width);
+    m68k_set_reg(M68K_REG_D2, fb_height);
+
+    h->last_pc = m68k_get_reg(NULL, M68K_REG_PC);
+    h->pc_stall_steps = 0;
+
+    printf("[HUNK] %u hunks at %08x..%08x, entry %08x, sp %08x\n",
+           img.hunk_count, img.base, img.end, img.entry, sp);
+    printf("[HUNK] framebuffer %ux%u RGB565 at %08x (pitch %u)\n",
+           fb_width, fb_height, fb, pitch);
+    printf("[HUNK] returns to %08x when it finishes\n", h->exec_exit);
+    return true;
+}
+
+bool harness_exec_framebuffer(const harness_t *h, uint32_t *addr,
+                              uint32_t *width, uint32_t *height,
+                              uint32_t *pitch)
+{
+    if (h == NULL || !h->exec_mode || h->exec_fb == 0u) return false;
+    if (addr)   *addr   = h->exec_fb;
+    if (width)  *width  = h->exec_fb_w;
+    if (height) *height = h->exec_fb_h;
+    if (pitch)  *pitch  = h->exec_fb_pitch;
     return true;
 }
 

@@ -1,0 +1,47 @@
+--- a/m68k_in.c
++++ b/m68k_in.c
+@@ -6731,6 +6731,30 @@
+ 			case 0x001:			   /* DFC */
+ 				REG_DA[(word2 >> 12) & 15] = REG_DFC;
+ 				return;
++			/*
++			 * Rigel: Emu68 invents control registers to hand the host's
++			 * timer to the guest, and its bare-metal examples read them
++			 * to time themselves — a frequency once at startup, then a
++			 * counter around each measured section.
++			 *
++			 * Two numberings are in the wild: 0x0E0/0x0E1 in the sources
++			 * shipped with Emu68, and 0x0C00/0x0C01 in binaries built
++			 * against a later one. Both are answered.
++			 *
++			 * The values are emulated CPU time, not the wall clock, so a
++			 * benchmark measures the machine being emulated and gives
++			 * the same answer every run.
++			 */
++			case 0x0e0:			   /* Emu68 timer frequency */
++			case 0xc00:
++				REG_DA[(word2 >> 12) & 15] =
++					(uint)rigel_m68k_timer_freq();
++				return;
++			case 0x0e1:			   /* Emu68 timer counter */
++			case 0xc01:
++				REG_DA[(word2 >> 12) & 15] =
++					(uint)rigel_m68k_timer_ticks();
++				return;
+ 			case 0x002:			   /* CACR */
+ 				if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
+ 				{
+--- a/m68kcpu.h
++++ b/m68kcpu.h
+@@ -53,6 +53,11 @@
+ #define RIGEL_M68K_LOG(...) fprintf(stderr, __VA_ARGS__)
+ #endif
+ 
++/* Rigel: the host's answer for Emu68's timer control registers, read through
++ * MOVEC. See the MOVEC handler in m68k_in.c. */
++unsigned int rigel_m68k_timer_freq(void);
++unsigned int rigel_m68k_timer_ticks(void);
++
+ #include <setjmp.h>
+ 
+ /* ======================================================================== */

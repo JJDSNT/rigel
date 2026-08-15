@@ -6,7 +6,13 @@
  * exits, which is what CI and chipset validation use.
  *
  *   rigel-harness <kickstart.rom> [options]
+ *   rigel-harness --exec <program> [options]     run a hunk executable, no ROM
  *
+ *     --exec FILE       LoadSeg an AmigaOS hunk executable and run it instead
+ *                       of a Kickstart. Emu68's bare-metal test programs work
+ *                       this way; give them --fast, they want the memory.
+ *     --exec-fb WxH     framebuffer geometry handed to it (default 640x480)
+ *     --exec-fb-out F   write that framebuffer as a PPM when the run ends
  *     --adf FILE        insert into DF0 (repeat with --df1/--df2/--df3)
  *     --cpu TYPE        68000 | 68010 | 68ec020 | 68020 | 68030 | 68040
  *     --chip KB         Chip RAM size in KB (default 512)
@@ -77,6 +83,9 @@ typedef struct options {
     const char *iso;
     const char *hdf;
     const char *lide_rom;
+    const char *exec_file;
+    uint32_t    exec_fb_w, exec_fb_h;
+    const char *exec_fb_out;
     const char *odfs;
     int         cpu_type;
     uint32_t    chip_kb;
@@ -449,6 +458,8 @@ static bool parse_args(int argc, char **argv, options_t *o)
     o->scale       = 2;
     o->serial_mode = env_or("HARNESS_SERIAL_MODE", "line");
     o->audio_rate  = 48000;
+    o->exec_fb_w   = 640;
+    o->exec_fb_h   = 480;
 
     for (i = 1; i < argc; i++) {
         const char *a = argv[i];
@@ -461,7 +472,23 @@ static bool parse_args(int argc, char **argv, options_t *o)
             }                                                                 \
         } while (0)
 
-        if (!strcmp(a, "--adf"))            { NEED_VALUE(); o->adf[0] = argv[++i]; }
+        if (!strcmp(a, "--exec"))           { NEED_VALUE(); o->exec_file = argv[++i]; }
+        else if (!strcmp(a, "--exec-fb-out")) { NEED_VALUE(); o->exec_fb_out = argv[++i]; }
+        else if (!strcmp(a, "--exec-fb")) {
+            char *sep;
+            NEED_VALUE();
+            o->exec_fb_w = (uint32_t)strtoul(argv[++i], &sep, 10);
+            if (sep == NULL || (*sep != 'x' && *sep != 'X')) {
+                fprintf(stderr, "rigel-harness: --exec-fb wants WxH\n");
+                return false;
+            }
+            o->exec_fb_h = (uint32_t)strtoul(sep + 1, NULL, 10);
+            if (o->exec_fb_w == 0 || o->exec_fb_h == 0) {
+                fprintf(stderr, "rigel-harness: --exec-fb wants non-zero WxH\n");
+                return false;
+            }
+        }
+        else if (!strcmp(a, "--adf"))       { NEED_VALUE(); o->adf[0] = argv[++i]; }
         else if (!strcmp(a, "--df1"))       { NEED_VALUE(); o->adf[1] = argv[++i]; }
         else if (!strcmp(a, "--df2"))       { NEED_VALUE(); o->adf[2] = argv[++i]; }
         else if (!strcmp(a, "--df3"))       { NEED_VALUE(); o->adf[3] = argv[++i]; }
@@ -558,10 +585,11 @@ static bool parse_args(int argc, char **argv, options_t *o)
 #undef NEED_VALUE
     }
 
-    if (o->rom == NULL) {
+    if (o->rom == NULL && o->exec_file == NULL) {
         fprintf(stderr,
                 "usage: rigel-harness <kickstart.rom> [--adf disk.adf] "
-                "[--headless] [--frames N] [--cycles N]\n");
+                "[--headless] [--frames N] [--cycles N]\n"
+                "       rigel-harness --exec <program> [--fast 8] [options]\n");
         return false;
     }
 
@@ -666,21 +694,57 @@ int main(int argc, char **argv)
         harness_set_serial_sink(h, serial_on_byte, &s_serial);
     }
 
-    rom = load_file(o.rom, &rom_size);
-    if (rom == NULL) { harness_destroy(h); return 1; }
-
-    if (!harness_load_kickstart(h, rom, rom_size)) {
-        fprintf(stderr,
-                "rigel-harness: %s is %u bytes; expected a 256K or 512K "
-                "Kickstart image\n", o.rom, rom_size);
-        free(rom);
-        harness_destroy(h);
-        return 1;
+    if (o.fast_mb == 0u && o.exec_file != NULL) {
+        /* Emu68's own programs assume a machine with Fast RAM, and the
+         * Buddhabrot renderer alone needs 2.6 MB. Default it on rather than
+         * failing with an out-of-memory message the user has to decode. */
+        o.fast_mb = 8u;
+        printf("rigel-harness: --exec implies --fast 8\n");
     }
-    free(rom);
-    printf("rigel-harness: ROM %s (%u KB), Chip %u KB, Slow %u KB, %s %s\n",
-           o.rom, rom_size / 1024u, o.chip_kb, o.slow_kb,
-           o.ntsc ? "NTSC" : "PAL", o.ecs ? "ECS" : "OCS");
+
+    if (o.fast_mb != 0u) {
+        if (harness_attach_fastram(h, o.fast_mb))
+            printf("rigel-harness: Fast RAM %u MB (Zorro II)\n", o.fast_mb);
+        else
+            fprintf(stderr, "rigel-harness: --fast %u rejected; use 1, 2, 4 or 8\n",
+                    o.fast_mb);
+    }
+
+    if (o.exec_file != NULL) {
+        char hunk_err[256] = "";
+
+        rom = load_file(o.exec_file, &rom_size);
+        if (rom == NULL) { harness_destroy(h); return 1; }
+
+        if (!harness_load_hunk(h, rom, rom_size, o.exec_fb_w, o.exec_fb_h,
+                               hunk_err, sizeof(hunk_err))) {
+            fprintf(stderr, "rigel-harness: cannot load %s: %s\n",
+                    o.exec_file, hunk_err[0] ? hunk_err : "not a hunk executable");
+            free(rom);
+            harness_destroy(h);
+            return 1;
+        }
+        free(rom);
+        printf("rigel-harness: exec %s (%u bytes), Chip %u KB, %s %s\n",
+               o.exec_file, rom_size, o.chip_kb,
+               o.ntsc ? "NTSC" : "PAL", o.ecs ? "ECS" : "OCS");
+    } else {
+        rom = load_file(o.rom, &rom_size);
+        if (rom == NULL) { harness_destroy(h); return 1; }
+
+        if (!harness_load_kickstart(h, rom, rom_size)) {
+            fprintf(stderr,
+                    "rigel-harness: %s is %u bytes; expected a 256K, 512K or "
+                    "1 MB ROM image\n", o.rom, rom_size);
+            free(rom);
+            harness_destroy(h);
+            return 1;
+        }
+        free(rom);
+        printf("rigel-harness: ROM %s (%u KB), Chip %u KB, Slow %u KB, %s %s\n",
+               o.rom, rom_size / 1024u, o.chip_kb, o.slow_kb,
+               o.ntsc ? "NTSC" : "PAL", o.ecs ? "ECS" : "OCS");
+    }
 
     for (i = 0; i < 4; i++) {
         uint8_t *adf;
@@ -694,14 +758,6 @@ int main(int argc, char **argv)
         else
             printf("rigel-harness: DF%d <- %s (%u KB)\n", i, o.adf[i], adf_size / 1024u);
         free(adf);
-    }
-
-    if (o.fast_mb != 0u) {
-        if (harness_attach_fastram(h, o.fast_mb))
-            printf("rigel-harness: Fast RAM %u MB (Zorro II)\n", o.fast_mb);
-        else
-            fprintf(stderr, "rigel-harness: --fast %u rejected; use 1, 2, 4 or 8\n",
-                    o.fast_mb);
     }
 
     /* HDF and ISO both hang off the LIDE board, so it only gets presented
@@ -813,6 +869,43 @@ int main(int argc, char **argv)
         harness_diag_disasm(h, o.disasm_addr, o.disasm_count, o.cpu_type);
     if (o.dump_len != 0)
         harness_diag_dump_mem(h, o.dump_addr, o.dump_len, o.dump_file);
+
+    if (o.exec_fb_out != NULL) {
+        uint32_t fb, fw, fh, fpitch;
+        if (harness_exec_framebuffer(h, &fb, &fw, &fh, &fpitch)) {
+            FILE *fp = fopen(o.exec_fb_out, "wb");
+            if (fp == NULL) {
+                fprintf(stderr, "rigel-harness: cannot write %s\n", o.exec_fb_out);
+            } else {
+                uint32_t y, x;
+                uint64_t nonzero = 0;
+                fprintf(fp, "P6\n%u %u\n255\n", fw, fh);
+                for (y = 0; y < fh; y++) {
+                    for (x = 0; x < fw; x++) {
+                        uint32_t a = fb + y * fpitch + x * 2u;
+                        /* Emu68's examples byte-swap before storing (the
+                         * `ror.w #8` in their pixel packer), so the buffer
+                         * holds little-endian RGB565. */
+                        uint16_t p = (uint16_t)(harness_peek8(h, a) |
+                                                (harness_peek8(h, a + 1u) << 8));
+                        uint8_t rgb[3];
+                        if (p != 0) nonzero++;
+                        /* RGB565 -> 8 bits per channel, replicating the high
+                         * bits so full-scale stays full-scale. */
+                        rgb[0] = (uint8_t)(((p >> 11) & 0x1F) * 255 / 31);
+                        rgb[1] = (uint8_t)(((p >> 5)  & 0x3F) * 255 / 63);
+                        rgb[2] = (uint8_t)(( p        & 0x1F) * 255 / 31);
+                        fwrite(rgb, 1, 3, fp);
+                    }
+                }
+                fclose(fp);
+                printf("[HUNK] wrote %s (%ux%u, %llu non-black pixels)\n",
+                       o.exec_fb_out, fw, fh, (unsigned long long)nonzero);
+            }
+        } else {
+            fprintf(stderr, "rigel-harness: --exec-fb-out needs --exec\n");
+        }
+    }
     harness_diag_summary(h, frames);
     printf("rigel-harness: %llu frames, %llu CPU cycles, %llu serial bytes\n",
            (unsigned long long)frames,
