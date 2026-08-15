@@ -41,7 +41,8 @@ it.
 | DiagROM | full serial diagnostic, Chip RAM test passes |
 | AROS (1 MB) | boots to its startup screen, with Fast RAM — see below |
 | Zorro II autoconfig | Fast RAM at `0x200000` and LIDE at `0xEA0000`, enumerated in chain order |
-| LIDE / ATAPI | see below — the board loads and talks, but breaks the boot |
+| HDF | Kickstart 2.0 boots Workbench 2.0 from `wb20.hdf`, volume mounted through the board |
+| CD-ROM | identified and talked to, but never mounted — see below |
 
 ## What does not
 
@@ -70,50 +71,32 @@ Earlier notes here blamed a jump into zeroed memory at `0x387A4`. That was an
 artefact of running AROS with no boot media at all, so dosboot waited forever;
 the address was noise.
 
-**The lide.rom that `scripts/build-lide-rom.sh` produces is broken.** The board
-emulation is not the problem — swapping in a known-good ROM makes everything
-work:
+**A CD is identified but never mounted.** Kickstart 2.0 boots Workbench from
+`wb20.hdf` with a CD attached, but no CD volume appears on the desktop.
 
-| lide.rom | KS20 + `wb20.hdf` |
-| --- | --- |
-| built by `scripts/build-lide-rom.sh` | 256x256, boot never completes |
-| the one Bellatrix had built | **Workbench 2.0 desktop with the WB20 volume mounted** |
+The ATAPI exchange is correct as far as it goes — TEST UNIT READY returning
+UNIT_ATTENTION, REQUEST SENSE, TEST UNIT READY now OK, then READ CAPACITY
+answering with the right last-LBA (`0x0004F1A6`) and 2048-byte blocks. After
+that the driver polls TEST UNIT READY forever and never issues READ TOC (0x43)
+or READ(10) (0x28), so it never looks at the disc. Whatever makes lide.device's
+mounter decide to go on is missing.
 
-Same submodule commit (`abc0434`), same Docker image, same CFLAGS — yet the
-driver binary comes out 804 bytes shorter (24784 vs 25588) and does not work.
-The ROM header and the nibble-encoded boot loader are byte-identical; only the
-lide.device binary differs, from offset `0x1016` on.
+Everything under that is verified: autoconfig, the DiagArea at `+0004`,
+lide.device loaded from the ROM, and the whole ODFS binary read from the second
+bank (31156 reads of a 31152-byte image, starting at `+1fff8` where the loader
+looks for the signature). Attaching a CD no longer harms the machine.
 
-The script's own comment points at the likely reason: crosstools' GCC 6.5.0b
-does not pull `execbase.h` and `expansionbase.h` in transitively the way LIV2's
-own amiga-gcc does, which is why the build force-includes them. That workaround
-apparently produces something that compiles and links but misbehaves. The
-known-good ROM was probably built with amiga-gcc rather than crosstools.
+The CU CD is a CDTV disc (`CD001`, System ID `CDTV`), so it is already marked
+bootable and the `HARNESS_CD_BOOTABLE` PVD patch skips it. Kickstart 2.0
+booting this CD is a known-good result from Bellatrix, so the gap is on our
+side.
 
-Until the build is fixed, `--lide-rom PATH` takes a working image.
+Two things were fixed getting here, both found by diffing against Bellatrix's
+board: the ATAPI layer was never wired to ATA DEVICE RESET (`ide.atapi_reset`),
+and the ATA channel was not reset after media was attached.
 
-With a working ROM:
-
-- **HDF boots.** Kickstart 2.0 reaches the Workbench 2.0 desktop from
-  `wb20.hdf`, with the volume mounted through the board.
-- **ISO does not boot yet**, but no longer harms the machine: KS20 with a CD
-  attached shows its normal insert-disk screen (592x200), exactly as it does
-  with no media at all. Everything up to the driver is verified — autoconfig,
-  the DiagArea at `+0004`, lide.device loaded from the ROM, the whole ODFS
-  binary read from the second bank (31156 reads of a 31152-byte image, starting
-  at `+1fff8` where the loader looks for the signature), and a correct ATAPI
-  exchange through READ CAPACITY returning the right last-LBA (`0x0004F1A6`)
-  and 2048-byte blocks. Kickstart 2.0 booting this CD is a known-good result
-  from Bellatrix, so what remains is on the mount/boot side.
-
-Two gaps found by diffing against the Bellatrix board and now fixed: the ATAPI
-layer was never wired to ATA DEVICE RESET (`ide.atapi_reset`), and the channel
-was not reset after media was attached. Neither was the cause here, but both
-were real.
-
-An earlier note in this file said the board broke the boot and blamed a missing
-interrupt. The board does not raise one in Bellatrix either, so that was wrong;
-the ROM build was the cause.
+An earlier note blamed a missing board interrupt. Bellatrix's board does not
+raise one either, so that was wrong.
 
 **Vertical banding in Battle Squadron gameplay.** The title and menu screens
 are pixel-correct; the scrolling playfield shows vertical stripes that are not
@@ -150,6 +133,14 @@ Kept because each one wasted real time and would again.
   `--stop-on-halt` restores the old behaviour for a caller that wants it.
 - **The overlay applies to debug reads too.** A `--dump` of low memory returns
   ROM while OVL is asserted — correct, and confusing. `--dump` now says so.
+- **A build that fails silently produces something that runs.** The lide.rom
+  this repository built did not work, while Bellatrix's from the same commit
+  did. The cause was `git describe` failing inside the container — git refuses
+  a checkout it considers foreign-owned — so the Makefile's VERSION came out
+  empty and `-DDEVICE_VERSION`/`-DDEVICE_REVISION` were never defined. The
+  build reported success throughout. `GIT_CONFIG_COUNT=1
+  GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'` fixes it without
+  needing a writable HOME, which `git config --global` would.
 - **A trace compiled out is worse than no trace.** The ATAPI and ATA sources
   carried over from Bellatrix gate their tracing on `BELLATRIX_HARNESS`, a
   define that does not exist here, so the trace silently returned nothing and

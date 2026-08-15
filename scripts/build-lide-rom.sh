@@ -33,11 +33,24 @@ if [ "$("$M68K" --check | cut -d: -f1)" != "docker" ]; then
 fi
 
 echo "[lide-rom] 1/4 building lide.device..."
-# amigadev/crosstools' GCC 6.5.0b does not pull execbase.h and expansionbase.h
-# in transitively the way LIV2's own amiga-gcc does, so force them in. CFLAGS
-# is set inside the container because the wrapper passes no host environment.
+#
+# Two things have to be right here, and both are silent when they are not.
+#
+# The Makefile derives the device version from `git describe`. Inside the
+# container the checkout is owned by a different user as far as git is
+# concerned, so it refuses the repository, VERSION comes out empty, and
+# -DDEVICE_VERSION/-DDEVICE_REVISION are never defined. The build still
+# succeeds and produces a driver that does not work. GIT_CONFIG_* sets
+# safe.directory without needing a writable HOME, which `git config --global`
+# would.
+#
+# And amigadev/crosstools' GCC 6.5.0b does not pull execbase.h and
+# expansionbase.h in transitively the way LIV2's own amiga-gcc does, so force
+# them in. The Makefile uses CFLAGS+=, so these land ahead of its own flags.
+#
 "$M68K" bash -c \
-    "CFLAGS='-include stdint.h -include exec/execbase.h -include libraries/expansionbase.h' \
+    "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'; \
+     CFLAGS='-include stdint.h -include exec/execbase.h -include libraries/expansionbase.h' \
      make -C '$LIDE_DIR' lide.device -s"
 
 echo "[lide-rom] 2/4 assembling the boot loader..."

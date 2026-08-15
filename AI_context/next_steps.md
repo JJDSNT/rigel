@@ -14,14 +14,12 @@ the full record and the repro commands.
    - Start from `from_bellatrix/rigel_graphics_dma_scroll_investigation.md`;
      BPLCON1 scroll and bitplane modulo are the obvious suspects.
 
-2. **`scripts/build-lide-rom.sh` produces a broken lide.device**
-   - Same commit, image and flags as the known-good build, yet 804 bytes
-     shorter and non-functional. Swap in Bellatrix's ROM and HDF boots to the
-     Workbench desktop.
-   - Suspect the force-included headers papering over a crosstools/amiga-gcc
-     difference. Comparing the two binaries, or building with amiga-gcc, should
-     settle it.
-   - `--lide-rom PATH` is the workaround meanwhile.
+2. **A CD is identified but never mounted**
+   - HDF boots to the Workbench desktop with a CD attached, but no CD volume
+     appears. ATAPI is correct through READ CAPACITY, then the driver polls
+     TEST UNIT READY forever and never issues READ TOC or READ(10).
+   - Everything below the driver is verified, so the gap is in what makes
+     lide.device's mounter proceed.
 
 3. **AROS without Fast RAM**
    - Boots clean with Fast RAM. Without it the console handler dies with
