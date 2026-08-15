@@ -14,15 +14,14 @@ the full record and the repro commands.
    - Start from `from_bellatrix/rigel_graphics_dma_scroll_investigation.md`;
      BPLCON1 scroll and bitplane modulo are the obvious suspects.
 
-2. **The LIDE board breaks an otherwise working boot** ← now the sharpest one
-   - KS20 boots Workbench from `wb20.adf` to 672x256; attach an HDF or a CD
-     and it ends at 256x256 without getting there. Both media types, with or
-     without Fast RAM.
-   - Everything up to the driver works — autoconfig, DiagArea, lide.device
-     loaded, the whole ODFS binary read, a correct ATAPI exchange through
-     READ CAPACITY. Then the driver polls TEST UNIT READY forever.
-   - No interrupt is wired from the board. A driver waiting on command
-     completion would look exactly like this; check that first.
+2. **`scripts/build-lide-rom.sh` produces a broken lide.device**
+   - Same commit, image and flags as the known-good build, yet 804 bytes
+     shorter and non-functional. Swap in Bellatrix's ROM and HDF boots to the
+     Workbench desktop.
+   - Suspect the force-included headers papering over a crosstools/amiga-gcc
+     difference. Comparing the two binaries, or building with amiga-gcc, should
+     settle it.
+   - `--lide-rom PATH` is the workaround meanwhile.
 
 3. **AROS without Fast RAM**
    - Boots clean with Fast RAM. Without it the console handler dies with

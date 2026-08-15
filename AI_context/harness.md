@@ -70,47 +70,50 @@ Earlier notes here blamed a jump into zeroed memory at `0x387A4`. That was an
 artefact of running AROS with no boot media at all, so dosboot waited forever;
 the address was noise.
 
-**Attaching the LIDE board breaks an otherwise working boot.** This is the
-sharpest open defect, and it covers both HDF and ISO.
+**The lide.rom that `scripts/build-lide-rom.sh` produces is broken.** The board
+emulation is not the problem — swapping in a known-good ROM makes everything
+work:
 
-With the same budget and memory, Kickstart 2.0 boots Workbench 2.0 from
-`wb20.adf` and reaches a 672x256 screen. Attach a CD or an HDF and the machine
-ends at 256x256 having never got there:
-
-| Configuration | Result |
+| lide.rom | KS20 + `wb20.hdf` |
 | --- | --- |
-| KS20 alone | 592x200, insert-disk screen |
-| KS20 + `wb20.adf` | **672x256, Workbench boots** |
-| KS20 + `wb20.adf` + CU CD | 256x256 |
-| KS20 + `wb20.hdf` | 256x256, with or without Fast RAM |
+| built by `scripts/build-lide-rom.sh` | 256x256, boot never completes |
+| the one Bellatrix had built | **Workbench 2.0 desktop with the WB20 volume mounted** |
 
-The machine is not hung — it is busier with the board attached (183k register
-writes vs 90k) and the PC keeps moving. It simply never gets where it was
-going. Fast RAM is not the variable, so the autoconfig chain is not the cause.
+Same submodule commit (`abc0434`), same Docker image, same CFLAGS — yet the
+driver binary comes out 804 bytes shorter (24784 vs 25588) and does not work.
+The ROM header and the nibble-encoded boot loader are byte-identical; only the
+lide.device binary differs, from offset `0x1016` on.
 
-Everything up to that point does work, which is what makes the defect narrow:
+The script's own comment points at the likely reason: crosstools' GCC 6.5.0b
+does not pull `execbase.h` and `expansionbase.h` in transitively the way LIV2's
+own amiga-gcc does, which is why the build force-includes them. That workaround
+apparently produces something that compiles and links but misbehaves. The
+known-good ROM was probably built with amiga-gcc rather than crosstools.
 
-- autoconfig assigns the board a base
-- expansion.library reads the DiagArea at `+0004`
-- the boot loader pulls lide.device out of the ROM
-- the ODFS bank is read essentially end to end (31156 reads of a 31152-byte
-  binary), starting at `+1fff8` where the loader looks for the signature
-- ATAPI runs a correct exchange: TEST UNIT READY → UNIT_ATTENTION, REQUEST
-  SENSE, TEST UNIT READY → OK, READ CAPACITY returning the right last-LBA
-  (`0x0004F1A6`) and block size
+Until the build is fixed, `--lide-rom PATH` takes a working image.
 
-Then the driver polls TEST UNIT READY forever and never issues READ TOC or
-READ(10). No interrupt is wired from the board, which is the first thing to
-check: a driver waiting on command completion would look exactly like this.
+With a working ROM:
 
-The board was reported as working earlier on the strength of log lines showing
-the driver loading. That was never a boot — no screenshot was ever taken. It is
-recorded here so the same mistake is not repeated: an emulator milestone is a
-picture or an assertion, not a trace line.
+- **HDF boots.** Kickstart 2.0 reaches the Workbench 2.0 desktop from
+  `wb20.hdf`, with the volume mounted through the board.
+- **ISO does not boot yet**, but no longer harms the machine: KS20 with a CD
+  attached shows its normal insert-disk screen (592x200), exactly as it does
+  with no media at all. Everything up to the driver is verified — autoconfig,
+  the DiagArea at `+0004`, lide.device loaded from the ROM, the whole ODFS
+  binary read from the second bank (31156 reads of a 31152-byte image, starting
+  at `+1fff8` where the loader looks for the signature), and a correct ATAPI
+  exchange through READ CAPACITY returning the right last-LBA (`0x0004F1A6`)
+  and 2048-byte blocks. Kickstart 2.0 booting this CD is a known-good result
+  from Bellatrix, so what remains is on the mount/boot side.
 
-The CU CD is a CDTV disc (`CD001`, System ID `CDTV`), so it is already marked
-bootable and the `HARNESS_CD_BOOTABLE` PVD patch does not apply to it. Kickstart
-2.0 booting this ISO is a known-good result from Bellatrix.
+Two gaps found by diffing against the Bellatrix board and now fixed: the ATAPI
+layer was never wired to ATA DEVICE RESET (`ide.atapi_reset`), and the channel
+was not reset after media was attached. Neither was the cause here, but both
+were real.
+
+An earlier note in this file said the board broke the boot and blamed a missing
+interrupt. The board does not raise one in Bellatrix either, so that was wrong;
+the ROM build was the cause.
 
 **Vertical banding in Battle Squadron gameplay.** The title and menu screens
 are pixel-correct; the scrolling playfield shows vertical stripes that are not

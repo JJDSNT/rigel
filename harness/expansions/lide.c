@@ -218,8 +218,12 @@ lide_board_t *lide_create(const char *rom_path)
     ata_ide_channel_init(&b->ide);
 
     atapi_cdrom_init(&b->atapi, &g_iso_ops, &b->iso);
-    b->ide.atapi_ctx  = &b->atapi;
-    b->ide.atapi_exec = atapi_cdrom_exec;
+    b->ide.atapi_ctx   = &b->atapi;
+    b->ide.atapi_exec  = atapi_cdrom_exec;
+    /* The guest issues ATA DEVICE RESET during identification; without this
+     * the ATAPI layer never hears about it and cannot re-raise
+     * UNIT_ATTENTION. */
+    b->ide.atapi_reset = (void (*)(void *))atapi_cdrom_reset;
 
     return b;
 }
@@ -250,6 +254,14 @@ bool lide_attach_hdf(lide_board_t *b, const char *path)
     b->ide.disk_read    = hdf_read;
     b->ide.disk_write   = hdf_write;
     b->ide.disk_sectors = b->hdf.sectors;
+
+    /* Attaching a device changes what the channel is: with a disk present it
+     * becomes a two-device bus and IDENTIFY answers differently. The channel
+     * has to be reset so its registers describe the drive that is now there. */
+    ata_ide_channel_reset(&b->ide);
+
+    kprintf("[LIDE] HD attached: %u sectors (%u MB)\n",
+            (unsigned)b->hdf.sectors, (unsigned)(b->hdf.sectors / 2048u));
     return true;
 }
 
@@ -257,7 +269,11 @@ bool lide_attach_iso(lide_board_t *b, const char *path)
 {
     if (b == NULL) return false;
     if (!media_open(&b->iso, path, ATAPI_SECTOR_SIZE, "rb")) return false;
+
     atapi_cdrom_insert(&b->atapi);
+    ata_ide_channel_reset(&b->ide);
+
+    kprintf("[LIDE] CD inserted: %u sectors\n", (unsigned)b->iso.sectors);
     return true;
 }
 
