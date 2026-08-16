@@ -75,10 +75,14 @@ typedef struct rigel_serial_config {
 
 typedef struct rigel_config {
     /*
-     * CPU-side clock in Hz. Only ever used to convert cycles to real time —
-     * the chipset counts colour clocks (half this) and derives its internal
-     * rates from fixed ratios of them, so this does not change how the machine
-     * behaves. Leave at 0 to get the rate for the configured video_std.
+     * CPU-side clock in Hz; the chipset counts colour clocks, half this.
+     *
+     * Any value is honoured, so an exotic rate is a valid configuration — it
+     * scales how simulated cycles map to real time, while the machine's
+     * internal ratios stay fixed, exactly as on hardware where everything is
+     * proportional to one oscillator.
+     *
+     * Leave at 0 for the rate matching video_std.
      */
     rigel_u32         clock_hz;
     rigel_u32         chip_ram_size;

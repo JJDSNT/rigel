@@ -26,14 +26,20 @@ frame, NTSC 262 and 59474, each within a microsecond of the real frame time
 once converted at `cck_hz`. Converted at `clock_hz` instead, both come out at
 half, and a drift correction built on that never converges.
 
-`clock_hz` is a scale factor, not a driver. Nothing inside Rigel reads it: the
-chipset counts colour clocks and derives everything from fixed ratios of them
-— the CIA E-clock is CCK/5, which is the hardware's CPU/10 — so setting it to
-an unusual value changes what cycles mean in seconds, and nothing else. That is
-the right model for an Amiga, where the whole machine is proportional to one
-oscillator, but it does mean the name promises more than it delivers.
+The clock is configurable. `rigel_config_t.clock_hz` set to anything non-zero
+is used as given, so PAL and NTSC are the two obvious choices rather than the
+only ones — an exotic rate is a legitimate configuration and behaves the way
+you would expect.
 
-Where it is consulted is the default, which follows `video_std`.
+What it scales is the relationship between simulated cycles and real time.
+Everything inside the chipset counts colour clocks and derives its rates from
+fixed ratios of them — the CIA E-clock is CCK/5, the hardware's CPU/10 — so a
+machine configured at twice the clock runs the identical simulation and
+reaches each frame in half the wall-clock time. That is the correct model for
+an Amiga, where every part is proportional to one oscillator, and it is why an
+exotic clock needs no special handling anywhere else.
+
+Left at zero, it follows `video_std`: 7093790 for PAL, 7159090 for NTSC.
 
 A 68000 host has the same halving to do in the other direction — CPU cycles
 into CCK, carrying the odd cycle so time is not lost across timeslices. See
