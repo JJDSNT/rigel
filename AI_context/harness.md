@@ -203,8 +203,15 @@ run.
 
 Both images load, relocate and execute — Buddha ran 2.8 billion cycles without
 a single exception — but **neither has produced output yet**. The framebuffer
-stays untouched. Whether the programs need something else from the Emu68
-environment, or the entry convention is not yet exactly right, is not settled.
+stays untouched, and why is not settled.
 
-The goal this path is heading towards is loading `aros_68k.elf`, which will
-need an ELF loader alongside the hunk one.
+The point of this path is not the examples. It is to load
+`aros-emu68-m68k.elf`, so the TUI can offer AROS either way: through the ROM
+that boots today, or through the ELF. That needs an ELF32 `ET_REL` loader and
+a synthesised device tree, and it is not blocked on the examples — they turned
+out to be hunk rather than ELF, so they share only this plumbing and not the
+environment.
+
+[`issues/ISSUE-0001.md`](issues/ISSUE-0001.md) has the investigation: the entry
+contract, why AROS refuses to boot without a `/memory` node, and what the work
+actually is.
