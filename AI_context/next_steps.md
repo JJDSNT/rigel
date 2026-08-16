@@ -35,6 +35,16 @@ the full record and the repro commands.
      minimum. Plausible once, suspicious every time.
    - `--audio-out FILE.wav` reports peak and RMS.
 
+## Open issues
+
+[`issues/`](issues/) — one file each, Bellatrix's convention.
+
+| | |
+| --- | --- |
+| [ISSUE-0002](issues/ISSUE-0002.md) | `pixel_format` and `framebuffer.format` can disagree; a host reading `frame.format` is misled. Needs a design call, not just a patch. |
+| [ISSUE-0003](issues/ISSUE-0003.md) | `enable_trace` is read by nothing. Wire it or remove it. |
+| [ISSUE-0004](issues/ISSUE-0004.md) | Nothing exercises the config surface. Three defects hid there, including one whose test enshrined the bug. |
+
 ## Not on the critical path
 
 [`issues/ISSUE-0001.md`](issues/ISSUE-0001.md) — loading `aros.elf` as an
