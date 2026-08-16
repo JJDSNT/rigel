@@ -19,7 +19,8 @@
  *     --slow KB         Slow RAM at 0xC00000 (default 0)
  *     --pal | --ntsc    video standard (default PAL)
  *     --ecs             ECS chipset (default OCS)
- *     --cycle-exact     enable Rigel's honest-hybrid cost model
+ *     --cycle-exact     Rigel's honest-hybrid cost model. Without it the
+ *                       blitter runs 2-3x fast; a product host runs with it on.
  *     --trace           let Rigel's structured log events reach stderr
  *     --stop-on-halt    end the run when the PC stops moving (exit code 3);
  *                       off by default, since a delay loop looks the same

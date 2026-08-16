@@ -63,7 +63,7 @@ optional: without it `rigel-harness` still builds and runs headless.
 | `--slow KB` | Slow RAM at `0xC00000`, default none |
 | `--pal` / `--ntsc` | video standard, default PAL |
 | `--ecs` | ECS chipset instead of OCS |
-| `--cycle-exact` | Rigel's honest-hybrid cost model |
+| `--cycle-exact` | Rigel's honest-hybrid cost model. Matters: without it the blitter runs 2-3x fast. Bellatrix ran with it on. |
 | `--headless` | no window |
 | `--frames N` / `--cycles N` | stop after a budget |
 | `--screenshot FILE` | write the last completed frame as a binary PPM |
