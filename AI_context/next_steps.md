@@ -31,6 +31,16 @@ the full record and the repro commands.
      minimum. Plausible once, suspicious every time.
    - `--audio-out FILE.wav` reports peak and RMS.
 
+## Still to migrate from Bellatrix
+
+See [`from_bellatrix/README.md`](from_bellatrix/README.md).
+
+- `docs/Rigel_integration.md` from Bellatrix `main` — 60 KB, the current
+  host-interface contract, superseding the exploratory notes already carried
+  over.
+- Copperline's `timing-test/` — a cycle-timing suite on a bootable ADF, plus an
+  FS-UAE config to compare against. Runnable by the harness as it stands.
+
 ## Near-Term Targets (fidelidade e completude)
 
 - `paula_disk`: melhorar `DSKBYTR`, `DSKDATR`, `DSKSYNC`, `ADKCON`, drive-selection real DF0–DF3

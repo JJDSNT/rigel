@@ -33,6 +33,26 @@ acted on. Where they disagree with `docs/`, `docs/` wins.
 | `rigel_aros_adf_investigation.md` | Booting AROS from ADF; the longest of these, mostly floppy and disk DMA. |
 | `rigel_performance_research.md` | Where the time went, and which measurements held up. |
 
+## Still to migrate
+
+Identified but not yet brought over.
+
+**`docs/Rigel_integration.md` from the current Bellatrix** — 60 KB, titled
+"Bellatrix / Rigel Integration Specification: Host Interface, MMIO, Timing,
+Interrupts, DMA, Memory, and Lifecycle". Note that this is from Bellatrix's
+`main`, not the `legacy` branch everything else here came from, so it is the
+*current* contract rather than a historical record. It supersedes
+`rigel_integration_notes.md` in this directory, which is the old exploratory
+version. Worth reading before changing any host-facing API.
+
+**Copperline's timing test** —
+`external/copperline/timing-test/` in the legacy tree holds `timing-test.adf`
+with its `test.asm` source, an FS-UAE config to compare against, and a
+`cputest-runner` crate. A cycle-timing suite on a bootable ADF is directly
+runnable by the harness now that it boots floppies, and it is the obvious way
+to put numbers on Rigel's timing model rather than arguing about it. Copperline
+is at <https://github.com/LinuxJedi/Copperline>.
+
 ## What was left behind
 
 Bellatrix's own harness (`tools/harness/`) and its Rigel backend
