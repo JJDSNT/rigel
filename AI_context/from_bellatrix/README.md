@@ -14,7 +14,8 @@ acted on. Where they disagree with `docs/`, `docs/` wins.
 
 | File | What it holds |
 | --- | --- |
-| `rigel_integration_notes.md` | How the host/chipset boundary was meant to work: temporal API over MMIO, bus observation, where planar→chunky belongs, why `libamivideo` is a host concern. |
+| **`rigel_integration_spec.md`** | **The current contract.** 60 KB, numbered sections: MMIO registration and dispatch, endianness, autoconfig, the execution-progress and deadline model, IPL ownership and arbitration, interrupt acknowledgement, lifecycle. Unlike everything else here it comes from Bellatrix's `main`, not `legacy`, so it describes how the host/library boundary is meant to work *now*. Read it before changing anything host-facing. |
+| `rigel_integration_notes.md` | The earlier exploratory version of the same subject, superseded by the spec above. Kept for the reasoning it records — why planar→chunky belongs in Denise, why `libamivideo` is a host concern. |
 | `rigel_suggestions_for_rigel_team.md` | API gaps found from the host side — what a host wants that Rigel did not yet expose. |
 
 ## Gap analysis
@@ -32,26 +33,6 @@ acted on. Where they disagree with `docs/`, `docs/` wins.
 | `rigel_graphics_dma_scroll_investigation.md` | Bitplane DMA and scroll behaviour under real workloads. |
 | `rigel_aros_adf_investigation.md` | Booting AROS from ADF; the longest of these, mostly floppy and disk DMA. |
 | `rigel_performance_research.md` | Where the time went, and which measurements held up. |
-
-## Still to migrate
-
-Identified but not yet brought over.
-
-**`docs/Rigel_integration.md` from the current Bellatrix** — 60 KB, titled
-"Bellatrix / Rigel Integration Specification: Host Interface, MMIO, Timing,
-Interrupts, DMA, Memory, and Lifecycle". Note that this is from Bellatrix's
-`main`, not the `legacy` branch everything else here came from, so it is the
-*current* contract rather than a historical record. It supersedes
-`rigel_integration_notes.md` in this directory, which is the old exploratory
-version. Worth reading before changing any host-facing API.
-
-**Copperline's timing test** —
-`external/copperline/timing-test/` in the legacy tree holds `timing-test.adf`
-with its `test.asm` source, an FS-UAE config to compare against, and a
-`cputest-runner` crate. A cycle-timing suite on a bootable ADF is directly
-runnable by the harness now that it boots floppies, and it is the obvious way
-to put numbers on Rigel's timing model rather than arguing about it. Copperline
-is at <https://github.com/LinuxJedi/Copperline>.
 
 ## What was left behind
 

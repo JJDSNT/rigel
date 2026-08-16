@@ -7,21 +7,30 @@ in `rigel_config_t` and the audio event all exist. What replaces it comes from
 running real software through `harness/` — see [`harness.md`](harness.md) for
 the full record and the repro commands.
 
-1. **Vertical banding in a scrolling playfield** ← best lead
+1. **The blitter is 2-3x too fast** ← now measured
+   - Copperline's timing test puts it at 0.50 of the reference for a clear,
+     0.47 for a line, 0.33 for a fill. Everything non-blitter is within 25%,
+     and frame length and multiply are exact.
+   - Same defect `harness_test_blitter_timing` has always reported; that test
+     said "+96 CCKs", this says which operations and by how much.
+   - `tools/tests/timing/run.sh` reproduces in about a minute and gates on a
+     baseline, so progress is visible per row.
+
+2. **Vertical banding in a scrolling playfield**
    - Battle Squadron's title and menu are pixel-correct; its scrolling
      gameplay shows vertical stripes that are not in the game.
    - First rendering defect with a short deterministic repro (~1 min headless).
    - Start from `from_bellatrix/rigel_graphics_dma_scroll_investigation.md`;
      BPLCON1 scroll and bitplane modulo are the obvious suspects.
 
-2. **AROS without Fast RAM**
+3. **AROS without Fast RAM**
    - Boots clean with Fast RAM. Without it the console handler dies with
      `PC: 0x00000008` regardless of Chip RAM size.
    - May simply be AROS wanting more memory than a stock Amiga has, but the
      failing case is the one where DMA contention on Chip RAM is heaviest, so
      it is worth confirming rather than assuming.
 
-3. **Audio mix has no headroom**
+4. **Audio mix has no headroom**
    - Every capture peaks at exactly 32768, the absolute value of the int16
      minimum. Plausible once, suspicious every time.
    - `--audio-out FILE.wav` reports peak and RMS.
@@ -33,16 +42,6 @@ alternative to `aros.rom`. Research: AROS already boots here through its ROM,
 so this adds a second door to a room we are already in. The investigation is
 written up because its answers are not cheap to rediscover, but it should not
 displace the work above.
-
-## Still to migrate from Bellatrix
-
-See [`from_bellatrix/README.md`](from_bellatrix/README.md).
-
-- `docs/Rigel_integration.md` from Bellatrix `main` — 60 KB, the current
-  host-interface contract, superseding the exploratory notes already carried
-  over.
-- Copperline's `timing-test/` — a cycle-timing suite on a bootable ADF, plus an
-  FS-UAE config to compare against. Runnable by the harness as it stands.
 
 ## Near-Term Targets (fidelidade e completude)
 

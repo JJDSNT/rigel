@@ -1,0 +1,58 @@
+{
+  "_about": [
+    "Cross-emulator timing reference for Copperline's timing-test ADF.",
+    "",
+    "The test takes over the machine, disables interrupts and DMA, and times a",
+    "battery of operations with CIA-A timer A — the E-clock, CPU clock / 10.",
+    "That is the only clock involved, so any emulator modelling the CPU-cycle to",
+    "E-clock ratio correctly reports the same numbers. A row that disagrees says",
+    "exactly which operation is timed differently.",
+    "",
+    "Results are drawn on screen and streamed out the serial port, which is how",
+    "the harness reads them.",
+    "",
+    "The reference column is FS-UAE, as recorded in Copperline's own compare.py.",
+    "Measurements, not our work: see external/copperline/timing-test/.",
+    "",
+    "Rows 19, 20 and 22 are raw VHPOSR values (vpos<<8 | hpos/2), not tick",
+    "counts, so a ratio against them means nothing."
+  ],
+
+  "config": {
+    "machine": "A500+ (ECS), 68EC020 @ 7.09 MHz, 2M chip + 512K slow, PAL",
+    "kickstart": "2.05",
+    "harness_args": "--cpu 68ec020 --chip 2048 --slow 512 --ecs"
+  },
+
+  "raw_rows": [19, 20, 22],
+
+  "rows": [
+    { "n": 0,  "name": "slowR",        "fsuae": 11511 },
+    { "n": 1,  "name": "slowW",        "fsuae": 9018  },
+    { "n": 2,  "name": "chipR",        "fsuae": 11509 },
+    { "n": 3,  "name": "chipW",        "fsuae": 9017  },
+    { "n": 4,  "name": "move",         "fsuae": 8198  },
+    { "n": 5,  "name": "shift",        "fsuae": 9837  },
+    { "n": 6,  "name": "mul",          "fsuae": 28679 },
+    { "n": 7,  "name": "dbra",         "fsuae": 6559  },
+    { "n": 8,  "name": "frame",        "fsuae": 14203 },
+    { "n": 9,  "name": "slowRd/f",     "fsuae": 2883  },
+    { "n": 10, "name": "cw1024",       "fsuae": 1136  },
+    { "n": 11, "name": "cw/6bpl",      "fsuae": 1136  },
+    { "n": 12, "name": "cw/8spr",      "fsuae": 1135  },
+    { "n": 13, "name": "dbraSlow",     "fsuae": 6566  },
+    { "n": 14, "name": "dbraChip",     "fsuae": 6564  },
+    { "n": 15, "name": "cw/6bpl+8spr", "fsuae": 1138  },
+    { "n": 16, "name": "cw/f",         "fsuae": 3171  },
+    { "n": 17, "name": "cw/f+VB",      "fsuae": 3169  },
+    { "n": 18, "name": "cw/3bpl",      "fsuae": 1135  },
+    { "n": 19, "name": "VBentry",      "fsuae": 39    },
+    { "n": 20, "name": "SOFTend",      "fsuae": 273   },
+    { "n": 21, "name": "cw/chain",     "fsuae": 3158  },
+    { "n": 22, "name": "VBraise",      "fsuae": 23    },
+    { "n": 23, "name": "blitClr",      "fsuae": 9908  },
+    { "n": 24, "name": "blitFill",     "fsuae": 18357 },
+    { "n": 25, "name": "blitLine",     "fsuae": 262   },
+    { "n": 26, "name": "fill+3bpl",    "fsuae": 25208 }
+  ]
+}

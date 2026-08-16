@@ -132,6 +132,39 @@ Kept because each one wasted real time and would again.
   Squadron's loader wants a button before it will do anything. `--key` and
   `--lmb` exist for that.
 
+## Timing
+
+`tools/tests/timing/` runs Copperline's cross-emulator timing test — a
+bootable ADF that disables interrupts and DMA, times a battery of operations
+with CIA-A timer A, and streams 27 values out the serial port. The E-clock is
+the only clock involved, so an emulator that models the CPU-cycle to E-clock
+ratio correctly reports the same numbers as any other, and a row that
+disagrees names exactly which operation is wrong.
+
+Against the FS-UAE reference, Rigel is:
+
+| | ratio |
+| --- | --- |
+| frame length, multiply | **1.00** |
+| chip/slow read and write | 0.85–0.91 |
+| `move`, `shift` | 0.80–0.83 |
+| `dbra` | 0.75 |
+| **blitter clear** | **0.50** |
+| **blitter line** | **0.47** |
+| **blitter fill, fill+3bpl** | **0.33** |
+
+The blitter is two to three times too fast, well clear of everything else.
+That is the same defect `harness_test_blitter_timing` reports as "estimate =
+W×H with no slot/CCK factor and no channel count", now with a number on it
+across four different operations.
+
+The CPU rows measure Musashi rather than Rigel, so a 0.75–0.91 spread there is
+a different question from the blitter's 0.33.
+
+The runner gates on `baseline.json` — what Rigel produces today — rather than
+on the reference, so it catches a number moving without demanding everything
+be right first. `--update` re-records it.
+
 ## Instrumentation
 
 The harness is read by people and by agents, so output is line-oriented with a

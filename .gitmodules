@@ -10,3 +10,6 @@
 [submodule "external/ODFileSystem"]
 	path = external/ODFileSystem
 	url = https://github.com/reinauer/ODFileSystem
+[submodule "external/copperline"]
+	path = external/copperline
+	url = https://github.com/LinuxJedi/Copperline
