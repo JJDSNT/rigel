@@ -49,9 +49,12 @@ the full record and the repro commands.
 
 [`issues/ISSUE-0001.md`](issues/ISSUE-0001.md) — loading `aros.elf` as an
 alternative to `aros.rom`. Research: AROS already boots here through its ROM,
-so this adds a second door to a room we are already in. The investigation is
-written up because its answers are not cheap to rediscover, but it should not
-displace the work above.
+so this adds a second door to a room we are already in. The harness-side
+findings are written up because they are not cheap to rediscover, but the work
+should not displace the items above, and it is parked besides: the AROS side of
+the question moved to Bellatrix (`docs/aros_port_contract.md`,
+`AI_context/issues/ISSUE-0023`), which is rewriting the entry conditions this
+would have to be built against.
 
 ## Near-Term Targets (fidelidade e completude)
 

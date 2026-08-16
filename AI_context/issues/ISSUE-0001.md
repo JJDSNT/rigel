@@ -6,13 +6,11 @@ priority: low
 type: research
 owner: unassigned
 created_at: 2026-08-15
-updated_at: 2026-08-15
+updated_at: 2026-08-16
 tags:
   - harness
   - hunk
   - emu68
-  - exec
-  - framebuffer
   - elf
   - aros
   - tui
@@ -31,90 +29,57 @@ related_files:
 
 **This is research, not a requirement.** The harness exists to move Rigel's
 development along, and it already does that: it boots Kickstart, Workbench,
-AROS, games and a CD. Loading `aros-emu68-m68k.elf` would be a second way in
-to an operating system that already boots here through its ROM, and it buys
-Rigel nothing it does not have.
+AROS, games and a CD. Loading `aros-emu68-m68k.elf` would be a second way in to
+an operating system that already boots here through its ROM, and it buys Rigel
+nothing it does not have.
 
-Kept because the investigation was real and the answers are not obvious enough
-to rediscover cheaply. Do not let it displace the chipset work in
-[`../next_steps.md`](../next_steps.md).
+Kept because the harness-side findings are real and not cheap to rediscover. Do
+not let it displace the chipset work in [`../next_steps.md`](../next_steps.md).
 
-## What it would take
+**The other half of this question left the repository.** What AROS requires from
+whatever starts it — the boot contract, how the memory range is delivered, the
+interrupt and console assumptions — is a question about the AROS port, not about
+Rigel. It is documented in Bellatrix, in `docs/aros_port_contract.md`, and the
+work is tracked there as `AI_context/issues/ISSUE-0023`.
 
-The TUI would offer AROS either way: `aros.rom` through the ROM path that
-boots today, or the ELF through a path that does not exist. The ROM path is a
-plain Amiga with a Kickstart; the ELF path would put the harness in the role
-Emu68 plays.
+That matters for scheduling here: the entry conditions this issue would build
+against are the subject of an open refactor. Anything written now against
+today's contract is written against a moving target. See **Wait for** below.
 
-## Where it started
+## What would be built here
 
-`--exec` LoadSegs an AmigaOS hunk executable and runs it in place of a ROM.
-Emu68's two bare-metal examples — `Buddha.rom` (a Buddhabrot renderer) and
-`sysinfo.rom` (a Dhrystone/BUSTEST benchmark), both misnamed, both actually
-hunk binaries — load, relocate and execute without a single exception.
+The TUI offers AROS either way: `aros.rom` through the ROM path that boots
+today, or the ELF through a path that does not exist. The harness side of that
+is three things.
 
-Neither draws anything. The framebuffer handed to them stays untouched.
+1. **An ELF32 BE m68k `ET_REL` loader.** `harness/hunk.c` does not cover this and
+   cannot be extended to — the file has no program headers and `e_entry = 0`, so
+   loading it means doing what a linker does.
+2. **Dispatch on the file.** `0x000003F3` is hunk, `\x7fELF` is ELF; one
+   `--exec` handles both.
+3. **TUI**: let a `.elf` be picked in the Kickstart pane and routed to `--exec`
+   instead of being passed as a ROM.
 
-```sh
-./build-harness/rigel-harness --exec media/roms/Buddha.rom --cpu 68040 \
-    --headless --frames 20000 --chip 2048 --exec-fb 640x256 \
-    --exec-fb-out bud.ppm
-# ... 2832960001 CPU cycles, 0 non-black pixels
-```
+Everything else already exists and is reusable: `--exec`, Fast RAM forced
+configured without autoconfig, the synthesised reset vector, the framebuffer
+plumbing, and the memory accessors a loader would write through.
 
-## What is known to work
+### The loader does not have to be written from scratch
 
-- The hunk file parses: 2 hunks for each image, sizes and relocations as
-  expected. Buddha's second hunk is a 2.6 MB BSS, which is why the loader
-  places images in Fast RAM.
-- Execution starts at the right address. Traced for sysinfo:
-  `00200008 move.l A0,$2020a8` / `move.l D0,$2020ac` / `pea $3e8` /
-  `jsr $200dec` — it is saving the framebuffer pointer and pitch it was
-  handed, so the register convention is being received.
-- Buddha runs 2.8 billion cycles with no F-line, no illegal instruction and no
-  bus error, sitting in a loop that packs RGB565 pixels (`lsl.w #5`, `or.w`,
-  `ror.w #8`).
-- The Emu68 timer registers are answered (`patches/musashi/0007`), so the
-  earlier crash into a null vector at `movec` is gone.
+AROS carries the machinery in-tree, for exactly this relocation set:
 
-## What is not known
+- `tools/elf2hunk/elf2hunk.c` — runs on the build host, accepts **only**
+  `ET_REL`, applies `R_68K_32` and `R_68K_PC32`, rejects `R_68K_PC16`
+- `arch/arm-raspi/boot/elf.c` and `arch/aarch64-raspi/boot/elf.c` — the Pi
+  bootstraps' loaders, both accepting `ET_REL` and walking `SHT_RELA`
 
-Why nothing reaches the framebuffer. Candidates, none tested:
+What none of them does is place the image at an absolute base and report that
+base as the entry point, which is what `ET_REL` requires. That is the smaller
+half.
 
-1. **The entry convention may be incomplete.** Emu68 calls `_c_start` with
-   four register arguments, which is what `startup.c` in the example declares.
-   Whether Emu68 also sets up something else first — a stack frame shape, an
-   `A6`, a supervisor/user mode — has not been checked against Emu68's own
-   launch path.
-2. **The programs may be waiting on something.** Buddha's loop was captured
-   mid-computation; whether it ever reaches its write-out phase is unverified.
-   A `--watch` on the framebuffer would answer this directly.
-3. **The framebuffer address may not be where they write.** The pointer is
-   saved to a variable in hunk 0 immediately, but nothing confirms the render
-   path reads it back rather than using a compiled-in address.
+## The file
 
-## Why it matters
-
-Beyond the examples themselves, this is the path towards loading
-`aros_68k.elf`, which is the actual goal. That will need an ELF loader
-alongside the hunk one, but everything else — `--exec`, the framebuffer, Fast
-RAM forced configured without autoconfig, the synthesised reset vector — is
-shared.
-
-As a workload these are also the only thing in the tree that exercises CPU and
-memory with no chipset involvement at all, which makes them a clean CPU
-benchmark once they work.
-
-## Notes
-
-The `.rom` extension on both files is an accident of where they were filed;
-they are `HUNK_HEADER` executables, not ROM images and not ELF.
-
-
-## Update — the AROS ELF is a different problem
-
-Investigated `out/aros/aros-emu68-m68k.elf` from the current Bellatrix, which
-is where this path is heading. It is not loadable the way the examples are.
+`aros-emu68-m68k.elf`, as built by Bellatrix:
 
 | | |
 | --- | --- |
@@ -123,158 +88,73 @@ is where this path is heading. It is not loadable the way the examples are.
 | **Type** | **REL — relocatable, not an executable** |
 | Program headers | **none** |
 | `e_entry` | **0** |
-| Sections | 11 |
 | `.text` | 0xD31F0 (~865 KB) |
 | `.data` / `.bss` | 4 bytes / 0x138 |
-| Relocations | **12116 × R_68K_32, 46 × R_68K_PC32** |
+| Relocations | **12116 × `R_68K_32`, 46 × `R_68K_PC32`** |
 
-With no program headers there are no LOAD segments to copy, and with
-`e_entry = 0` the entry is not in the header. This is an object file: loading
-it means doing what a linker does — walk the section headers, place every
-`SHF_ALLOC` section, and resolve twelve thousand relocations against the
-symbol table.
+## The open harness bug
 
-Emu68 does exactly that, in `src/ElfLoader.c` (542 lines):
+`--exec` LoadSegs an AmigaOS hunk executable and runs it in place of a ROM.
+Emu68's two bare-metal examples — `Buddha.rom` (a Buddhabrot renderer) and
+`sysinfo.rom` (a Dhrystone/BUSTEST benchmark), both misnamed, both actually hunk
+binaries rather than ROM images or ELF — load, relocate and execute without a
+single exception.
 
-- `checkHeader` accepts `ET_REL` as well as `ET_EXEC`, big-endian, m68k or PPC
-- `GetElfSize` totals the allocatable sections, split into RO and RW so the
-  two can be placed in separate regions
-- `loadHunk` places each section and assigns it an `sh_addr`
-- `relocate` walks `SHT_RELA` and applies `R_68K_32`, `R_68K_PC32` and the
-  smaller widths, resolving `SHN_UNDEF` and `SHN_COMMON` symbols
+**Neither draws anything.** The framebuffer handed to them stays untouched.
 
-For `ET_REL` it keeps the load base as the result, so the entry is simply the
-base — `.text` is the first allocatable section and starts there.
-`src/aarch64/start.c` calls it with `top_of_ram` as the base, having first
-sniffed whether the initrd is HUNK or ELF.
-
-### What this means here
-
-`harness/hunk.c` does not cover this and cannot be extended to. A separate ELF
-loader is needed, of comparable size to Emu68's. What is already built is
-reusable: `--exec` and its file dispatch, Fast RAM forced configured without
-autoconfig, the synthesised reset vector, the framebuffer plumbing, and the
-memory accessors the loader writes through.
-
-Sniffing the two formats apart is trivial — `0x000003F3` versus `\x7fELF` in
-the first four bytes.
-
-### Order of work
-
-The hunk examples are the smaller problem and the better first target: they
-already load and run, so whatever stops them reaching the framebuffer is a
-bounded question. The ELF loader is a known quantity — a day's transcription
-of `ElfLoader.c` against our memory accessors — but it lands on top of an
-`--exec` path that is not yet proven to produce output at all.
-
-
-## Update 2 — what the ELF path actually requires
-
-Read the AROS side, in `aros/arch/m68k-emu68/boot/boot.c` of the current
-Bellatrix. The contract is larger than the examples', and one part of it is
-not optional.
-
-`.text` begins with:
-
-```
-move.l D2,-(A7)      ; height
-move.l D1,-(A7)      ; width
-move.l D0,-(A7)      ; pitch
-move.l A0,-(A7)      ; framebuffer
-move.l A6,-(A7)      ; fdt
-jsr    <relocated>
-lea    20(A7),A7
-stop   #$2700
+```sh
+./build-harness/rigel-harness --exec media/roms/Buddha.rom --cpu 68040 \
+    --headless --frames 20000 --chip 2048 --exec-fb 640x256 \
+    --exec-fb-out bud.ppm
+# ... 2832960001 CPU cycles, 0 non-black pixels
 ```
 
-which lands on:
+Known to work:
 
-```c
-void emu68_bootstrap(const void *fdt, void *framebuffer, uint32_t pitch,
-                     uint32_t width, uint32_t height)
-```
+- The hunk file parses: 2 hunks for each image, sizes and relocations as
+  expected. Buddha's second hunk is a 2.6 MB BSS, which is why the loader places
+  images in Fast RAM.
+- Execution starts at the right address. Traced for sysinfo:
+  `00200008 move.l A0,$2020a8` / `move.l D0,$2020ac` / `pea $3e8` /
+  `jsr $200dec` — it is saving the framebuffer pointer and pitch it was handed,
+  so the register convention is being received.
+- Buddha runs 2.8 billion cycles with no F-line, no illegal instruction and no
+  bus error, sitting in a loop that packs RGB565 pixels (`lsl.w #5`, `or.w`,
+  `ror.w #8`).
+- The Emu68 timer registers are answered (`patches/musashi/0007`), so the earlier
+  crash into a null vector at `movec` is gone.
 
-So the entry registers are **A6 = flattened device tree, A0 = framebuffer,
-D0 = pitch, D1 = width, D2 = height**. The framebuffer four are what the
-Emu68 examples already take; A6 is new and it is the hard part.
+Candidates for why nothing reaches the framebuffer, none tested:
 
-**The device tree is mandatory.** `emu68_bootstrap` calls `parse_fdt`, which
-walks the tree for a `/memory` node and fills `memory_base`/`memory_size`,
-setting `EMU68_BOOT_MEMORY_VALID`. `start_aros` then opens with:
+1. **The entry convention may be incomplete.** Whether Emu68 sets up anything
+   else first — a stack frame shape, an `A6`, a supervisor/user mode — has not
+   been checked against Emu68's own launch path.
+2. **The programs may be waiting on something.** Buddha's loop was captured
+   mid-computation; whether it ever reaches its write-out phase is unverified. A
+   `--watch` on the framebuffer would answer this directly.
+3. **The framebuffer address may not be where they write.** The pointer is saved
+   to a variable in hunk 0 immediately, but nothing confirms the render path
+   reads it back rather than using a compiled-in address.
 
-```c
-if (!(ctx->flags & EMU68_BOOT_MEMORY_VALID))
-    return;
-```
+**These examples are not a stepping stone to the ELF path.** They were picked
+because they looked like ELF; they are hunk. They differ from the ELF path in
+the file format *and* in the entry contract. What they share with it is
+`--exec`, the framebuffer plumbing and the memory accessors — all of which
+already work. They are worth finishing on their own account, being 12 KB against
+865 KB, and nothing about the ELF path is blocked on them.
 
-Pass no FDT — or one without a memory node — and AROS returns without booting.
-`parse_fdt` bails out cleanly on a bad header rather than crashing, so the
-failure is silent: exactly the shape of "loads, runs, produces nothing" that
-this issue opened with.
+## Wait for
 
-`/chosen` bootargs are read too, but nothing depends on them.
+Bellatrix `ISSUE-0023` to settle, or to be abandoned. It splits the AROS port
+into a `m68k-native` architecture and a machine bootstrap, and the entry
+conditions a Rigel-hosted AROS would have to satisfy are precisely what it is
+rewriting. Building against today's conditions means building a bootstrap for a
+contract that is under revision.
 
-### The work
+If it does land, the harness becomes a candidate second machine — the value of
+which, from Rigel's side, is a CPU-and-memory workload with no chipset
+involvement at all, and from the port's side, a deterministic place to be
+observed. Its first milestone would be a serial log out of Exec, not a desktop:
+with no hardware description there is no storage, so no dosboot.
 
-1. **ELF32 BE m68k `ET_REL` loader.** Sections rather than segments; place
-   every `SHF_ALLOC` one, split RO from RW; resolve 12162 relocations
-   (`R_68K_32`, `R_68K_PC32`) against the symbol table, handling `SHN_UNDEF`
-   and `SHN_COMMON`. Entry is the load base, since `.text` is placed first.
-   Emu68's `src/ElfLoader.c` is 542 lines and is the reference.
-2. **Synthesise a minimal FDT** — a header, one `/memory` node with the
-   harness's RAM range, optionally `/chosen` for bootargs. A few hundred bytes
-   of well-documented binary format, generated in C.
-3. **Pass A6** alongside the four registers `--exec` already sets.
-4. **Dispatch on the file** — `0x000003F3` is hunk, `\x7fELF` is ELF. One
-   `--exec` handles both.
-5. **TUI**: let a `.elf` be picked in the Kickstart pane and routed to
-   `--exec` instead of being passed as a ROM.
-
-### On the examples
-
-They are **not** a stepping stone, and the reason for starting with them has
-evaporated. They were picked because they looked like ELF; they are hunk. So
-they differ from the ELF path in both respects that matter — the file format
-*and* the entry contract, since they take four registers and no device tree.
-What they share with it is `--exec`, the framebuffer plumbing and the memory
-accessors, all of which already exist.
-
-They are still worth finishing at some point, being 12 KB against 865 KB, but
-nothing about the ELF path is blocked on them.
-
-## Update 3 — the device tree is the only way to pass memory
-
-Checked whether the memory range can be handed over some other way. It cannot,
-without changing AROS.
-
-`EMU68_BOOT_MEMORY_VALID` is set in exactly one place — inside `parse_fdt`,
-on finding a `/memory` node — and `start_aros` refuses to run without it.
-There is no bootargs route, no default and no fallback.
-
-The current Bellatrix is no precedent here: it *builds* this ELF and hands it
-to Emu68 as an initrd, and Emu68 gets its device tree from the Raspberry Pi
-firmware or from QEMU. Nobody in that chain synthesises one.
-
-So the harness has to. That is less work than it sounds — roughly 200 bytes,
-and the shape is fixed:
-
-```
-/ {
-    #address-cells = <1>;
-    #size-cells = <1>;
-    memory@0 {
-        device_type = "memory";
-        reg = <base size>;
-    };
-};
-```
-
-Two details in `parse_fdt` that will otherwise cost an afternoon:
-
-- The node must sit at **depth 2** — a direct child of the root — because the
-  walker only tests `in_memory` there.
-- `node_is_memory` matches the name `memory` followed by either `\0` or `@`,
-  so `memory` and `memory@0` both work and nothing else does.
-
-`/chosen` for bootargs and an `emu68` node are read at the same depth, but
-neither is required to boot.
+Neither of those is a reason to start now.
