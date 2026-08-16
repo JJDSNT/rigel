@@ -200,7 +200,15 @@ vector, 512K Chip RAM.
 ctest --test-dir build-harness --output-on-failure
 ```
 
-`harness_test_blitter_timing` currently fails: the blitter cost model estimates
-`W×H` without the slot/CCK factor or the channel count, so it comes out ~96 CCKs
-faster than hardware. This is a Rigel model gap, not a harness one — it fails
-identically against an unpatched Musashi.
+`harness_test_blitter_timing` currently fails: the blitter cost model comes out
+faster than hardware for this blit, by 32 CCKs against a reference of
+`W×H×channels×2`.
+
+It used to be 96 CCKs, measured with cycle-exact off. That is not the mode a
+host runs in — Bellatrix set `config.cycle_exact = true` — so the test now
+enables it, which closes two thirds of the gap. What is left is a genuine Rigel
+model gap, not a harness one.
+
+`tools/tests/timing/` measures the same thing against real software and finds
+blitter clear and fill exact in this mode, so whatever remains here is specific
+to this blit rather than a blanket error.

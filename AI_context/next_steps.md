@@ -7,14 +7,14 @@ in `rigel_config_t` and the audio event all exist. What replaces it comes from
 running real software through `harness/` — see [`harness.md`](harness.md) for
 the full record and the repro commands.
 
-1. **The blitter is 2-3x too fast** ← now measured
-   - Copperline's timing test puts it at 0.50 of the reference for a clear,
-     0.47 for a line, 0.33 for a fill. Everything non-blitter is within 25%,
-     and frame length and multiply are exact.
-   - Same defect `harness_test_blitter_timing` has always reported; that test
-     said "+96 CCKs", this says which operations and by how much.
+1. **The blitter line drawer is 27% fast** ← now measured
+   - In cycle-exact mode Copperline's timing test puts blitter clear at 1.00
+     of the reference and fill at 0.99, but a line at 0.73. It is the only
+     chipset row still clearly wrong.
    - `tools/tests/timing/run.sh` reproduces in about a minute and gates on a
      baseline, so progress is visible per row.
+   - Note the earlier claim here that "the blitter is 2-3x too fast" was
+     measured with cycle-exact off, which is not the mode a host runs in.
 
 2. **Vertical banding in a scrolling playfield**
    - Battle Squadron's title and menu are pixel-correct; its scrolling

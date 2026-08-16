@@ -15,6 +15,7 @@
 #
 #   tools/tests/timing/run.sh                 compare against the baseline
 #   tools/tests/timing/run.sh --update        record the current numbers
+#   CYCLE_EXACT= tools/tests/timing/run.sh    A/B against the coarse model
 #
 set -euo pipefail
 
@@ -51,10 +52,18 @@ if [ ! -f "$ROM" ]; then
 fi
 
 # The machine the reference was measured on; see reference.json.
-echo "[timing] running..."
+#
+# --cycle-exact matters enormously here and is the mode a product host runs in
+# (Bellatrix set config.cycle_exact = true and offered turning it *off* as the
+# dev-only A/B). Without it the blitter rows come out at 0.33-0.50 of the
+# reference; with it, clear is exact and fill is within 1%. Measuring the
+# coarse model against hardware numbers is measuring the wrong thing.
+CYCLE_EXACT="${CYCLE_EXACT:---cycle-exact}"
+
+echo "[timing] running${CYCLE_EXACT:+ (cycle-exact)}..."
 "$HARNESS" "$ROM" --adf "$ADF" \
     --headless --frames 1500 \
-    --cpu 68ec020 --chip 2048 --slow 512 --ecs \
+    --cpu 68ec020 --chip 2048 --slow 512 --ecs $CYCLE_EXACT \
     > "$WORK/run.log" 2>&1
 
 if [ "${1:-}" = "--update" ]; then

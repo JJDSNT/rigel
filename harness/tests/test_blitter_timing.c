@@ -18,6 +18,7 @@
  *   Conclusão em W × H × canais × 2 CCKs
  */
 
+#include <string.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -65,7 +66,15 @@ int main(void)
     int64_t          reference_gap;
     int              result = 0;
 
-    h = harness_create();
+    {
+        harness_config_t cfg;
+        memset(&cfg, 0, sizeof(cfg));
+        /* Cycle-exact is the mode a host runs in; the coarse model is a
+         * dev-only A/B. Measuring blitter cost without it measures the wrong
+         * thing — see AI_context/harness.md. */
+        cfg.cycle_exact = true;
+        h = harness_create_ex(&cfg);
+    }
     if (h == NULL) {
         fprintf(stderr, "FAIL: harness_create\n");
         return 1;

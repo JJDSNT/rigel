@@ -141,25 +141,35 @@ the only clock involved, so an emulator that models the CPU-cycle to E-clock
 ratio correctly reports the same numbers as any other, and a row that
 disagrees names exactly which operation is wrong.
 
-Against the FS-UAE reference, Rigel is:
+**Run it with `--cycle-exact`.** The difference is not a detail:
+
+| row | coarse | cycle-exact |
+| --- | --- | --- |
+| blitter clear | 0.50 | **1.00** |
+| blitter fill | 0.33 | **0.99** |
+| fill + 3 bitplanes | 0.33 | **0.99** |
+| blitter line | 0.47 | 0.73 |
+
+Nothing else moves. Bellatrix set `config.cycle_exact = true` and offered
+turning it *off* as a dev-only A/B, so cycle-exact is what a product host
+runs; measuring the coarse model against hardware numbers measures the wrong
+thing. The runner passes it by default, and `CYCLE_EXACT= ` reproduces the
+comparison above.
+
+In cycle-exact mode, against the FS-UAE reference:
 
 | | ratio |
 | --- | --- |
-| frame length, multiply | **1.00** |
-| chip/slow read and write | 0.85–0.91 |
+| frame length, multiply, blitter clear | **1.00** |
+| blitter fill, fill+3bpl | 0.99 |
+| chip/slow read and write, DMA contention | 0.85–0.91 |
 | `move`, `shift` | 0.80–0.83 |
 | `dbra` | 0.75 |
-| **blitter clear** | **0.50** |
-| **blitter line** | **0.47** |
-| **blitter fill, fill+3bpl** | **0.33** |
+| **blitter line** | **0.73** |
 
-The blitter is two to three times too fast, well clear of everything else.
-That is the same defect `harness_test_blitter_timing` reports as "estimate =
-W×H with no slot/CCK factor and no channel count", now with a number on it
-across four different operations.
-
-The CPU rows measure Musashi rather than Rigel, so a 0.75–0.91 spread there is
-a different question from the blitter's 0.33.
+So the blitter's area operations are right and **the line drawer is not** —
+27% fast, and the only chipset row still clearly off. The CPU rows measure
+Musashi rather than Rigel, which is a different question from the line.
 
 The runner gates on `baseline.json` — what Rigel produces today — rather than
 on the reference, so it catches a number moving without demanding everything
