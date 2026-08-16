@@ -44,18 +44,54 @@ are actively driven by the chipset:
 
 ## Host integration
 
-Rigel notifies changes via `RIGEL_EVENT_IRQ_CHANGED` in `rigel_step_result_t`.
-The host queries `rigel_get_ipl()` and delivers the interrupt to the CPU core:
+**IPL is a level, not an edge.** It is a signal the host mirrors into its CPU
+core, not a notification to act on once. A host that publishes it only when
+`RIGEL_EVENT_IRQ_CHANGED` appears will hang:
 
 ```c
+/* Wrong — this hangs. */
 rigel_step_result_t r = rigel_step_until(rigel, target);
-
 if (r.events & RIGEL_EVENT_IRQ_CHANGED)
     cpu_set_ipl(cpu, rigel_get_ipl(rigel));
 ```
 
+The reason is that IPL moves outside `rigel_step`. An interrupt handler
+acknowledges by writing `INTREQ`, which drops the level immediately, with no
+step in between and so no event to observe. The host is left holding the old
+level, the next source of the same priority raises IPL to a value the CPU is
+already at, and nothing re-triggers. Kickstart 1.3 does not reach its
+insert-disk screen this way.
+
+Mirror the level after every advance *and* after every write that can move it —
+which means `INTREQ` and `INTENA`, and any CIA register access, since reading
+CIA ICR acknowledges and clears the CIA's pending interrupts:
+
+```c
+static void publish_ipl(host_t *h)
+{
+    rigel_u8 ipl = rigel_get_ipl(h->rigel);
+    if (ipl == h->last_ipl) return;   /* only on a real change */
+    h->last_ipl = ipl;
+    cpu_set_ipl(h->cpu, ipl);
+}
+
+/* after every step */
+rigel_step_result_t r = rigel_step_until(rigel, target);
+publish_ipl(h);
+
+/* and after every write that can move it */
+rigel_custom_write16(rigel, reg, value);
+publish_ipl(h);
+```
+
+`RIGEL_EVENT_IRQ_CHANGED` remains useful for logging or for waking a host that
+is otherwise idle. It is not sufficient as the delivery trigger.
+
 Rigel does not know about autovectors, IACK cycles, or interrupt acknowledgement
 — those are the responsibility of the host and the integrated CPU core.
+
+A worked implementation is in `harness/harness.c` (`harness_sync_ipl`), and the
+history of getting it wrong is in `AI_context/harness.md`.
 
 ## Direct queries
 
