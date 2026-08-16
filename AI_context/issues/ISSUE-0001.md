@@ -2,8 +2,8 @@
 id: ISSUE-0001
 title: "Support loading aros.elf as well as aros.rom, selectable in the TUI"
 status: open
-priority: high
-type: enhancement
+priority: low
+type: research
 owner: unassigned
 created_at: 2026-08-15
 updated_at: 2026-08-15
@@ -27,14 +27,24 @@ related_files:
   - media/roms/sysinfo.rom
 ---
 
-## Goal
+## Standing
 
-The TUI should offer AROS either way: `aros.rom` through the ROM path, which
-boots today, or `aros-emu68-m68k.elf` through an ELF path, which does not
-exist yet. Same operating system, two ways in — the ROM path is a plain Amiga
-with a Kickstart, the ELF path puts the harness in the role Emu68 plays.
+**This is research, not a requirement.** The harness exists to move Rigel's
+development along, and it already does that: it boots Kickstart, Workbench,
+AROS, games and a CD. Loading `aros-emu68-m68k.elf` would be a second way in
+to an operating system that already boots here through its ROM, and it buys
+Rigel nothing it does not have.
 
-Everything below is what stands between here and that.
+Kept because the investigation was real and the answers are not obvious enough
+to rediscover cheaply. Do not let it displace the chipset work in
+[`../next_steps.md`](../next_steps.md).
+
+## What it would take
+
+The TUI would offer AROS either way: `aros.rom` through the ROM path that
+boots today, or the ELF through a path that does not exist. The ROM path is a
+plain Amiga with a Kickstart; the ELF path would put the harness in the role
+Emu68 plays.
 
 ## Where it started
 
