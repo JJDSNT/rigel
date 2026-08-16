@@ -26,9 +26,14 @@ frame, NTSC 262 and 59474, each within a microsecond of the real frame time
 once converted at `cck_hz`. Converted at `clock_hz` instead, both come out at
 half, and a drift correction built on that never converges.
 
-One thing `clock_hz` does not do is track `video_std`: it returns the PAL
-constant unless the host sets it, so an NTSC host should configure
-`clock_hz = 7159090` explicitly rather than rely on the default.
+`clock_hz` is a scale factor, not a driver. Nothing inside Rigel reads it: the
+chipset counts colour clocks and derives everything from fixed ratios of them
+— the CIA E-clock is CCK/5, which is the hardware's CPU/10 — so setting it to
+an unusual value changes what cycles mean in seconds, and nothing else. That is
+the right model for an Amiga, where the whole machine is proportional to one
+oscillator, but it does mean the name promises more than it delivers.
+
+Where it is consulted is the default, which follows `video_std`.
 
 A 68000 host has the same halving to do in the other direction — CPU cycles
 into CCK, carrying the odd cycle so time is not lost across timeslices. See

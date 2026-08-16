@@ -113,7 +113,14 @@ static rigel_bus_owner_t slot_to_bus_owner(agnus_slot_owner_t slot)
     case AGNUS_SLOT_FREE: case AGNUS_SLOT_CPU: default:   return RIGEL_BUS_OWNER_CPU;
     }
 }
-enum { RIGEL_DEFAULT_CLOCK_HZ = 7093790u };
+/*
+ * CPU-side clock, one per video standard. The colour clock the temporal API
+ * counts is half of these. A host can override with rigel_config_t.clock_hz.
+ */
+enum {
+    RIGEL_CLOCK_HZ_PAL  = 7093790u,
+    RIGEL_CLOCK_HZ_NTSC = 7159090u
+};
 
 RigelContext *rigel_create(const rigel_config_t *config)
 {
@@ -211,11 +218,20 @@ bool rigel_get_cycle_exact(const RigelContext *ctx)
 
 rigel_u32 rigel_get_clock_hz(const RigelContext *ctx)
 {
-    if (ctx == NULL || ctx->config.clock_hz == 0) {
-        return RIGEL_DEFAULT_CLOCK_HZ;
+    if (ctx == NULL) {
+        return RIGEL_CLOCK_HZ_PAL;
     }
 
-    return ctx->config.clock_hz;
+    if (ctx->config.clock_hz != 0) {
+        return ctx->config.clock_hz;
+    }
+
+    /* Follow the configured standard. Returning one constant regardless left
+     * an NTSC context reporting the PAL rate while its geometry was NTSC, so
+     * anything converting cycles to time came out wrong. */
+    return (ctx->config.video_std == RIGEL_VIDEO_PAL)
+        ? RIGEL_CLOCK_HZ_PAL
+        : RIGEL_CLOCK_HZ_NTSC;
 }
 
 rigel_u32 rigel_get_line_cycles(const RigelContext *ctx)
@@ -245,7 +261,7 @@ rigel_u32 rigel_get_frame_cycles(const RigelContext *ctx)
 rigel_u64 rigel_cycles_to_us(rigel_cycle_t cycles, rigel_u32 clock_hz)
 {
     if (clock_hz == 0) {
-        clock_hz = RIGEL_DEFAULT_CLOCK_HZ;
+        clock_hz = RIGEL_CLOCK_HZ_PAL;
     }
 
     return (rigel_u64)((cycles * 1000000u) / clock_hz);
@@ -254,7 +270,7 @@ rigel_u64 rigel_cycles_to_us(rigel_cycle_t cycles, rigel_u32 clock_hz)
 rigel_cycle_t rigel_us_to_cycles(rigel_u64 microseconds, rigel_u32 clock_hz)
 {
     if (clock_hz == 0) {
-        clock_hz = RIGEL_DEFAULT_CLOCK_HZ;
+        clock_hz = RIGEL_CLOCK_HZ_PAL;
     }
 
     return (rigel_cycle_t)((microseconds * clock_hz) / 1000000u);

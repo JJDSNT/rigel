@@ -68,7 +68,12 @@ int main(void)
     frame_cycles = rigel_get_frame_cycles(ctx);
     frame_us = rigel_cycles_to_us(frame_cycles, clock_hz);
 
-    if (clock_hz != 7093790u) {
+    /*
+     * A zeroed config is NTSC, so the clock has to be NTSC's too. These used
+     * to disagree — NTSC geometry reported with the PAL rate — which made
+     * every cycles-to-time conversion wrong for an unconfigured context.
+     */
+    if (clock_hz != 7159090u) {
         rigel_destroy(ctx);
         return 1;
     }
@@ -76,6 +81,16 @@ int main(void)
     if (line_cycles != 227u || frame_cycles != (227u * 262u)) {
         rigel_destroy(ctx);
         return 1;
+    }
+
+    /* A frame's worth of cycles must convert to a frame's worth of time.
+     * The temporal API counts colour clocks, half the CPU rate. */
+    {
+        rigel_u64 us = rigel_cycles_to_us(frame_cycles, clock_hz / 2u);
+        if (us < 16000u || us > 17400u) {   /* NTSC frame ~16683 us */
+            rigel_destroy(ctx);
+            return 1;
+        }
     }
 
     if (frame_us == 0 || rigel_us_to_cycles(frame_us, clock_hz) == 0) {
@@ -161,6 +176,13 @@ int main(void)
     if (pal_ctx == NULL) {
         return 1;
     }
+    /* And the PAL context reports the PAL rate, not the NTSC one. */
+    if (rigel_get_clock_hz(pal_ctx) != 7093790u) {
+        rigel_destroy(pal_ctx);
+        rigel_destroy(ctx);
+        return 1;
+    }
+
     geometry = rigel_get_beam_geometry(pal_ctx);
     if (geometry.frame_lines == 262u ||
         !rigel_beam_position_at(

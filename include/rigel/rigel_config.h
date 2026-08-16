@@ -74,6 +74,12 @@ typedef struct rigel_serial_config {
 } rigel_serial_config_t;
 
 typedef struct rigel_config {
+    /*
+     * CPU-side clock in Hz. Only ever used to convert cycles to real time —
+     * the chipset counts colour clocks (half this) and derives its internal
+     * rates from fixed ratios of them, so this does not change how the machine
+     * behaves. Leave at 0 to get the rate for the configured video_std.
+     */
     rigel_u32         clock_hz;
     rigel_u32         chip_ram_size;
     bool              enable_trace;
