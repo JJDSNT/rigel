@@ -222,7 +222,49 @@ this issue opened with.
 
 ### On the examples
 
-They remain the cheaper thing to get working first — 12 KB rather than 865 KB,
-and no device tree involved. But they are no longer the point, and if they
-turn out to need something obscure they should not hold the ELF path up: the
-two share the loader plumbing, not the environment.
+They are **not** a stepping stone, and the reason for starting with them has
+evaporated. They were picked because they looked like ELF; they are hunk. So
+they differ from the ELF path in both respects that matter — the file format
+*and* the entry contract, since they take four registers and no device tree.
+What they share with it is `--exec`, the framebuffer plumbing and the memory
+accessors, all of which already exist.
+
+They are still worth finishing at some point, being 12 KB against 865 KB, but
+nothing about the ELF path is blocked on them.
+
+## Update 3 — the device tree is the only way to pass memory
+
+Checked whether the memory range can be handed over some other way. It cannot,
+without changing AROS.
+
+`EMU68_BOOT_MEMORY_VALID` is set in exactly one place — inside `parse_fdt`,
+on finding a `/memory` node — and `start_aros` refuses to run without it.
+There is no bootargs route, no default and no fallback.
+
+The current Bellatrix is no precedent here: it *builds* this ELF and hands it
+to Emu68 as an initrd, and Emu68 gets its device tree from the Raspberry Pi
+firmware or from QEMU. Nobody in that chain synthesises one.
+
+So the harness has to. That is less work than it sounds — roughly 200 bytes,
+and the shape is fixed:
+
+```
+/ {
+    #address-cells = <1>;
+    #size-cells = <1>;
+    memory@0 {
+        device_type = "memory";
+        reg = <base size>;
+    };
+};
+```
+
+Two details in `parse_fdt` that will otherwise cost an afternoon:
+
+- The node must sit at **depth 2** — a direct child of the root — because the
+  walker only tests `in_memory` there.
+- `node_is_memory` matches the name `memory` followed by either `\0` or `@`,
+  so `memory` and `memory@0` both work and nothing else does.
+
+`/chosen` for bootargs and an `emu68` node are read at the same depth, but
+neither is required to boot.
