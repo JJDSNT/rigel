@@ -31,8 +31,26 @@ int main(void)
     RigelContext *ctx = rigel_create(&cfg);
     RigelContext *ecs_ctx;
     rigel_denise_video_desc_t video;
+    rigel_u32 mmio_value = 0;
 
     if (ctx == NULL) {
+        return 1;
+    }
+
+    if (rigel_mmio_write(ctx, 0x00dff180u, 2u, 0x0f00u) !=
+            RIGEL_MMIO_HANDLED ||
+        rigel_mmio_read(ctx, 0x00dff180u, 2u, &mmio_value) !=
+            RIGEL_MMIO_HANDLED ||
+        mmio_value != 0x0f00u ||
+        rigel_mmio_read(ctx, 0x00bfd000u, 1u, &mmio_value) !=
+            RIGEL_MMIO_HANDLED ||
+        rigel_mmio_read(ctx, 0x00bfe001u, 1u, &mmio_value) !=
+            RIGEL_MMIO_HANDLED ||
+        rigel_mmio_read(ctx, 0x00bfd000u, 2u, &mmio_value) !=
+            RIGEL_MMIO_UNSUPPORTED ||
+        rigel_mmio_read(ctx, 0x00e80000u, 1u, &mmio_value) !=
+            RIGEL_MMIO_UNMAPPED) {
+        rigel_destroy(ctx);
         return 1;
     }
 

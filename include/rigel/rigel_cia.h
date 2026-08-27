@@ -6,7 +6,8 @@
 typedef struct RigelContext RigelContext;
 
 /*
- * CIA MMIO access — the host decodes CIA addresses and calls these.
+ * Low-level CIA register access. Hosts normally use rigel_mmio_read/write so
+ * that Rigel, rather than the host, owns CPU-visible address decoding.
  *
  * cia_id: 0 = CIA-A (0xBFExxx, odd bytes — keyboard, joystick fire, parallel)
  *         1 = CIA-B (0xBFDxxx, even bytes — floppy motor/select, serial /RxD)
