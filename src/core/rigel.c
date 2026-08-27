@@ -130,7 +130,19 @@ RigelContext *rigel_create(const rigel_config_t *config)
         return NULL;
     }
 
-    ctx = (RigelContext *)calloc(1, sizeof(*ctx));
+    if ((config->alloc_fn == NULL) != (config->free_fn == NULL)) {
+        return NULL;
+    }
+
+    if (config->alloc_fn != NULL) {
+        ctx = (RigelContext *)config->alloc_fn(sizeof(*ctx),
+                                               config->alloc_opaque);
+        if (ctx != NULL) {
+            memset(ctx, 0, sizeof(*ctx));
+        }
+    } else {
+        ctx = (RigelContext *)calloc(1, sizeof(*ctx));
+    }
     if (ctx == NULL) {
         return NULL;
     }
@@ -158,7 +170,20 @@ RigelContext *rigel_create(const rigel_config_t *config)
 
 void rigel_destroy(RigelContext *ctx)
 {
-    free(ctx);
+    rigel_free_fn_t free_fn;
+    void *alloc_opaque;
+
+    if (ctx == NULL) {
+        return;
+    }
+
+    free_fn = ctx->config.free_fn;
+    alloc_opaque = ctx->config.alloc_opaque;
+    if (free_fn != NULL) {
+        free_fn(ctx, alloc_opaque);
+    } else {
+        free(ctx);
+    }
 }
 
 void rigel_chipset_wire(RigelContext *ctx)

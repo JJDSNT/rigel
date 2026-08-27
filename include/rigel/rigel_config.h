@@ -35,6 +35,8 @@ typedef struct rigel_log_event {
  * formatting. Field meanings are event-specific and documented next to each
  * internal emission site. */
 typedef void (*rigel_log_event_fn_t)(const rigel_log_event_t *event, void *opaque);
+typedef void *(*rigel_alloc_fn_t)(size_t size, void *opaque);
+typedef void (*rigel_free_fn_t)(void *ptr, void *opaque);
 
 typedef enum rigel_video_std {
     RIGEL_VIDEO_NTSC = 0,
@@ -74,6 +76,10 @@ typedef struct rigel_serial_config {
 } rigel_serial_config_t;
 
 typedef struct rigel_config {
+    /* Optional allocator pair for freestanding hosts. Supply both or neither. */
+    rigel_alloc_fn_t alloc_fn;
+    rigel_free_fn_t free_fn;
+    void *alloc_opaque;
     /*
      * CPU-side clock in Hz; the chipset counts colour clocks, half this.
      *

@@ -1,10 +1,26 @@
 #include "rigel/rigel.h"
 #include "core/rigel_context.h"
 
+#include <stdlib.h>
+
 typedef struct chip_ram_trace {
     rigel_u32 last_read_addr;
     rigel_u32 last_write_addr;
 } chip_ram_trace_t;
+
+static void *test_alloc(size_t size, void *opaque)
+{
+    unsigned int *calls = (unsigned int *)opaque;
+    (*calls)++;
+    return calloc(1, size);
+}
+
+static void test_free(void *ptr, void *opaque)
+{
+    unsigned int *calls = (unsigned int *)opaque;
+    (*calls)++;
+    free(ptr);
+}
 
 static rigel_u16 trace_chip_ram_read16(void *opaque, rigel_u32 addr)
 {
@@ -28,10 +44,16 @@ int main(void)
     rigel_config_t ecs_cfg = { 0 };
     chip_ram_trace_t ocs_trace = { 0 };
     chip_ram_trace_t ecs_trace = { 0 };
-    RigelContext *ctx = rigel_create(&cfg);
+    RigelContext *ctx;
     RigelContext *ecs_ctx;
     rigel_denise_video_desc_t video;
     rigel_u32 mmio_value = 0;
+    unsigned int allocator_calls = 0;
+
+    cfg.alloc_fn = test_alloc;
+    cfg.free_fn = test_free;
+    cfg.alloc_opaque = &allocator_calls;
+    ctx = rigel_create(&cfg);
 
     if (ctx == NULL) {
         return 1;
@@ -181,6 +203,9 @@ int main(void)
 
     rigel_destroy(ecs_ctx);
     rigel_destroy(ctx);
+    if (allocator_calls != 2u) {
+        return 1;
+    }
 
     cfg = (rigel_config_t){ 0 };
     cfg.chip_ram_size = 0x00100000u;
