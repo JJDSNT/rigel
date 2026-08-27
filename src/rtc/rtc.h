@@ -9,10 +9,12 @@ typedef struct RigelRTC {
     rigel_rtc_model_t model;
     rigel_u8 reg[4][16];
     int64_t time_offset;
+    rigel_rtc_host_t host;
 } RigelRTC;
 
 void rtc_init(RigelRTC *rtc, rigel_rtc_model_t model);
 void rtc_reset(RigelRTC *rtc);
+void rtc_set_host(RigelRTC *rtc, const rigel_rtc_host_t *host);
 void rtc_set_model(RigelRTC *rtc, rigel_rtc_model_t model);
 rigel_rtc_model_t rtc_get_model(const RigelRTC *rtc);
 

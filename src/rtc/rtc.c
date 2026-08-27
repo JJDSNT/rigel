@@ -27,19 +27,59 @@ static inline int rtc_from_bcd(uint8_t lo, uint8_t hi)
     return (int)(rtc_nibble(lo) + 10 * rtc_nibble(hi));
 }
 
-static void rtc_localtime_copy(time_t t, struct tm *out)
+static time_t rtc_host_now(const RigelRTC *rtc)
 {
-#if defined(_WIN32)
-    localtime_s(out, &t);
-#elif defined(_POSIX_VERSION)
-    localtime_r(&t, out);
+    if (rtc->host.now != NULL)
+        return rtc->host.now(rtc->host.opaque);
+#if RIGEL_ENABLE_HOSTED_RTC
+    return time(NULL);
 #else
-    struct tm *tmp = localtime(&t);
+    return (time_t)0;
+#endif
+}
+
+static bool rtc_host_to_calendar(const RigelRTC *rtc, time_t value,
+                                 struct tm *out)
+{
+    if (rtc->host.to_calendar != NULL)
+        return rtc->host.to_calendar(rtc->host.opaque, value, out);
+#if RIGEL_ENABLE_HOSTED_RTC
+#if defined(_WIN32)
+    return localtime_s(out, &value) == 0;
+#elif defined(_POSIX_VERSION)
+    return localtime_r(&value, out) != NULL;
+#else
+    struct tm *tmp = localtime(&value);
     if (tmp) {
         *out = *tmp;
+        return true;
     } else {
         memset(out, 0, sizeof(*out));
+        return false;
     }
+#endif
+#else
+    (void)value;
+    memset(out, 0, sizeof(*out));
+    return false;
+#endif
+}
+
+static bool rtc_host_from_calendar(const RigelRTC *rtc,
+                                   const struct tm *calendar, time_t *value)
+{
+    if (rtc->host.from_calendar != NULL)
+        return rtc->host.from_calendar(rtc->host.opaque, calendar, value);
+#if RIGEL_ENABLE_HOSTED_RTC
+    {
+        struct tm copy = *calendar;
+        *value = mktime(&copy);
+        return *value != (time_t)-1;
+    }
+#else
+    (void)calendar;
+    (void)value;
+    return false;
 #endif
 }
 
@@ -190,7 +230,8 @@ static void rtc_time_to_regs(RigelRTC *rtc)
         return;
 
     now = rtc_get_time(rtc);
-    rtc_localtime_copy(now, &t);
+    if (!rtc_host_to_calendar(rtc, now, &t))
+        return;
 
     switch (rtc->model) {
 
@@ -290,8 +331,7 @@ static void rtc_regs_to_time(RigelRTC *rtc)
             return;
     }
 
-    new_time = mktime(&t);
-    if (new_time != (time_t)-1)
+    if (rtc_host_from_calendar(rtc, &t, &new_time))
         rtc_set_time(rtc, new_time);
 }
 
@@ -321,13 +361,25 @@ void rtc_reset(RigelRTC *rtc)
 {
     rigel_rtc_model_t model = rtc->model;
     int64_t offset = rtc->time_offset;
+    rigel_rtc_host_t host = rtc->host;
 
     memset(rtc, 0, sizeof(*rtc));
     rtc->model = model;
     rtc->time_offset = offset;
+    rtc->host = host;
 
     rtc_apply_model_defaults(rtc);
     rtc_update(rtc);
+}
+
+void rtc_set_host(RigelRTC *rtc, const rigel_rtc_host_t *host)
+{
+    if (rtc == NULL)
+        return;
+    if (host != NULL)
+        rtc->host = *host;
+    else
+        memset(&rtc->host, 0, sizeof(rtc->host));
 }
 
 void rtc_set_model(RigelRTC *rtc, rigel_rtc_model_t model)
@@ -348,7 +400,7 @@ rigel_rtc_model_t rtc_get_model(const RigelRTC *rtc)
 
 time_t rtc_get_time(RigelRTC *rtc)
 {
-    time_t host_now = time(NULL);
+    time_t host_now = rtc_host_now(rtc);
 
     if (rtc->model == RIGEL_RTC_MODEL_NONE)
         return host_now;
@@ -358,7 +410,7 @@ time_t rtc_get_time(RigelRTC *rtc)
 
 void rtc_set_time(RigelRTC *rtc, time_t t)
 {
-    time_t host_now = time(NULL);
+    time_t host_now = rtc_host_now(rtc);
     rtc->time_offset = (int64_t)t - (int64_t)host_now;
 }
 

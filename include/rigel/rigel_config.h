@@ -101,6 +101,7 @@ typedef struct rigel_config {
      */
     rigel_rtc_model_t rtc_model;
     time_t            rtc_time;
+    rigel_rtc_host_t  rtc_host;
     /*
      * Optional host log callback. If non-NULL, Rigel internal log messages are
      * delivered here. When NULL, the default build writes to stderr; configure
