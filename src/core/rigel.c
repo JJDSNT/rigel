@@ -1,7 +1,9 @@
 #include "rigel/rigel.h"
 #include "rigel/rigel_serial.h"
 
+#if RIGEL_ENABLE_STDLIB_ALLOC
 #include <stdlib.h>
+#endif
 #include <string.h>
 
 #include "chipset/chipset.h"
@@ -141,7 +143,11 @@ RigelContext *rigel_create(const rigel_config_t *config)
             memset(ctx, 0, sizeof(*ctx));
         }
     } else {
+#if RIGEL_ENABLE_STDLIB_ALLOC
         ctx = (RigelContext *)calloc(1, sizeof(*ctx));
+#else
+        return NULL;
+#endif
     }
     if (ctx == NULL) {
         return NULL;
@@ -182,7 +188,9 @@ void rigel_destroy(RigelContext *ctx)
     if (free_fn != NULL) {
         free_fn(ctx, alloc_opaque);
     } else {
+#if RIGEL_ENABLE_STDLIB_ALLOC
         free(ctx);
+#endif
     }
 }
 
