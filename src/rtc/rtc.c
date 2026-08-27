@@ -3,35 +3,6 @@
 #include <assert.h>
 #include <string.h>
 
-#ifndef RIGEL_ENABLE_STDLIB_TIME
-#define RIGEL_ENABLE_STDLIB_TIME 1
-#endif
-
-#if !RIGEL_ENABLE_STDLIB_TIME
-static time_t rigel_no_host_time(time_t *result)
-{
-    if (result != NULL)
-        *result = (time_t)0;
-    return (time_t)0;
-}
-
-static struct tm *rigel_no_host_localtime(const time_t *value)
-{
-    (void)value;
-    return NULL;
-}
-
-static time_t rigel_no_host_mktime(struct tm *value)
-{
-    (void)value;
-    return (time_t)-1;
-}
-
-#define time      rigel_no_host_time
-#define localtime rigel_no_host_localtime
-#define mktime    rigel_no_host_mktime
-#endif
-
 /* ------------------------------------------------------------------------- */
 /* internal helpers                                                          */
 /* ------------------------------------------------------------------------- */
