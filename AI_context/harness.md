@@ -38,6 +38,7 @@ it.
 | --- | --- |
 | Kickstart 1.3 | insert-disk screen, and the Workbench 1.3 desktop from `wb13.adf` |
 | Battle Squadron | cracktro → title → menu → gameplay, with sound |
+| NewTek Demo Reel 3 | both disks mounted as DF0/DF1; loader and demo run, including the rendered countdown/static sequence |
 | DiagROM | full serial diagnostic, Chip RAM test passes |
 | AROS (1 MB) | boots to its startup screen, with Fast RAM — see below |
 | Zorro II autoconfig | Fast RAM at `0x200000` and LIDE at `0xEA0000`, enumerated in chain order |

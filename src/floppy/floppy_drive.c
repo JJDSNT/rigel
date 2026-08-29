@@ -33,6 +33,7 @@ static int floppy_trace_enabled(void)
 void floppy_init(FloppyDrive *d)
 {
     d->connected = 0;
+    d->selected = 0;
     d->motor = 0;
     d->cylinder = 0;
     d->side = 0;
@@ -52,14 +53,12 @@ void floppy_init(FloppyDrive *d)
     /*
      * Drive ID model (AHRM; vAmiga Drive::getDriveId):
      *
-     * - The ID shift register is read out on /DSKRDY: a 1 bit drives the
-     *   line LOW (active), a 0 bit leaves it HIGH (inactive).
-     * - The internal DF0 drive has no ID shifter, so /DSKRDY stays HIGH
-     *   for the whole scan and Kickstart decodes ID 0x00000000. KS 2.0+
-     *   depends on this: an ID of 0xFFFFFFFF on DF0 reads as an external
-     *   drive and the boot ROM re-runs the ID scan forever (KS20 hang).
-     * - External drives would answer 0xFFFFFFFF (3.5" DD) or
-     *   0xAAAAAAAA (3.5" HD).
+     * - The ID shift register is read directly from /DSKRDY: a 0 bit drives
+     *   the active-low line LOW, while a 1 bit leaves it HIGH.
+     * - DF0 is treated as a built-in DD drive by the system; external DD
+     *   drives return 0x00000000 through the shift sequence.
+     * - An unconnected external slot reads 0xFFFFFFFF; a 3.5" HD drive
+     *   identifies as 0xAAAAAAAA.
      */
     d->id_data = 0x00000000u;
     d->id_count = 0;
@@ -149,6 +148,7 @@ void floppy_step(FloppyDrive *d, const FloppySignals *sig)
 {
     if (!d->connected)
     {
+        d->selected = 0;
         d->motor = 0;
         d->ready = 0;
         return;
@@ -165,11 +165,14 @@ void floppy_step(FloppyDrive *d, const FloppySignals *sig)
          * Omega advances the ID shift counter on select -> deselect cycles
          * while the motor is OFF.
          */
-        if (d->motor == 0)
+        if (d->selected && d->motor == 0)
             d->id_count++;
 
+        d->selected = 0;
         return;
     }
+
+    d->selected = 1;
 
     /* ------------------------------------------------------------- */
     /* Motor                                                         */
@@ -187,7 +190,9 @@ void floppy_step(FloppyDrive *d, const FloppySignals *sig)
              * error path instead of falling back to the insert-disk screen.
              */
             d->ready = floppy_has_media(d) ? 1 : 0;
-            d->id_count = 0;
+            /* The motor-on/off identification preamble includes one
+             * select->deselect edge before the first of the 32 sampled bits. */
+            d->id_count = -1;
             if (floppy_trace_enabled()) {
                 char msg[160];
                 (void)snprintf(msg, sizeof(msg),

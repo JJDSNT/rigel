@@ -68,18 +68,11 @@ static void rigel_sync_floppy_cia_lines(RigelContext *ctx)
     pra = cia_port_a_value(cia_a);
     pra |= 0x3Cu;
 
-    /* /CHNG always reflects the disk-change latch (open-drain across all
-     * connected drives); the drive ID shift register is clocked out on
-     * /DSKRDY, never on /CHNG — see cia_b_prb_update_floppy(). */
-    for (i = 0; i < 4; i++) {
-        if (ctx->chipset.floppy[i].connected &&
-            !floppy_get_dskchg(&ctx->chipset.floppy[i], 0)) {
+    if (selected_count == 1) {
+        idmode = !mtr && active->id_count >= 0 && active->id_count < 32;
+        if (!floppy_get_dskchg(active, 0)) {
             pra &= (rigel_u8)~0x04u;
         }
-    }
-
-    if (selected_count == 1) {
-        idmode = !mtr && (active->id_count < 32);
         if (!floppy_get_wpro(active)) {
             pra &= (rigel_u8)~0x08u;
         }
@@ -87,7 +80,7 @@ static void rigel_sync_floppy_cia_lines(RigelContext *ctx)
             pra &= (rigel_u8)~0x10u;
         }
         if (idmode) {
-            if (floppy_get_idbit(active)) {
+            if (!floppy_get_idbit(active)) {
                 pra &= (rigel_u8)~0x20u;
             }
         } else if (floppy_get_ready(active)) {

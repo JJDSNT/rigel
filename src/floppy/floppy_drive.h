@@ -46,6 +46,7 @@ typedef struct
 typedef struct
 {
     int connected;
+    int selected;
 
     int motor;
     int cylinder;

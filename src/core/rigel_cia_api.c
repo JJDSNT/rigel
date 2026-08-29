@@ -58,34 +58,24 @@ static void cia_b_prb_update_floppy(RigelContext *ctx)
      * Update CIA-A PRA ext inputs (bits 2-5) with drive status.
      * CIA-A PRA: bit2=/CHNG, bit3=/WPROT, bit4=/TRK0, bit5=/DSKRDY (active low).
      *
-     * /DSKCHG (bit 2) is open-drain: each connected drive asserts it independently
-     * of selection — software can read disk-change state without selecting a drive.
-     * Bits 3-5 require the drive to be selected (motor/head state only driven when selected).
+     * The shared status bus reflects the selected drive.  Leaving /DSKCHG
+     * asserted by an unselected drive prevents Kickstart from probing and
+     * booting another drive when more than one drive contains media.
      */
     pra = cia_port_a_value(cia_a);
     pra |= 0x3Cu; /* default all floppy lines high (inactive) */
 
-    /* OR /DSKCHG from all drives — not gated by selection.
-     * /CHNG must always reflect the mechanical disk-change latch: the drive
-     * ID shift register is clocked out on /DSKRDY, never on /CHNG (AHRM;
-     * vAmiga Drive::driveStatusFlags). Overriding /CHNG with the ID bit made
-     * trackdisk see phantom insert/remove events on an empty drive whenever
-     * it sampled /CHNG inside the post-motor-off ID window (ISSUE-0037). */
-    for (i = 0; i < 4; i++) {
-        if (ctx->chipset.floppy[i].connected &&
-            !floppy_get_dskchg(&ctx->chipset.floppy[i], 0))
-            pra &= ~0x04u;  /* bit 2: /CHNG active low (0 = change sensed) */
-    }
-
     if (selected_count == 1) {
-        idmode = !mtr && (active->id_count < 32);
+        idmode = !mtr && active->id_count >= 0 && active->id_count < 32;
+        if (!floppy_get_dskchg(active, 0))
+            pra &= ~0x04u;  /* bit 2: /CHNG active low */
         if (!floppy_get_wpro(active))
             pra &= ~0x08u;  /* bit 3: /WPROT active low */
         if (floppy_get_track0(active))
             pra &= ~0x10u;  /* bit 4: /TRK0 active low */
         if (idmode) {
             /* Drive ID scan: /DSKRDY outputs the ID shift register bit */
-            if (floppy_get_idbit(active))
+            if (!floppy_get_idbit(active))
                 pra &= ~0x20u;  /* bit 5: /DSKRDY active low */
         } else if (floppy_get_ready(active)) {
             pra &= ~0x20u;  /* bit 5: /DSKRDY active low */
