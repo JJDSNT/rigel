@@ -4,6 +4,12 @@ Este documento preserva as conclusões úteis de `rigel_perf.md`. Ele **não é 
 tracker**. Qualquer trabalho futuro só se torna ativo quando entrar na
 ISSUE-0052 com uma medição que demonstre gargalo interno no Rigel.
 
+> **2026-08-29 — o portão abriu.** A medição existe: `rigel_cck_cost_measurement.md`
+> nesta pasta, escrita como `../issues/ISSUE-0006.md`. Um chipset ocioso custa
+> 140 ns/CCK (realtime são 282) e uma carga real custa 162 — o custo é fixo por
+> colour clock, não depende do que está programado. A hipótese 1 abaixo,
+> "scheduler orientado a eventos", é a resposta directa.
+
 ## Gate antes de alterar o chipset
 
 Separar por wall-time e por frame:

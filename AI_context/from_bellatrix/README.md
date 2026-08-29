@@ -43,6 +43,15 @@ Rigel's own constraints.
 | --- | --- |
 | `rigel_integration_notes.md` | The first exploratory pass at the same subject, from the `legacy` branch. Superseded by the spec above, but it records reasoning the spec dropped — why planar→chunky belongs in Denise, why `libamivideo` is a host concern. |
 
+## Measurements
+
+Unlike everything else here, this one is neither historical nor a proposal: it
+is a measurement taken against **this** tree, with a repro that can be re-run.
+
+| File | What it holds |
+| --- | --- |
+| `rigel_cck_cost_measurement.md` | What a colour clock costs, idle and under a real workload, with the per-domain `gprof` split and the bench source. Taken 2026-08-29; it is the evidence that opens the gate `rigel_performance_research.md` sets, and it is written up as `../issues/ISSUE-0006.md`. |
+
 ## Gap analysis
 
 | File | What it holds |

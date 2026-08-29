@@ -7,7 +7,26 @@ in `rigel_config_t` and the audio event all exist. What replaces it comes from
 running real software through `harness/` — see [`harness.md`](harness.md) for
 the full record and the repro commands.
 
-1. **The blitter line drawer is 27% fast** ← now measured
+1. **The per-colour-clock loop has no event skipping** ← now measured
+   - An idle chipset costs 140 ns/CCK on a modern x86 desktop, against 282 for
+     realtime: only 2x headroom with nothing programmed at all. A real workload
+     (Demo Reel 3 under KS13 in the harness) costs 162 ns/CCK -- **16% more than
+     idle** -- so the fixed per-clock cost is the whole problem and optimising
+     the loaded case means optimising the empty one.
+   - `gprof` says every clock asks every domain: slot scheduler 14.5%, Denise
+     framebuffer sync 13.2%, beam 10.5%, `blitter_is_busy()` 7.9% at 2.25 calls
+     per clock for a blitter that never runs, refresh-DMA slot ownership 6.6%,
+     copper 5.3%, compositor tick 5.3%.
+   - `rigel_get_next_observable_deadline()` bounds the caller's quantum but not
+     the loop inside `rigel_chipset_step()`. Hypothesis 1 of
+     `from_bellatrix/rigel_performance_research.md` is the direct answer, and
+     this is the measurement its gate was waiting for.
+   - Scaled to a Raspberry Pi 3 the gap is ~3.8x, which is what stops Bellatrix
+     booting a machine with the chipset live. See
+     [`issues/ISSUE-0006.md`](issues/ISSUE-0006.md) and the repro in
+     [`from_bellatrix/rigel_cck_cost_measurement.md`](from_bellatrix/rigel_cck_cost_measurement.md).
+
+2. **The blitter line drawer is 27% fast** ← now measured
    - In cycle-exact mode Copperline's timing test puts blitter clear at 1.00
      of the reference and fill at 0.99, but a line at 0.73. It is the only
      chipset row still clearly wrong.
@@ -16,21 +35,39 @@ the full record and the repro commands.
    - Note the earlier claim here that "the blitter is 2-3x too fast" was
      measured with cycle-exact off, which is not the mode a host runs in.
 
-2. **Vertical banding in a scrolling playfield**
+3. **Paula audio is only available pre-mixed**
+   - `rigel_get_audio_sample()` returns one stereo pair; there is no per-voice
+     access. Enough to make a machine audible, not enough for per-voice debug,
+     per-voice resampling, or handing the four voices to a host mixer that
+     wants channels. See [`issues/ISSUE-0007.md`](issues/ISSUE-0007.md).
+   - What a host with its own mixer needs is per-voice *state* (location,
+     length, period, volume, DMA) rather than rendered samples, so it can play
+     the guest's own sample data itself. That also means audio is **not** gated
+     on the loop above: the host mixer plays at the host's rate whatever speed
+     the chipset runs at.
+
+4. **No per-line display description** (low, revisit after 1)
+   - The API's smallest unit of input is a finished pixel, so a host with a
+     vector unit and a hardware compositor cannot render a line itself even
+     where that would be faster. See [`issues/ISSUE-0008.md`](issues/ISSUE-0008.md).
+   - Deliberately behind item 1: rendering per scanline segment inside Rigel
+     helps every host with no new API, and may remove the reason to want this.
+
+5. **Vertical banding in a scrolling playfield**
    - Battle Squadron's title and menu are pixel-correct; its scrolling
      gameplay shows vertical stripes that are not in the game.
    - First rendering defect with a short deterministic repro (~1 min headless).
    - Start from `from_bellatrix/rigel_graphics_dma_scroll_investigation.md`;
      BPLCON1 scroll and bitplane modulo are the obvious suspects.
 
-3. **AROS without Fast RAM**
+6. **AROS without Fast RAM**
    - Boots clean with Fast RAM. Without it the console handler dies with
      `PC: 0x00000008` regardless of Chip RAM size.
    - May simply be AROS wanting more memory than a stock Amiga has, but the
      failing case is the one where DMA contention on Chip RAM is heaviest, so
      it is worth confirming rather than assuming.
 
-4. **Audio mix has no headroom**
+7. **Audio mix has no headroom**
    - Every capture peaks at exactly 32768, the absolute value of the int16
      minimum. Plausible once, suspicious every time.
    - `--audio-out FILE.wav` reports peak and RMS.
