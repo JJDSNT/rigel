@@ -20,6 +20,34 @@ related_files:
   - src/chipset/denise/
 ---
 
+> **Correction, 2026-08-29, same day: the headline numbers below were measured
+> against an unoptimised build and are wrong by about 4x.** `out/rigel-harness`
+> on the Bellatrix side had an empty `CMAKE_BUILD_TYPE` and empty
+> `CMAKE_C_FLAGS`, so both the idle bench and the Demo Reel 3 timing ran at
+> `-O0`. Rebuilt with `-DCMAKE_BUILD_TYPE=Release`:
+>
+> | | published | correct |
+> |---|---|---|
+> | idle floor | 140 ns/CCK, 2x realtime | **35 ns/CCK, 8x realtime** |
+> | Demo Reel 3, 600 frames | 6.92 s, 86.7 fps, 162 ns/CCK | **2.61 s, 229.9 fps, 61 ns/CCK** |
+>
+> What survives: the `gprof` ranking below, which came from a separate `-O2 -pg`
+> build and is a ranking rather than an absolute; the shape of the finding, that
+> a real workload costs only modestly more than an idle one (61 against 35, so
+> +74% rather than +16%, still nothing like proportional to what is programmed);
+> and that the loop has no event skipping.
+>
+> What does **not** survive: the claim that an idle chipset has only 2x headroom
+> on a desktop, and everything derived from it. In particular the "~3.8x short
+> on a Pi 3" conclusion rested on an earlier ~1080 ns/CCK figure for the Pi,
+> which against 35 ns/CCK native would make an A53 31x slower than a modern x86
+> -- implausible, so that figure is now suspect too and **the Pi must be
+> re-measured before any target is set from it**.
+>
+> The body below is left as written, with its numbers wrong, because the
+> mistake is the useful part: a performance gate was opened with a measurement
+> whose build flags were never checked.
+
 ## Why this issue exists
 
 `AI_context/from_bellatrix/rigel_performance_research.md` sets a gate: no

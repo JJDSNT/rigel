@@ -7,12 +7,14 @@ in `rigel_config_t` and the audio event all exist. What replaces it comes from
 running real software through `harness/` — see [`harness.md`](harness.md) for
 the full record and the repro commands.
 
-1. **The per-colour-clock loop has no event skipping** ← now measured
-   - An idle chipset costs 140 ns/CCK on a modern x86 desktop, against 282 for
-     realtime: only 2x headroom with nothing programmed at all. A real workload
-     (Demo Reel 3 under KS13 in the harness) costs 162 ns/CCK -- **16% more than
-     idle** -- so the fixed per-clock cost is the whole problem and optimising
-     the loaded case means optimising the empty one.
+1. **The per-colour-clock loop has no event skipping** ← measured, then corrected
+   - **The first measurement was against an unoptimised build and was wrong by
+     about 4x.** Corrected: an idle chipset costs **35 ns/CCK** against 282 for
+     realtime, so 8x headroom, and Demo Reel 3 under KS13 costs **61 ns/CCK**
+     (229.9 fps, 4.6x realtime). Check the build type before quoting a number.
+   - What survives is the shape: a real workload costs 61 against an idle 35,
+     which is far from proportional to what is programmed, so a large fixed
+     per-clock cost is real even if it is smaller than first claimed.
    - `gprof` says every clock asks every domain: slot scheduler 14.5%, Denise
      framebuffer sync 13.2%, beam 10.5%, `blitter_is_busy()` 7.9% at 2.25 calls
      per clock for a blitter that never runs, refresh-DMA slot ownership 6.6%,
@@ -21,8 +23,9 @@ the full record and the repro commands.
      the loop inside `rigel_chipset_step()`. Hypothesis 1 of
      `from_bellatrix/rigel_performance_research.md` is the direct answer, and
      this is the measurement its gate was waiting for.
-   - Scaled to a Raspberry Pi 3 the gap is ~3.8x, which is what stops Bellatrix
-     booting a machine with the chipset live. See
+   - The "~3.8x short on a Pi 3" conclusion is withdrawn with the numbers it
+     rested on: against 35 ns/CCK native it would make an A53 31x slower than a
+     modern x86. **The Pi has to be re-measured before any target is set.** See
      [`issues/ISSUE-0006.md`](issues/ISSUE-0006.md) and the repro in
      [`from_bellatrix/rigel_cck_cost_measurement.md`](from_bellatrix/rigel_cck_cost_measurement.md).
 

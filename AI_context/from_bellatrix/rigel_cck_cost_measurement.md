@@ -1,5 +1,16 @@
 # Measuring what a colour clock costs
 
+> **Correction, 2026-08-29: the numbers below were taken against an unoptimised
+> build.** The library came from a tree whose `CMAKE_BUILD_TYPE` and
+> `CMAKE_C_FLAGS` were both empty, so everything here ran at `-O0`. With
+> `-DCMAKE_BUILD_TYPE=Release` the idle floor is **35 ns/CCK** rather than 140,
+> and Demo Reel 3's 600 frames take **2.61 s** rather than 6.92 -- 229.9 fps,
+> 4.6x realtime, 61 ns/CCK.
+>
+> **Check the build type before quoting any number from this document.** That
+> is the lesson worth keeping from it: the recipe below is right and the results
+> are not, because the recipe never said which build to link against.
+
 A repro for `../issues/ISSUE-0006.md`, from Bellatrix on 2026-08-29. It answers
 the first question `rigel_performance_research.md` asks before any chipset
 change: how much of the time is exclusive to Rigel, how many calls, how many

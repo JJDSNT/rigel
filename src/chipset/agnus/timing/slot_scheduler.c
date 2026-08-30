@@ -807,15 +807,22 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
     if (ctx) {
         rigel_u16 live_dmacon =
             rigel_dma_domain_read_dmacon(&ctx->chipset.agnus.dma);
+        /*
+         * Asked once, not twice. blitter_is_busy() is a field read behind an
+         * out-of-line call -- it lives in another translation unit, so nothing
+         * inlines it -- and this function runs once per colour clock. Nothing
+         * between the two uses can change the blitter, so one call is the same
+         * answer for less. It was 7.9% of an idle profile at 2.25 calls per
+         * colour clock.
+         */
+        int blitter_busy = blitter_is_busy(&ctx->chipset.agnus.blitter) != 0;
 
         if (sched->dmacon != live_dmacon) {
             sched->dmacon = live_dmacon;
             sched->table_dirty = true;
         }
 
-        sched->blitter_active =
-            blitter_is_busy(&ctx->chipset.agnus.blitter) != 0 &&
-            dmacon_blten(sched->dmacon);
+        sched->blitter_active = blitter_busy && dmacon_blten(sched->dmacon);
         sched->copper_active  = dmacon_copen(sched->dmacon);
         /* WAIT comparison follows the beam without consuming the chip bus.
          * Only an instruction fetch ready on this CCK requests a FREE slot. */
@@ -823,7 +830,7 @@ void agnus_slot_scheduler_step(agnus_slot_scheduler_t *sched, RigelContext *ctx,
             &ctx->chipset.agnus.copper,
             &ctx->chipset.agnus.beam,
             &ctx->chipset.agnus.dma,
-            blitter_is_busy(&ctx->chipset.agnus.blitter) != 0
+            blitter_busy
         );
         sched->copper_request =
             sched->copper_active &&
