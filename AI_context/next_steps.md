@@ -38,7 +38,20 @@ the full record and the repro commands.
      [`issues/ISSUE-0006.md`](issues/ISSUE-0006.md) and the repro in
      [`from_bellatrix/rigel_cck_cost_measurement.md`](from_bellatrix/rigel_cck_cost_measurement.md).
 
-2. **The blitter line drawer is 27% fast** ← now measured
+2. **The host boundary was drawn before a host existed** (new)
+   - Four things a real integration found missing, with the measurement or the
+     failed attempt that produced each: the deadline never exceeds a scanline
+     so it cannot serve the skipping it exists for; there is no way to ask
+     whether anything needs time; Paula is only available pre-mixed; Denise
+     only as finished pixels. See [`issues/ISSUE-0009.md`](issues/ISSUE-0009.md).
+   - The proposal is deliberately "answer questions" rather than "expose
+     internals" -- every gap could be closed by handing out DMACON and the CIA
+     registers, and every one of those moves Rigel's reasoning into a host that
+     will get it subtly wrong.
+   - Behind item 1 in priority: this makes a host's accounting honest, the loop
+     is what makes the chipset fast.
+
+3. **The blitter line drawer is 27% fast** ← now measured
    - In cycle-exact mode Copperline's timing test puts blitter clear at 1.00
      of the reference and fill at 0.99, but a line at 0.73. It is the only
      chipset row still clearly wrong.
@@ -47,7 +60,7 @@ the full record and the repro commands.
    - Note the earlier claim here that "the blitter is 2-3x too fast" was
      measured with cycle-exact off, which is not the mode a host runs in.
 
-3. **Paula audio is only available pre-mixed**
+4. **Paula audio is only available pre-mixed**
    - `rigel_get_audio_sample()` returns one stereo pair; there is no per-voice
      access. Enough to make a machine audible, not enough for per-voice debug,
      per-voice resampling, or handing the four voices to a host mixer that
@@ -58,28 +71,28 @@ the full record and the repro commands.
      on the loop above: the host mixer plays at the host's rate whatever speed
      the chipset runs at.
 
-4. **No per-line display description** (low, revisit after 1)
+5. **No per-line display description** (low, revisit after 1)
    - The API's smallest unit of input is a finished pixel, so a host with a
      vector unit and a hardware compositor cannot render a line itself even
      where that would be faster. See [`issues/ISSUE-0008.md`](issues/ISSUE-0008.md).
    - Deliberately behind item 1: rendering per scanline segment inside Rigel
      helps every host with no new API, and may remove the reason to want this.
 
-5. **Vertical banding in a scrolling playfield**
+6. **Vertical banding in a scrolling playfield**
    - Battle Squadron's title and menu are pixel-correct; its scrolling
      gameplay shows vertical stripes that are not in the game.
    - First rendering defect with a short deterministic repro (~1 min headless).
    - Start from `from_bellatrix/rigel_graphics_dma_scroll_investigation.md`;
      BPLCON1 scroll and bitplane modulo are the obvious suspects.
 
-6. **AROS without Fast RAM**
+7. **AROS without Fast RAM**
    - Boots clean with Fast RAM. Without it the console handler dies with
      `PC: 0x00000008` regardless of Chip RAM size.
    - May simply be AROS wanting more memory than a stock Amiga has, but the
      failing case is the one where DMA contention on Chip RAM is heaviest, so
      it is worth confirming rather than assuming.
 
-7. **Audio mix has no headroom**
+8. **Audio mix has no headroom**
    - Every capture peaks at exactly 32768, the absolute value of the int16
      minimum. Plausible once, suspicious every time.
    - `--audio-out FILE.wav` reports peak and RMS.
