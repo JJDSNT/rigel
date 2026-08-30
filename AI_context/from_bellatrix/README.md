@@ -34,7 +34,7 @@ Rigel's own constraints.
 | File | What it proposes |
 | --- | --- |
 | `rigel_integration_spec.md` | How Bellatrix would like the boundary to work: MMIO registration and dispatch, endianness, autoconfig, the execution-progress and deadline model, IPL ownership and arbitration, lifecycle. 60 KB. Note that Rigel's harness already answers several of these questions differently and works — see `../harness.md` on the two clocks and on IPL being a level. |
-| `rigel_api_convergence_plan.md` | A recommended refinement of the public API so the host boundary is explicit, minimal and host-neutral. This one lived in Rigel's own `docs/` until it was removed just before the harness work began, so it has been round the loop once already. 47 KB. |
+| `rigel_api_convergence_plan.md` | A recommended refinement of the public API so the host boundary is explicit, minimal and host-neutral. 47 KB. **Correction, 2026-08-30: an earlier version of this line said it "was removed" from Rigel's `docs/`, which reads as rejected and is wrong.** It was relocated; the live copy is Bellatrix's `docs/Convergence.md`, and it is the standing design frame there. Its §35, §45 and §46 are the principles behind `../issues/ISSUE-0009.md`, which supplies measurements for the interfaces they leave unspecified. |
 | `rigel_optimization_candidates.md` | Performance opportunities at the Emu68/Bellatrix/Rigel boundary. Explicitly opportunities, with no measurements behind them — `tools/tests/timing/` is where numbers actually come from. 30 KB. |
 
 ## Earlier integration notes

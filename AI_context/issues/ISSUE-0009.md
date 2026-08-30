@@ -106,13 +106,33 @@ Already ISSUE-0008, and deliberately low priority. Same shape again, and the
 same caution: it is only worth doing if rendering per scanline segment inside
 Rigel (ISSUE-0006) does not remove the reason to want it.
 
-## What this is not
+## Relationship to the API convergence plan
 
-It is not a request to reopen the API convergence plan in
-`from_bellatrix/`. That document has been round this loop once already, and
-these four items come from measurements rather than from a design preference:
-each one names the boot, the number or the failed attempt that produced it.
+The plan in `from_bellatrix/rigel_api_convergence_plan.md` is **not a rejected
+document**. This directory's README says it "was removed" from Rigel's `docs/`,
+and that is misleading: it was relocated. The live copy is Bellatrix's
+`docs/Convergence.md`, and it is the standing design frame.
 
-It is also not urgent in the way ISSUE-0006 is. Items 1 and 2 make a host's
+These four items are not a competing proposal. They are measurements filling in
+interfaces the plan states only as principle:
+
+| plan | states | this issue adds |
+| --- | --- | --- |
+| §35 Timing | Rigel is authoritative for chipset time; caches, shadows and fast paths must not create an independent chipset timeline | items 1 and 2 -- the deadline cannot serve skipping, and there is no way to ask whether anything needs time |
+| §45 Video | Rigel owns classic video generation and produces host-consumable output | item 4 (ISSUE-0008) |
+| §46 Audio | Paula through Rigel to host-independent audio output | item 3 (ISSUE-0007) |
+
+§35 is worth reading before implementing item 2, because it already forbids the
+route a host would otherwise take. Bellatrix tried to disarm its chipset clock
+by shadowing the DMACON and CIA writes it intercepts, and abandoned it as a
+second source of truth -- which is precisely "caches, shadows, and fast paths
+must not create an independent chipset timeline", arrived at from the other
+direction. **The plan predicted the failure; the measurement confirmed it.**
+That is an argument for the plan, and for answering the question inside Rigel
+rather than reconstructing it outside.
+
+## Priority
+
+Not urgent in the way ISSUE-0006 is. Items 1 and 2 make a host's
 time accounting honest and cheap; ISSUE-0006 is what makes the chipset fast
 enough to matter. If only one is done, it should be that one.
