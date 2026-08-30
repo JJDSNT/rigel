@@ -167,3 +167,91 @@ and the KS1.3/Battle Squadron compatibility gates are what keep that honest.
    that is not running (7.9%).
 3. **Re-measure with a loaded profile** before touching the per-call cost of
    `rigel_step()`, since the idle case cannot show it.
+
+
+# 2026-08-30: sharpened by a host that instrumented itself
+
+Bellatrix now measures the exclusive cost of `rigel_step()` from inside the
+machine, with the ARM generic timer, and reports it during boot. Four facts
+follow, and together they say where the fix has to go and where it cannot.
+
+## 1. The host's call granularity is already maximal
+
+```text
+[BELLATRIX:RIGEL:PERF] 4000286 CCK in 5460 ms over 17691 calls -> 1365 ns/CCK, 226 CCK/call
+```
+
+**226 colour clocks per call.** Bellatrix already steps to
+`rigel_get_next_observable_deadline()`, and its own 512-CCK ceiling is never
+reached. So the first hypothesis this project's own performance research says
+to exclude -- "many short calls indicate bad integration granularity" -- is
+excluded, by measurement, on a real host.
+
+## 2. No host can ever do better, because the line end is an unconditional deadline
+
+226 is not a coincidence: `RIGEL_BEAM_DEFAULT_LINE_CLOCKS` is 227. In
+`rigel_get_deadline()`:
+
+```c
+line_end = beam_cycles_until_line_end(&ctx->chipset.agnus.beam);
+if (line_end == 0) {
+    line_end = RIGEL_BEAM_DEFAULT_LINE_CLOCKS;
+}
+d.beam_line_end = line_end;          /* unconditional */
+```
+
+`d.beam_line_end` is set on every call regardless of what is programmed, so
+`agnus_deadlines_min()` can never return more than a scanline. **A host asking
+"how long may I skip" is told "at most 227" even on a chipset with nothing
+running at all.**
+
+## 3. Lengthening it would buy little anyway
+
+```c
+void agnus_slot_scheduler_step_until(..., rigel_u32 cycles, ...)
+{
+    for (i = 0; i < cycles; i++)
+        agnus_slot_scheduler_step(sched, ctx, line_clocks, frame_lines);
+}
+```
+
+A longer quantum still walks every colour clock. At 226 CCK per call the fixed
+per-call cost amortises to about 1 ns/CCK against a measured 1365, so the
+deadline governs *call* granularity while the cost lives *inside* the call.
+**The skipping has to happen in `step_until`, not in the deadline.**
+
+## 4. The sharpest case: a boot that pays 1365 ns/CCK for a CIA timer
+
+The measured host boot arms the chipset here:
+
+```text
+[BELLATRIX:RIGEL] clock armed by a write to $00bfed01
+```
+
+CIAA CRB -- `cia.resource` starting a timer. From that point the only
+time-dependent thing on the machine is that timer, and a CIA timer costs
+nothing per colour clock: `rigel_chipset_step()` accumulates the remainder and
+calls `cia_step()` **once per call**, in bulk:
+
+```c
+chipset->cia_eclock_rem += cycles;
+eclock_ticks = chipset->cia_eclock_rem / CIA_CCK_PER_ECLOCK;
+if (eclock_ticks > 0u)
+    cia_step(&chipset->cia[0], (uint64_t)eclock_ticks);
+```
+
+So the machine pays the full per-colour-clock Agnus and Denise loop -- slot
+scheduler, beam, framebuffer sync, compositor tick, copper, refresh DMA -- for
+a domain that is already O(1) per call and for a display with nothing on it.
+
+That is the case worth optimising for, and it suggests the shape of the answer:
+the cheap domains already advance in bulk, and the expensive ones could when
+nothing they own is programmed.
+
+## What the host tried instead, and why it does not work
+
+Bellatrix considered disarming its clock when nothing needs time -- the mirror
+of the rule that arms it. It does not help, and the reason is the same case: a
+CIA timer that keeps running genuinely needs time to pass, so the machine
+cannot disarm, and the API exposes no DMACON or CIA timer state to reason with
+anyway. **The host cannot solve this from outside.**

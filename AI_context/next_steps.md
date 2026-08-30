@@ -12,6 +12,15 @@ the full record and the repro commands.
      about 4x.** Corrected: an idle chipset costs **35 ns/CCK** against 282 for
      realtime, so 8x headroom, and Demo Reel 3 under KS13 costs **61 ns/CCK**
      (229.9 fps, 4.6x realtime). Check the build type before quoting a number.
+   - **Sharpened 2026-08-30 by a host that instrumented itself**: 226 CCK per
+     call measured, so host granularity is already maximal and that hypothesis
+     is excluded; `d.beam_line_end` is unconditional in `rigel_get_deadline()`
+     so no host can ever be told it may skip more than a scanline; and
+     `agnus_slot_scheduler_step_until()` is a plain loop, so a longer quantum
+     would not skip work anyway. Sharpest case: a boot whose only
+     time-dependent thing is a CIA timer -- which `cia_step()` already advances
+     in bulk, once per call -- still pays the full per-colour-clock Agnus and
+     Denise loop, 1365 ns/CCK, for a display with nothing on it.
    - What survives is the shape: a real workload costs 61 against an idle 35,
      which is far from proportional to what is programmed, so a large fixed
      per-clock cost is real even if it is smaller than first claimed.
