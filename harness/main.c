@@ -50,6 +50,10 @@
  *                             it two frames later (Space is 40, Return 44,
  *                             Esc 45, F1 50)
  *     --lmb FRAME[:HOLD]      click the left mouse button, held HOLD frames
+ *     --mouse FRAME:X/Y[,..]  move the pointer to X,Y at that frame. The
+ *                             Amiga has no absolute pointer, so this homes
+ *                             into the top-left corner first and then walks
+ *                             out; allow it about thirty frames to arrive.
  *     --audio-out FILE.wav    write the Paula mix as a 16-bit stereo WAV
  *     --audio-rate HZ         output rate (default 48000)
  *     --no-audio              do not open an audio device in interactive mode
@@ -114,6 +118,7 @@ typedef struct options {
     const char *shot_dir;
     const char *key_script;
     const char *lmb_script;
+    const char *mouse_script;
     const char *audio_out;
     uint32_t    audio_rate;
     bool        no_audio;
@@ -440,6 +445,117 @@ static void input_tick(input_script_t *s, harness_t *h, uint64_t frame)
     }
 }
 
+/*
+ * Pointer movement, for a machine that has no absolute pointer.
+ *
+ * JOY0DAT is a pair of 8-bit quadrature counters and Intuition reads their
+ * delta once per VBlank, so there is no way to say "be at 320,100" -- only
+ * "move by this much". Getting somewhere known therefore means going to a
+ * corner first: the pointer clamps at 0,0 and stops, so a long enough run of
+ * negative steps arrives there from anywhere on any screen. Then walk out.
+ *
+ * Steps stay well under 128, because a delta at or above that reads as
+ * negative and the pointer would go backwards instead.
+ *
+ * This is the same JOY0DAT the SDL path in harness_video.c drives from real
+ * mouse motion. Interactively a person does this by hand; everything below
+ * exists so a headless run can too. Without it the only way to reach a
+ * Workbench icon is to patch the disk that holds it, which changes the thing
+ * under test -- and the demo this was written for is started from an icon.
+ */
+enum { MOUSE_MAX_EVENTS = 8, MOUSE_STEP = 60, MOUSE_HOME_FRAMES = 24 };
+
+typedef struct mouse_event {
+    uint64_t frame;
+    int      x, y;
+    bool     started;
+} mouse_event_t;
+
+typedef struct mouse_script {
+    mouse_event_t events[MOUSE_MAX_EVENTS];
+    size_t   count;
+    bool     active;
+    int      home_left;
+    int      dx_left, dy_left;
+    uint8_t  cx, cy;
+} mouse_script_t;
+
+/* "frame:x/y,frame:x/y" */
+static bool mouse_parse(mouse_script_t *m, const char *spec)
+{
+    const char *p = spec;
+
+    while (*p != '\0' && m->count < MOUSE_MAX_EVENTS) {
+        char *end;
+        mouse_event_t *e = &m->events[m->count];
+
+        e->frame = strtoull(p, &end, 0);
+        if (end == p) return false;
+        p = end;
+        if (*p != ':') return false;
+
+        e->x = (int)strtol(p + 1, &end, 0);
+        if (end == p + 1) return false;
+        p = end;
+        if (*p != '/') return false;
+
+        e->y = (int)strtol(p + 1, &end, 0);
+        if (end == p + 1) return false;
+        p = end;
+
+        if (e->x < 0 || e->y < 0) return false;
+        m->count++;
+        if (*p == ',') p++;
+        else if (*p != '\0') return false;
+    }
+
+    return true;
+}
+
+static void mouse_tick(mouse_script_t *m, harness_t *h, uint64_t frame)
+{
+    RigelContext *ctx = harness_rigel(h);
+    int dx = 0, dy = 0;
+    size_t i;
+
+    if (!m->active) {
+        for (i = 0; i < m->count; i++) {
+            if (!m->events[i].started && frame == m->events[i].frame) {
+                m->events[i].started = true;
+                m->active     = true;
+                m->home_left  = MOUSE_HOME_FRAMES;
+                m->dx_left    = m->events[i].x;
+                m->dy_left    = m->events[i].y;
+                printf("[INPUT] frame %llu: pointer to %d,%d\n",
+                       (unsigned long long)frame, m->events[i].x,
+                       m->events[i].y);
+                break;
+            }
+        }
+    }
+    if (!m->active) return;
+
+    if (m->home_left > 0) {
+        dx = -MOUSE_STEP;
+        dy = -MOUSE_STEP;
+        m->home_left--;
+    } else {
+        dx = m->dx_left > MOUSE_STEP ? MOUSE_STEP : m->dx_left;
+        dy = m->dy_left > MOUSE_STEP ? MOUSE_STEP : m->dy_left;
+        m->dx_left -= dx;
+        m->dy_left -= dy;
+        if (dx == 0 && dy == 0) {
+            m->active = false;
+            return;
+        }
+    }
+
+    m->cx = (uint8_t)((int)m->cx + dx);
+    m->cy = (uint8_t)((int)m->cy + dy);
+    rigel_input_set_joydat(ctx, 0u,
+        (rigel_u16)(((rigel_u16)m->cy << 8) | (rigel_u16)m->cx));
+}
+
 /* ------------------------------------------------------------------------- */
 
 static bool parse_args(int argc, char **argv, options_t *o)
@@ -518,6 +634,7 @@ static bool parse_args(int argc, char **argv, options_t *o)
         else if (!strcmp(a, "--screenshot-dir"))   { NEED_VALUE(); o->shot_dir = argv[++i]; }
         else if (!strcmp(a, "--key"))       { NEED_VALUE(); o->key_script = argv[++i]; }
         else if (!strcmp(a, "--lmb"))       { NEED_VALUE(); o->lmb_script = argv[++i]; }
+        else if (!strcmp(a, "--mouse"))     { NEED_VALUE(); o->mouse_script = argv[++i]; }
         else if (!strcmp(a, "--audio-out")) { NEED_VALUE(); o->audio_out = argv[++i]; }
         else if (!strcmp(a, "--audio-rate")){ NEED_VALUE(); o->audio_rate = (uint32_t)strtoul(argv[++i], NULL, 0); }
         else if (!strcmp(a, "--no-audio"))  { o->no_audio = true; }
@@ -607,6 +724,7 @@ int main(int argc, char **argv)
     harness_config_t cfg;
     static serial_sink_t s_serial;
     static input_script_t s_input;
+    static mouse_script_t s_mouse;
     static wav_writer_t   s_wav;
     harness_t       *h;
     uint8_t         *rom;
@@ -651,6 +769,12 @@ int main(int argc, char **argv)
                 o.key_script);
         rc = 2;
         goto out;
+    }
+    if (o.mouse_script != NULL && !mouse_parse(&s_mouse, o.mouse_script)) {
+        fprintf(stderr, "rigel-harness: bad --mouse script '%s'\n"
+                        "               expected FRAME:X/Y[,FRAME:X/Y...]\n",
+                o.mouse_script);
+        return 2;
     }
     if (o.lmb_script != NULL && !input_parse(&s_input, o.lmb_script, false)) {
         fprintf(stderr, "rigel-harness: bad --lmb script '%s'\n"
@@ -808,6 +932,7 @@ int main(int argc, char **argv)
             frames++;
             harness_diag_frame(h, frames);
             input_tick(&s_input, h, frames);
+            mouse_tick(&s_mouse, h, frames);
 
 #ifdef RIGEL_HARNESS_SDL
             if (video != NULL) {
