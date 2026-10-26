@@ -64,6 +64,7 @@ rigel_cycle_t       rigel_get_next_deadline(const RigelContext *ctx);
 rigel_cycle_t       rigel_get_next_observable_deadline(const RigelContext *ctx);
 rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles);
 rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time);
+rigel_step_result_t rigel_step_cpu_cycles(RigelContext *ctx, rigel_u64 cpu_cycles);
 ```
 
 `rigel_get_next_deadline()` answers: "how far can I advance without missing a
@@ -87,6 +88,15 @@ typedef struct rigel_step_result {
 
 Notified events: `IRQ_CHANGED`, `BLIT_DONE`, `VBLANK`, `HBLANK`, `FRAME_READY`,
 `AUDIO_READY`, `COPPER`, `DMA_CHANGED`, `BUS_CHANGED`, `DEADLINE`.
+
+### CPU-cycle convenience stepping
+
+Hosts that receive elapsed CPU cycles rather than CCK deltas can call
+`rigel_step_cpu_cycles()`. `rigel_config_t.cpu_cycle_ratio` expresses
+`cpu_cycles : color_clocks`; leaving both fields zero selects the default
+`2:1` ratio. Rigel retains fractional CCK between calls, and `rigel_reset()`
+clears that conversion phase. Direct calls to `rigel_step()` or
+`rigel_step_until()` leave the retained CPU-cycle fraction unchanged.
 
 ### Read-only beam projection
 

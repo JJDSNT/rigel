@@ -33,6 +33,12 @@ while (running) {
 }
 ```
 
+If the CPU exposes elapsed CPU cycles instead of time already expressed in
+CCK, use `rigel_step_cpu_cycles()` after each CPU run. Its default conversion
+is two CPU cycles per CCK; `rigel_config_t.cpu_cycle_ratio` supports other
+clock relationships without putting fractional-accumulation policy in the
+host.
+
 `RIGEL_EVENT_FRAME_READY` means the beam wrapped to the next frame and Denise
 has swapped the completed internal front buffer. If a host framebuffer target is
 configured, all visible scanlines for that completed frame have also been

@@ -67,6 +67,7 @@ rigel_cycle_t       rigel_get_time(const RigelContext *ctx);
 rigel_cycle_t       rigel_get_next_deadline(const RigelContext *ctx);
 rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles);
 rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time);
+    rigel_step_result_t rigel_step_cpu_cycles(RigelContext *ctx, rigel_u64 cpu_cycles);
 ```
 
 `rigel_step_result_t` carries the current time and a bitmask of what changed

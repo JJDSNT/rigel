@@ -75,6 +75,13 @@ typedef struct rigel_serial_config {
     bool tx_instant; /* bypass baud-rate timing for immediate SERDAT TX */
 } rigel_serial_config_t;
 
+/* Conversion used by rigel_step_cpu_cycles(). A zeroed pair selects the
+ * classic Amiga default: two CPU cycles advance one colour clock (CCK). */
+typedef struct rigel_cpu_cycle_ratio {
+    rigel_u32 cpu_cycles;
+    rigel_u32 color_clocks;
+} rigel_cpu_cycle_ratio_t;
+
 typedef struct rigel_config {
     /* Optional allocator pair for freestanding hosts. Supply both or neither. */
     rigel_alloc_fn_t alloc_fn;
@@ -91,6 +98,7 @@ typedef struct rigel_config {
      * Leave at 0 for the rate matching video_std.
      */
     rigel_u32         clock_hz;
+    rigel_cpu_cycle_ratio_t cpu_cycle_ratio;
     rigel_u32         chip_ram_size;
     bool              enable_trace;
     rigel_chip_ram_if_t chip_ram;

@@ -114,7 +114,9 @@ static rigel_bus_owner_t slot_to_bus_owner(agnus_slot_owner_t slot)
  */
 enum {
     RIGEL_CLOCK_HZ_PAL  = 7093790u,
-    RIGEL_CLOCK_HZ_NTSC = 7159090u
+    RIGEL_CLOCK_HZ_NTSC = 7159090u,
+    RIGEL_DEFAULT_CPU_CYCLES = 2u,
+    RIGEL_DEFAULT_COLOR_CLOCKS = 1u
 };
 
 RigelContext *rigel_create(const rigel_config_t *config)
@@ -126,6 +128,11 @@ RigelContext *rigel_create(const rigel_config_t *config)
     }
 
     if ((config->alloc_fn == NULL) != (config->free_fn == NULL)) {
+        return NULL;
+    }
+
+    if ((config->cpu_cycle_ratio.cpu_cycles == 0u) !=
+        (config->cpu_cycle_ratio.color_clocks == 0u)) {
         return NULL;
     }
 
@@ -154,6 +161,10 @@ RigelContext *rigel_create(const rigel_config_t *config)
     }
 
     ctx->config = *config;
+    if (ctx->config.cpu_cycle_ratio.cpu_cycles == 0u) {
+        ctx->config.cpu_cycle_ratio.cpu_cycles = RIGEL_DEFAULT_CPU_CYCLES;
+        ctx->config.cpu_cycle_ratio.color_clocks = RIGEL_DEFAULT_COLOR_CLOCKS;
+    }
     rtc_set_host(&ctx->chipset.rtc, &config->rtc_host);
     rigel_reset(ctx);
     rigel_chipset_wire(ctx);
@@ -210,6 +221,7 @@ void rigel_reset(RigelContext *ctx)
     }
 
     rigel_chipset_reset(&ctx->chipset);
+    ctx->cpu_cycle_remainder = 0u;
     rigel_agnus_set_chip_rev(
         &ctx->chipset.agnus,
         ctx->config.chipset_model == RIGEL_CHIPSET_ECS ? AGNUS_REV_ECS : AGNUS_REV_OCS
@@ -441,6 +453,53 @@ rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_tim
     }
 
     return rigel_step(ctx, target_time - current);
+}
+
+rigel_step_result_t rigel_step_cpu_cycles(RigelContext *ctx, rigel_u64 cpu_cycles)
+{
+    rigel_step_result_t result = { 0u, RIGEL_EVENT_NONE };
+    rigel_u64 numerator;
+    rigel_u64 denominator;
+
+    if (ctx == NULL) {
+        return result;
+    }
+
+    numerator = ctx->config.cpu_cycle_ratio.color_clocks;
+    denominator = ctx->config.cpu_cycle_ratio.cpu_cycles;
+    result.time = rigel_get_time(ctx);
+
+    /* Convert in bounded pieces: the public delta is 64-bit, while both the
+     * multiplication and the current chipset stepping primitive have smaller
+     * practical limits. Events are accumulated across every piece. */
+    while (cpu_cycles != 0u) {
+        rigel_u64 max_input = (UINT64_MAX - ctx->cpu_cycle_remainder) / numerator;
+        rigel_u64 input = cpu_cycles < max_input ? cpu_cycles : max_input;
+        rigel_u64 scaled;
+        rigel_u64 color_clocks;
+
+        if (input == 0u) {
+            input = 1u;
+        }
+
+        scaled = input * numerator + ctx->cpu_cycle_remainder;
+        color_clocks = scaled / denominator;
+        ctx->cpu_cycle_remainder = scaled % denominator;
+        cpu_cycles -= input;
+
+        while (color_clocks != 0u) {
+            rigel_cycle_t chunk = color_clocks > UINT32_MAX
+                ? (rigel_cycle_t)UINT32_MAX
+                : (rigel_cycle_t)color_clocks;
+            rigel_step_result_t partial = rigel_step(ctx, chunk);
+
+            result.time = partial.time;
+            result.events |= partial.events;
+            color_clocks -= chunk;
+        }
+    }
+
+    return result;
 }
 
 void rigel_take_snapshot(const RigelContext *ctx, rigel_snapshot_t *snapshot)

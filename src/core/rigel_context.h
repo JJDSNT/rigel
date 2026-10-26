@@ -8,6 +8,7 @@
 struct RigelContext {
     rigel_config_t config;
     RigelChipset chipset;
+    rigel_u64 cpu_cycle_remainder;
 };
 
 rigel_chip_ram_if_t rigel_context_chip_ram(RigelContext *ctx);

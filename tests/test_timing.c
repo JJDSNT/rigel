@@ -38,6 +38,65 @@ static int check_beam_projection(rigel_video_std_t video_std)
     return 0;
 }
 
+static int check_cpu_cycle_stepping(void)
+{
+    rigel_config_t cfg = { 0 };
+    RigelContext *ctx = rigel_create(&cfg);
+    rigel_step_result_t result;
+
+    if (ctx == NULL)
+        return 1;
+
+    result = rigel_step_cpu_cycles(ctx, 1u);
+    if (result.time != 0u)
+        goto fail;
+
+    result = rigel_step_cpu_cycles(ctx, 1u);
+    if (result.time != 1u)
+        goto fail;
+
+    /* Direct CCK stepping is independent and preserves the CPU conversion
+     * phase accumulated by the convenience API. */
+    (void)rigel_step_cpu_cycles(ctx, 1u);
+    (void)rigel_step(ctx, 10u);
+    result = rigel_step_cpu_cycles(ctx, 1u);
+    if (result.time != 12u)
+        goto fail;
+
+    /* Reset clears a partial CPU-to-CCK conversion. */
+    (void)rigel_step_cpu_cycles(ctx, 1u);
+    rigel_reset(ctx);
+    result = rigel_step_cpu_cycles(ctx, 1u);
+    if (result.time != 0u)
+        goto fail;
+
+    rigel_destroy(ctx);
+
+    cfg.cpu_cycle_ratio.cpu_cycles = 3u;
+    cfg.cpu_cycle_ratio.color_clocks = 2u;
+    ctx = rigel_create(&cfg);
+    if (ctx == NULL)
+        return 1;
+
+    if (rigel_step_cpu_cycles(ctx, 1u).time != 0u ||
+        rigel_step_cpu_cycles(ctx, 1u).time != 1u ||
+        rigel_step_cpu_cycles(ctx, 1u).time != 2u) {
+        goto fail;
+    }
+
+    rigel_destroy(ctx);
+
+    cfg.cpu_cycle_ratio.color_clocks = 0u;
+    if (rigel_create(&cfg) != NULL)
+        return 1;
+
+    return 0;
+
+fail:
+    rigel_destroy(ctx);
+    return 1;
+}
+
 int main(void)
 {
     rigel_config_t cfg = { 0 };
@@ -55,7 +114,8 @@ int main(void)
     rigel_u16 hpos;
 
     if (check_beam_projection(RIGEL_VIDEO_NTSC) != 0 ||
-        check_beam_projection(RIGEL_VIDEO_PAL) != 0) {
+        check_beam_projection(RIGEL_VIDEO_PAL) != 0 ||
+        check_cpu_cycle_stepping() != 0) {
         return 1;
     }
 

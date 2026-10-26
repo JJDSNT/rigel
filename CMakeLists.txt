@@ -124,6 +124,14 @@ target_include_directories(rigel
         ${CMAKE_CURRENT_SOURCE_DIR}/src/chipset
 )
 
+include(GNUInstallDirs)
+install(TARGETS rigel
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+install(DIRECTORY include/rigel
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
 target_compile_options(rigel PRIVATE
     $<$<C_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
 )

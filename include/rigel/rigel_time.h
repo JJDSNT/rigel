@@ -21,5 +21,8 @@ rigel_cycle_t       rigel_get_next_deadline(const RigelContext *ctx);
 rigel_cycle_t       rigel_get_next_observable_deadline(const RigelContext *ctx);
 rigel_step_result_t rigel_step(RigelContext *ctx, rigel_cycle_t cycles);
 rigel_step_result_t rigel_step_until(RigelContext *ctx, rigel_cycle_t target_time);
+/* Advance from a host CPU-cycle delta using config.cpu_cycle_ratio. Fractional
+ * colour clocks are retained per context so repeated small steps do not drift. */
+rigel_step_result_t rigel_step_cpu_cycles(RigelContext *ctx, rigel_u64 cpu_cycles);
 
 #endif
